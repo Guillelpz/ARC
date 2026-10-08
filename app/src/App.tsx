@@ -123,7 +123,7 @@ export default function App() {
 
   function propose(trackerId: string, partyIds: string[]) {
     const now = nowStamp()
-    setCustom(c => ({ ...c, proposals: proposeTo(c.proposals, trackerId, partyIds, allTrackers(c.trackers), now) }))
+    setCustom(c => ({ ...c, proposals: proposeTo(c.proposals, trackerId, partyIds, allTrackers(c.trackers, c.goals), now) }))
   }
 
   const loadExample = () => setEvents(seedFor(today))
@@ -181,7 +181,7 @@ export default function App() {
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
-        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} />
+        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} />
       )}
       {screen === 'new' && (
         <UnknownView trackers={active} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />
