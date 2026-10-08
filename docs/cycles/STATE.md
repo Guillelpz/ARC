@@ -4,8 +4,8 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-- Ciclo 1 — fusionado; paso 8 (análisis).
-- Ciclo 2 (P1.1 + P1.2 + P3.1 CI, adelantada por ser independiente): paso 4 (spec).
+- Ciclo 1 — cerrado (a712108).
+- Ciclo 2 (P1.1 + P1.2 + P3.1 CI, adelantada por ser independiente): paso 5 (implementación).
 - Ciclo 3 (P3.1 + P3.3/P3.2): aprobado; P3.1 puede ir en paralelo al ciclo 2.
 
 ## Decisiones del usuario (2026-10-08)
