@@ -7,7 +7,7 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
 - Ciclo 3 — cerrado.
-- Ciclo 4 (P4.1 + P4.2) — fusionado; paso 8 (análisis).
+- Ciclo 4 — cerrado.
 - Ciclo 5 (P4.4) — paso 4 (spec). Después P4.3 y P4.5 (aprobadas).
 
 ## Decisiones del usuario (2026-10-08)

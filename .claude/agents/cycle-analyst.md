@@ -23,6 +23,7 @@ Cierras el ciclo N después del merge. Respondes en español.
    - Deuda nueva: hallazgos `menor` sin corregir y `ponytail:` nuevos.
    - Fricción del proceso: qué paso del workflow costó más o falló (para ajustar agentes).
    - Huecos o riesgos que el siguiente ciclo debería considerar (entrada para el product-strategist).
-3. Commit en `main`: `docs: cierre ciclo N`, con el trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
+3. **`CLAUDE.md` y `AGENTS.md`:** corrige solo las líneas de arquitectura/fechas/persistencia que el ciclo haya dejado falsas (verifícalo con Grep antes). No toques reglas ni restricciones.
+4. Commit en `main`: `docs: cierre ciclo N`, con el trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
 Devuelve **solo**: 3-5 líneas de resumen para el usuario (qué cambió en la app y qué deuda queda).

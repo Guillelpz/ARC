@@ -22,14 +22,14 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
 
 - **`ActivityEvent[]` es la única fuente de verdad.** Stats, XP, niveles, ranking y criterios de party se derivan en cada render (`useMemo` en `App.tsx`); nunca se guardan derivados. Las correcciones son eventos con `amount` negativo.
 - `app/src/core/` es TypeScript puro, sin React:
-  - `stats.ts` — semanas lun–dom sobre strings `YYYY-MM-DD` (comparación lexicográfica, rangos `[start, end)`); compara la semana en curso hasta hoy con el mismo tramo de la anterior.
+  - `stats.ts` — semanas lun–dom sobre strings `YYYY-MM-DD` (comparación lexicográfica, rangos `[start, end)`); compara la semana en curso hasta hoy con el mismo tramo de la anterior. `dayTotal`/`clampAmount` (el «−» no baja de 0 en el día elegido) e `history` (últimos registros; `undoes?` en `ActivityEvent` enlaza un deshacer con su registro).
   - `rpg.ts` — `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps()` compara dos `GameState` para el toast.
   - `party.ts` — parties y amigos hardcodeados (`PARTIES`); votación simulada por `stance` de rama (mayoría estricta); cada party deriva su propio `GameState` solo con sus criterios aceptados.
   - `classify.ts` — `classifyAI()` llama a Claude Haiku vía el proxy de Vite `/api/claude` (key en `app/.env.local` como `ANTHROPIC_API_KEY`); ante cualquier fallo usa `classify()`, la heurística determinista por palabras clave que comprueba el selfcheck.
   - `trackers.ts` (trackers fijos + custom), `seed.ts` (`seedFor(today)` desplaza los 28 eventos de ejemplo por semanas; `DEMO_DATE` solo fija la fecha del selfcheck), `types.ts`.
   - `storage.ts` — única capa de persistencia: localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (trackers custom + propuestas), con validación; clave ausente → vacío, clave corrupta → backup `<clave>.backup.<stamp>` + aviso. Exportar/importar copia en JSON (`life-rpg-meta-v1` guarda la fecha de la última exportación); antes de importar o «Borrar todo», `backupCurrent` copia de forma atómica a `.backup.last` (rotando a `.backup.prev`). `requestPersist()` se pide al exportar.
 - `App.tsx` tiene todo el estado y la navegación por `screen` (`home | hero | villain | new | party`), sin router. Los componentes de `src/components/` son presentacionales y reciben callbacks.
-- Fechas: fecha local real (`localDate` en `stats.ts`; `nowStamp` en `App.tsx`). Usuario nuevo arranca vacío con «Cargar ejemplo».
+- Fechas: fecha local real (`localDate` en `stats.ts`; `nowStamp(day?)` en `App.tsx`); cada pantalla de misiones tiene selector de día (sin futuro). Usuario nuevo arranca vacío con «Cargar ejemplo».
 
 ## Restricciones
 
