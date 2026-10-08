@@ -80,11 +80,13 @@ export default function App() {
   }
 
   // amount < 0 = corrección (evento negativo); no deja el día por debajo de 0
-  function add(t: Tracker, amount: number, day = today) {
+  // undo = registro positivo que se anula entero
+  function add(t: Tracker, amount: number, day = today, undo?: ActivityEvent) {
     if (day > today) day = today
     amount = clampAmount(events, t.id, day, amount)
-    if (!amount) return
-    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount, occurredAt: nowStamp(day) }
+    if (!amount || (undo && amount !== -undo.amount)) return
+    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,
+      occurredAt: undo ? undo.occurredAt : nowStamp(day), ...(undo && { undoes: undo.id }) }
     const next = [...events, ev]
     const after = deriveGame(next, today, trackers)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
@@ -105,6 +107,8 @@ export default function App() {
       if (lost) { setOvertake(lost); break }
     }
   }
+
+  const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
 
@@ -155,7 +159,7 @@ export default function App() {
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
-        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} />
+        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} />
       )}
       {screen === 'new' && (
         <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />
