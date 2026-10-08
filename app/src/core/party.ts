@@ -1,5 +1,6 @@
 import type { ActivityEvent, Branch, GameState, Party, PartyMember, PartyState, Proposal, RankMetric, Tracker, VoteResult } from './types'
 import { deriveGame, weeklyXp } from './rpg'
+import { daysLeftInWeek } from './stats'
 
 export const PARTIES: Party[] = [
   { id: 'los-del-gym', name: 'Los del Gym', seedCriteria: ['gym', 'bjj', 'running', 'reading', 'beer', 'burgers'], members: [
@@ -50,14 +51,21 @@ export function proposeTo(proposals: Proposal[], trackerId: string, partyIds: st
 export const rankScore = (m: PartyMember, metric: RankMetric): number =>
   metric === 'hero' ? m.weeklyHeroXp : metric === 'villain' ? m.weeklyVillainXp : m.weeklyHeroXp + m.weeklyVillainXp
 
-export function buildRanking(game: GameState, members: PartyMember[] = PARTIES[0].members, metric: RankMetric = 'hero'): PartyMember[] {
+// ponytail: amigos simulados a ritmo lineal (semanal × días transcurridos / 7; lun 1/7 … dom 7/7).
+// Se sustituye por su XP semanal real cuando haya PARTY real (P3.5).
+const paced = (m: PartyMember, today: string): PartyMember => {
+  const d = 8 - daysLeftInWeek(today)
+  return { ...m, weeklyHeroXp: Math.round(m.weeklyHeroXp * d / 7), weeklyVillainXp: Math.round(m.weeklyVillainXp * d / 7) }
+}
+
+export function buildRanking(game: GameState, members: PartyMember[], metric: RankMetric, today: string): PartyMember[] {
   const you: PartyMember = {
     id: 'you', name: 'Tú', isYou: true,
     playerLevel: game.player.level, heroLevel: game.hero.level, villainLevel: game.villain.level,
     weeklyHeroXp: game.weeklyHeroXp, weeklyVillainXp: weeklyXp(game, 'villain'),
   }
   // usuario primero: sort estable => gana empates
-  return [you, ...members].sort((a, b) => rankScore(b, metric) - rankScore(a, metric))
+  return [you, ...members.map(m => paced(m, today))].sort((a, b) => rankScore(b, metric) - rankScore(a, metric))
 }
 
 export function derivePartyState(party: Party, events: ActivityEvent[], today: string, trackers: Tracker[], proposals: Proposal[]): PartyState {
@@ -69,7 +77,7 @@ export function derivePartyState(party: Party, events: ActivityEvent[], today: s
     const result = vote(tracker.branch, party)
     return result.accepted ? [] : [{ tracker, result }]
   })
-  const ranking = buildRanking(game, party.members)
+  const ranking = buildRanking(game, party.members, 'hero', today)
   return { party, game, criteria, rejected, ranking, position: ranking.findIndex(r => r.isYou) + 1 }
 }
 

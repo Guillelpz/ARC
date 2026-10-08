@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, type LucideIcon } from 'lucide-react'
-import type { HistoryRow, Tracker, TrackerStats } from '../core/types'
+import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, Users, type LucideIcon } from 'lucide-react'
+import type { HistoryRow, Party, Tracker, TrackerStats, VoteResult } from '../core/types'
 import { defaultGoal } from '../core/trackers'
 import { editTracker, isValidName } from '../core/classify'
 import { dayLabel } from '../core/stats'
@@ -17,12 +17,12 @@ const THEME = {
   hero: {
     card: 'border-hero-border bg-hero-surface text-hero-text',
     accent: 'text-hero', muted: 'text-hero-muted', chip: 'border-hero-border text-hero-muted',
-    button: 'bg-hero text-hero-on-accent hover:bg-hero/90 outline-hero',
+    button: 'bg-hero text-hero-on-accent hover:bg-hero/90 outline-hero', check: 'accent-hero',
   },
   villain: {
     card: 'border-villain-border bg-villain-surface text-villain-text',
     accent: 'text-villain', muted: 'text-villain-muted', chip: 'border-villain-border text-villain-muted',
-    button: 'bg-villain text-villain-on-accent hover:bg-villain/90 outline-villain',
+    button: 'bg-villain text-villain-on-accent hover:bg-villain/90 outline-villain', check: 'accent-villain scheme-dark',
   },
 }
 
@@ -30,9 +30,9 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0')
 // km/min se añaden a la diferencia; sesiones/clases/unidades no
 const withUnit = (n: string, unit: string) => (unit === 'km' || unit === 'min' ? `${n} ${unit}` : n)
 
-type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; today: string; history: HistoryRow[]; onUndo: (e: HistoryRow['event']) => void; onAdd: (amount: number) => void; countsIn: string[]; onSave?: (t: Tracker) => void; nameTaken?: (name: string) => boolean }
+type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; today: string; history: HistoryRow[]; onUndo: (e: HistoryRow['event']) => void; onAdd: (amount: number) => void; countsIn: string[]; onSave?: (t: Tracker) => void; nameTaken?: (name: string) => boolean; proposable?: Party[]; proposals?: { party: string; result: VoteResult }[]; onPropose?: (partyIds: string[]) => void }
 
-export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, onUndo, onAdd, countsIn, onSave, nameTaken }: Props) {
+export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, onUndo, onAdd, countsIn, onSave, nameTaken, proposable, proposals, onPropose }: Props) {
   const { tracker: t, week, diff, allTime, goalPct, xp } = stats
   const Icon = ICONS[t.id] ?? Sparkles
   const c = THEME[t.branch]
@@ -41,6 +41,8 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
   const n = Math.round(Number(qty))
   const valid = Number.isFinite(n) && n > 0
   const [editing, setEditing] = useState(false)
+  const [proposing, setProposing] = useState(false)
+  const [picked, setPicked] = useState<string[]>([])
   const [eName, setEName] = useState(t.name)
   const [eInc, setEInc] = useState(String(t.increment))
   const [eGoal, setEGoal] = useState(t.weeklyGoal ? String(t.weeklyGoal) : '')
@@ -49,7 +51,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
   const goalOk = eGoal.trim() === '' || Math.round(Number(eGoal)) >= 1
   const canSave = fixed ? goalOk : !nameErr && incOk && goalOk
   const field = `min-h-11 w-full rounded-lg border bg-transparent px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`
-  const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setEditing(true) }
+  const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setProposing(false); setEditing(true) }
   const save = () => {
     if (fixed) { onSave?.({ ...t, weeklyGoal: eGoal.trim() === '' ? undefined : Number(eGoal) }); setEditing(false); return }
     const next = editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal) })
@@ -103,6 +105,9 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
         <span>Histórico: {allTime} {t.unit}</span>
         {t.custom && allTime === 0 && <span>Registra tu primera vez</span>}
         <span>Cuenta en: {countsIn.join(' · ') || 'ninguna party'}</span>
+        {proposals && <div aria-live="polite" className="flex flex-col">
+          {proposals.map(p => <span key={p.party}>{p.result.accepted ? 'Aceptada' : 'Rechazada'} en {p.party} · {p.result.yes}/{p.result.total}</span>)}
+        </div>}
       </div>
 
       {editing ? (
@@ -136,8 +141,27 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
             </button>
           </div>}
         </div>
+      ) : proposing ? (
+        <div className="flex flex-col gap-3">
+          <fieldset className="flex flex-col">
+            <legend className="text-xs font-medium">¿A qué parties la propones?</legend>
+            {proposable?.map(p => (
+              <label key={p.id} className="flex min-h-11 items-center gap-3 text-sm">
+                <input type="checkbox" className={`size-5 ${c.check}`} checked={picked.includes(p.id)}
+                  onChange={e => setPicked(e.target.checked ? [...picked, p.id] : picked.filter(x => x !== p.id))} />
+                {p.name}
+              </label>
+            ))}
+          </fieldset>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setProposing(false)}
+              className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>Cancelar</button>
+            <button type="button" disabled={!picked.length} onClick={() => { onPropose?.(picked); setProposing(false) }}
+              className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 ${c.button}`}>Proponer</button>
+          </div>
+        </div>
       ) : (
-      <div className="relative">
+      <div className="relative flex flex-col gap-3">
         <div className="flex gap-2">
           <button
             type="button"
@@ -167,6 +191,12 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
             {valid ? `+${n} ${t.unit}${dayNote ? ` · ${dayNote}` : ''}` : t.buttonLabel}
           </button>
         </div>
+        {proposable && proposable.length > 0 && (
+          <button type="button" onClick={() => { setPicked([]); setProposing(true) }} aria-label={`Proponer ${t.name} a una party`}
+            className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
+            <Users className="size-4" aria-hidden /> Proponer a party
+          </button>
+        )}
         {gain?.trackerId === t.id && (
           <span key={gain.key} className={`float-xp -top-6 right-2 text-sm font-semibold tabular-nums ${c.accent}`}>
             {signed(gain.xp)} {gain.branch.toUpperCase()} XP

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Search } from 'lucide-react'
 import type { ActivityEvent, Branch, GameState, PartyState, Tracker } from '../core/types'
-import { countsIn } from '../core/party'
+import { countsIn, vote } from '../core/party'
 import { addDays, byRecent, dayLabel, dayTotal, history } from '../core/stats'
 import { isDuplicateName, normalizeText } from '../core/classify'
 import { ProgressBar } from './ProgressBar'
@@ -17,9 +17,10 @@ type Props = {
   onAdd: (t: Tracker, amount: number, day: string) => void
   onUndo: (t: Tracker, e: ActivityEvent) => void
   onSave: (t: Tracker) => void
+  onPropose: (trackerId: string, partyIds: string[]) => void
 }
 
-export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd, onUndo, onSave }: Props) {
+export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd, onUndo, onSave, onPropose }: Props) {
   const hero = branch === 'hero'
   const name = hero ? 'HERO' : 'VILLAIN'
   const info = game[branch]
@@ -37,6 +38,12 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
     : { ring: 'outline-villain', box: 'border-villain-border bg-villain-surface', opt: 'text-villain-muted', on: 'bg-villain text-villain-on-accent font-semibold', scheme: 'scheme-dark' }
   const optCls = (active: boolean) => `min-h-11 rounded-md text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${SEG.ring} ${active ? SEG.on : `font-medium ${SEG.opt}`}`
   const muted = hero ? 'text-hero-muted' : 'text-villain-muted'
+  const has = (s: PartyState, id: string) => s.criteria.some(c => c.id === id)
+  const isRejected = (s: PartyState, id: string) => s.rejected.some(r => r.tracker.id === id)
+  const proposable = (t: Tracker) => partyStates.filter(s => !has(s, t.id) && !isRejected(s, t.id)).map(s => s.party)
+  const proposals = (t: Tracker) => partyStates.flatMap(s =>
+    has(s, t.id) ? [{ party: s.party.name, result: vote(t.branch, s.party) }]
+    : s.rejected.filter(r => r.tracker.id === t.id).map(r => ({ party: s.party.name, result: r.result })))
   return (
     <div className={`min-h-dvh ${hero ? 'bg-hero-bg text-hero-text' : 'bg-villain-bg text-villain-text'}`}>
       <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pt-6 pb-28 sm:max-w-2xl lg:max-w-4xl">
@@ -74,6 +81,9 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
             <div key={s.tracker.id} className="rise" style={{ animationDelay: `${i * 60}ms` }}>
             <TrackerCard stats={s} gain={gain} today={today} history={history(events, s.tracker.id)} onUndo={e => onUndo(s.tracker, e)} dayTotal={dayTotal(events, s.tracker.id, day)} dayNote={day === today ? undefined : dayLabel(day, today).toLowerCase()} onAdd={n => onAdd(s.tracker, n, day)}
               countsIn={countsIn(s.tracker.id, partyStates)}
+              proposable={s.tracker.custom ? proposable(s.tracker) : undefined}
+              proposals={s.tracker.custom ? proposals(s.tracker) : undefined}
+              onPropose={s.tracker.custom ? ids => onPropose(s.tracker.id, ids) : undefined}
               onSave={s.tracker.custom || s.tracker.weeklyGoal ? onSave : undefined}
               nameTaken={n => isDuplicateName(n, game.trackers.map(x => x.tracker).filter(x => x.id !== s.tracker.id))} />
             </div>
