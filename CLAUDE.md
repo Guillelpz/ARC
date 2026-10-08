@@ -9,7 +9,7 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
 - `npm run dev` — Vite dev server. En DEV, `main.tsx` ejecuta `runSelfCheck()` (`src/core/selfcheck.ts`): los fallos salen como `console.assert` en la consola del navegador y termina con `[selfcheck] done`.
 - `npm run build` — `tsc -b && vite build` (es también el type-check).
 - `npm run lint` — oxlint (`.oxlintrc.json`).
-- `npm test` — Vitest: ejecuta `selfcheck.ts` (falla si algún `console.assert` es falso) y los tests de `core/`.
+- `npm test` — Vitest: ejecuta `selfcheck.ts` (falla si algún `console.assert` es falso) los tests de `core/` y los de UI (`src/App.test.tsx`, Testing Library + happy-dom).
 - `selfcheck.ts` es el oráculo de dominio (TECH_SPEC §5/§10 y §4.6 de V2): si falla, se arregla el motor, nunca los asserts. Para cambios de código, pasar `build`, `lint` y `test`; si cambia `core/`, revisar los asserts afectados.
 
 ## Documentos
@@ -27,7 +27,7 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
   - `party.ts` — parties y amigos hardcodeados (`PARTIES`); votación simulada por `stance` de rama (mayoría estricta); cada party deriva su propio `GameState` solo con sus criterios aceptados.
   - `classify.ts` — `classifyAI()` llama a Claude Haiku vía el proxy de Vite `/api/claude` (key en `app/.env.local` como `ANTHROPIC_API_KEY`); ante cualquier fallo usa `classify()`, la heurística determinista por palabras clave que comprueba el selfcheck.
   - `trackers.ts` (trackers fijos + custom), `seed.ts` (`seedFor(today)` desplaza los 28 eventos de ejemplo por semanas; `DEMO_DATE` solo fija la fecha del selfcheck), `types.ts`.
-  - `storage.ts` — única capa de persistencia: localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (trackers custom + propuestas), con validación; clave ausente → vacío, clave corrupta → backup `<clave>.backup.<stamp>` + aviso. Exportar/importar copia en JSON (`life-rpg-meta-v1` guarda la fecha de la última exportación); antes de importar o «Borrar todo», `backupCurrent` copia de forma atómica a `.backup.last` (rotando a `.backup.prev`); `restoreLast` restaura `.backup.last` intercambiándola con el estado actual (botón «Recuperar copia anterior»). `requestPersist()` se pide al exportar.
+  - `storage.ts` — única capa de persistencia: localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (trackers custom + propuestas), con validación (incl. `weeklyGoal`/`archived` de trackers custom); clave ausente → vacío, clave corrupta → backup `<clave>.backup.<stamp>` + aviso. Exportar/importar copia en JSON (`life-rpg-meta-v1` guarda la fecha de la última exportación); antes de importar o «Borrar todo», `backupCurrent` copia de forma atómica a `.backup.last` (rotando a `.backup.prev`); `restoreLast` restaura `.backup.last` intercambiándola con el estado actual (botón «Recuperar copia anterior»). `requestPersist()` se pide al exportar.
 - `App.tsx` tiene todo el estado y la navegación por `screen` (`home | hero | villain | new | party`), sin router. Los componentes de `src/components/` son presentacionales y reciben callbacks.
 - Fechas: fecha local real (`localDate` en `stats.ts`; `nowStamp(day?)` en `App.tsx`); cada pantalla de misiones tiene selector de día (sin futuro). Usuario nuevo arranca vacío con «Cargar ejemplo».
 

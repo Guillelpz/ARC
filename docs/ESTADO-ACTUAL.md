@@ -18,6 +18,7 @@ App web (móvil primero) que convierte actividades de la vida real en un persona
 |---|---|
 | Inicio (`home`) | Nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, estado vacío de bienvenida para usuario nuevo, bloque «Tus datos» (estado de la última copia y aviso si pasan 14 días con datos), «Cargar ejemplo» / «Borrar todo» (con confirmación; «Borrar todo» ofrece exportar antes), «Exportar copia» / «Importar copia» (JSON, con confirmación), «Recuperar copia anterior» (intercambia el estado actual con `.backup.last`; repetirlo deshace) y aviso si al cargar se perdieron o descartaron datos. |
 | HERO / VILLAIN (`hero`, `villain`) | Tarjetas de actividad: registro con incremento fijo, selector de día («Hoy», «Ayer» o fecha pasada) para registrar y corregir, corrección (evento negativo, limitada al total de ese día), «Últimos registros» (10 más recientes) con «Deshacer», semana actual vs. mismo tramo de la anterior, objetivo semanal, XP y nivel por actividad, en qué parties cuenta. |
+| Actividades propias | En su tarjeta (HERO/VILLAIN) se pueden editar nombre, incremento y objetivo semanal (solo HERO) y archivar; no se cambia rama, tipo, unidad ni XP/unidad. Las archivadas se ocultan de las tarjetas, pero su XP, histórico y parties siguen contando; se reactivan desde Inicio. |
 | Nuevo (`new`) | Crear actividad propia: texto libre → clasificación (Claude Haiku o heurística local) → el usuario confirma rama, tipo, unidad y XP/unidad. Detecta actividades parecidas ya existentes. Permite proponerla a parties. |
 | Party (`party`) | Dos parties fijas (*Los del Gym*, *La Oficina*), criterios aceptados/rechazados, ranking semanal (HERO, VILLAIN, profundidad) y nivel del usuario calculado solo con los criterios de esa party. |
 
@@ -27,7 +28,7 @@ Feedback: toast de level-up / level-down, XP flotante, aviso de adelantamientos 
 
 React 19 + TypeScript 6 + Vite 8 + Tailwind CSS v4 (sin config, tokens en `@theme` de `src/index.css`) + lucide-react. Lint con oxlint. Versiones exactas en `app/package.json`.
 
-Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `selfcheck.ts` más tests de las funciones puras de `storage.ts` (incl. restauración). CI en GitHub Actions (`.github/workflows/ci.yml`: lint, build y test en cada push/PR).
+Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `selfcheck.ts`, tests de las funciones puras de `storage.ts` (incl. restauración) y `src/App.test.tsx` (Testing Library + happy-dom sobre `<App />` real: registrar, día pasado, corrección, deshacer, editar/archivar, exportar/importar/borrar/recuperar). Solo devDependencies. CI en GitHub Actions (`.github/workflows/ci.yml`: lint, build y test en cada push/PR).
 
 ## 4. Arquitectura
 
@@ -41,7 +42,7 @@ Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `s
 | `stats.ts` | Semanas lun–dom sobre strings `YYYY-MM-DD`, rangos `[start, end)` lexicográficos. `localDate(Date)` da la fecha local real. `dayTotal`, `clampAmount` (la corrección no baja el día de 0), `history()` (últimos registros con `undone`/`canUndo`) y `dayLabel`. |
 | `rpg.ts` | `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps/Downs()`. |
 | `party.ts` | `PARTIES` hardcodeadas; votación simulada por `stance` (mayoría estricta); estado por party con su propio `deriveGame`. |
-| `classify.ts` | `classifyAI()` (Claude Haiku vía proxy) con fallback a `classify()` (palabras clave). `findSimilar()` (prefijo + Levenshtein). |
+| `classify.ts` | `classifyAI()` (Claude Haiku vía proxy) con fallback a `classify()` (palabras clave). `editTracker()` edita nombre/incremento/objetivo de una custom sin tocar `xpPerUnit`. `findSimilar()` (prefijo + Levenshtein). |
 | `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents` (repara un `undoes` inválido conservando el evento)/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar, `restoreLast` (intercambio atómico con `.backup.last`) y helper privado `writeAll`. |
 | `seed.ts` | `seedFor(today)`: 28 eventos de ejemplo relativos a semanas enteras respecto a `today`. `DEMO_DATE` y `SEED_EVENTS` solo los usan selfcheck y tests. |
 | `selfcheck.ts` | Asserts de dominio, se ejecutan en DEV al arrancar y en `npm test`. |
@@ -63,10 +64,10 @@ Cosas que funcionan pero son atajos de hackathon. Ninguna está decidida; cada u
 | Persistencia | Solo localStorage del navegador, con exportar/importar manual. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador (persist es solo petición); recordatorio fijo de 14 días, sin copias automáticas, UI para restaurar solo `.backup.last` (el resto, manual en DevTools; backups con sello sin purgar) ni migraciones de esquema. |
 | IA | Proxy de Vite solo en local; sin reintentos, caché ni límite de uso. | Necesita un endpoint de servidor para funcionar desplegada. |
 | Progresión | Umbrales lineales y XP/unidad fijos; sin límite de registros por día; solo la corrección se limita al total del día. | Balance de juego sin validar con usuarios. |
-| Calidad | `npm test` (Vitest) solo cubre selfcheck y funciones puras de storage; sin tests de componentes ni e2e. CI ya existe (ciclo 2). | Añadir cobertura de UI si el proyecto crece. |
+| Calidad | `npm test` cubre selfcheck, storage y los flujos críticos de UI (`App.test.tsx`, ciclo 6); sin e2e en navegador real. CI ya existe (ciclo 2). | Ampliar `App.test.tsx` al añadir flujos; los tests dependen de textos de la UI. |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Revisar cuando se quiten los atajos anteriores. |
 
-Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas)).
+Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `App.tsx` (`UnknownView` solo ve las activas: se puede crear una misión con el nombre de una archivada) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas)).
 
 ## 6. Cómo trabajar
 
@@ -75,7 +76,7 @@ Desde `app/`:
 - `npm run dev` — servidor de desarrollo; en la consola del navegador aparece `[selfcheck] done` (los fallos salen como `console.assert`).
 - `npm run build` — `tsc -b && vite build` (también es el type-check).
 - `npm run lint` — oxlint.
-- `npm test` — Vitest (`vitest run`): selfcheck + tests de `storage.ts`.
+- `npm test` — Vitest (`vitest run`): selfcheck + tests de `storage.ts` + tests de UI (`App.test.tsx`, happy-dom).
 - IA opcional: crear `app/.env.local` con `ANTHROPIC_API_KEY=...`.
 
 Regla: `selfcheck.ts` es el oráculo del dominio; si falla, se arregla el motor, no los asserts (salvo cambio de reglas decidido explícitamente).
