@@ -150,6 +150,22 @@ test('U11 hoy', () => {
   expect(screen.getByRole('heading', { name: 'Misiones HERO' })).toBeTruthy()
 })
 
+const streakEvents = () => {
+  const wk = (mon: string, n: number) => Array.from({ length: n }, (_, i) => {
+    const d = new Date(mon + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + i)
+    return { id: `${mon}-${i}`, trackerId: 'gym', amount: 1, occurredAt: `${d.toISOString().slice(0, 10)}T10:00:00` }
+  })
+  localStorage.setItem(EV, JSON.stringify([...wk('2026-09-21', 4), ...wk('2026-09-28', 4), ...wk('2026-10-05', 2)]))
+}
+
+test('U12 racha', () => {
+  streakEvents(); render(<App />); go('HERO')
+  expect(card('Gym').getByText('Racha: 2 semanas')).toBeTruthy()
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  expect(card('Gym').getByText('Racha: 3 semanas')).toBeTruthy()
+})
+
 test('U10 archivar y reactivar', () => {
   preload(); render(<App />); go('HERO')
   const xp = heroXp()

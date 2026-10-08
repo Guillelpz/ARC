@@ -41,6 +41,7 @@ export type TrackerStats = {
   diff: number
   allTime: number
   goalPct: number | null
+  streak: number // semanas seguidas con objetivo cumplido; 0 si no hay objetivo
   xp: LevelInfo
 }
 

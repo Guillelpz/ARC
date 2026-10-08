@@ -1,7 +1,7 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, TRACKERS } from './trackers'
-import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, todaySummary, undoneIds } from './stats'
+import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, undoneIds } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -182,8 +182,22 @@ export function runSelfCheck() {
   ok(!undoneIds(rp).has('h1') && !history(rp, 'running').find(r => r.event.id === 'h1')!.undone, 'R1 positivo con undoes no anula')
   ok(undoneIds(hu).has('h1'), 'R2 deshecho ya anulado')
 
-  // H1–H4 — resumen de hoy
+  // S1–S6 — racha semanal
   const ev = (trackerId: string, amount: number, day: string, id = `${trackerId}-${day}`): ActivityEvent => ({ id, trackerId, amount, occurredAt: `${day}T10:00:00` })
+  let wid = 0
+  const wk = (mon: string, n: number, id = 'gym') => Array.from({ length: n }, (_, i) => ev(id, 1, addDays(mon, i), `wk${++wid}`))
+  const G = TRACKERS[0], st = (e: ActivityEvent[], t: Tracker = G) => streak(e, t, DEMO_DATE)
+  ok(st(SEED_EVENTS) === 0 && st(SEED_EVENTS, TRACKERS[4]) === 0, 'S1 racha: semilla y sin objetivo')
+  const s2 = [...wk('2026-09-21', 4), ...wk('2026-09-28', 4), ...wk('2026-10-05', 2)]
+  ok(st(s2) === 2 && st([...s2, ...wk('2026-10-05', 3)]) === 3, 'S2 racha: semana en curso suma')
+  const s3 = [...wk('2026-09-14', 4), ...wk('2026-09-21', 3), ...wk('2026-09-28', 4)]
+  ok(st(s3) === 1, 'S3 racha rota')
+  ok(st([...s3, ev('gym', 1, '2026-09-26', 'wk-fix')]) === 3, 'S4 un día pasado recompone')
+  ok(st(s3, { ...G, weeklyGoal: 3 }) === 3, 'S5 objetivo actual retroactivo')
+  const s6 = wk('2026-09-28', 4)
+  ok(st(s6) === 1 && get(deriveGame(s6, DEMO_DATE), 'gym').streak === 1, 'S6 corte en el primer evento')
+
+  // H1–H4 — resumen de hoy
   const hv = [ev('gym', 1, DEMO_DATE), ev('beer', 1, DEMO_DATE), ev('running', 5, '2026-10-06')]
   const hs = todaySummary(hv, deriveGame(hv, DEMO_DATE).trackers, DEMO_DATE)
   ok(hs.xp.hero === 30 && hs.xp.villain === 15 && hs.done.map(d => d.tracker.id).join() === 'gym,beer', 'H1 hoy: XP y registrado')

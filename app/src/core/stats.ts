@@ -48,6 +48,23 @@ export const dayLabel = (day: string, today: string) =>
   day === today ? 'Hoy' : day === addDays(today, -1) ? 'Ayer'
     : new Date(day + 'T00:00:00Z').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 
+// ponytail: usa el weeklyGoal actual también para semanas pasadas (si baja el objetivo, la racha
+// crece hacia atrás); guardar el histórico de objetivos si importa. O(semanas · eventos del tracker).
+export function streak(events: ActivityEvent[], t: Tracker, today: string): number {
+  const goal = t.weeklyGoal
+  if (!goal) return 0
+  const own = events.filter(e => e.trackerId === t.id)
+  if (!own.length) return 0
+  const first = mondayOf(own.reduce((m, e) => (e.occurredAt < m ? e.occurredAt : m), own[0].occurredAt).slice(0, 10))
+  const cur = mondayOf(today)
+  let n = total(own, t.id, cur, addDays(today, 1)) >= goal ? 1 : 0 // la semana en curso suma, no rompe
+  for (let w = addDays(cur, -7); w >= first; w = addDays(w, -7)) {
+    if (total(own, t.id, w, addDays(w, 7)) < goal) break
+    n++
+  }
+  return n
+}
+
 export function trackerStats(t: Tracker, events: ActivityEvent[], today: string) {
   const thisStart = mondayOf(today)
   const thisEnd = addDays(today, 1) // exclusivo
@@ -57,6 +74,7 @@ export function trackerStats(t: Tracker, events: ActivityEvent[], today: string)
   return {
     week, prev, diff: week - prev, allTime,
     goalPct: t.weeklyGoal ? (week / t.weeklyGoal) * 100 : null,
+    streak: streak(events, t, today),
   }
 }
 

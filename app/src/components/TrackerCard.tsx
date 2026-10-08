@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Archive, BookOpen, Beer, Check, Dumbbell, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, type LucideIcon } from 'lucide-react'
+import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, type LucideIcon } from 'lucide-react'
 import type { HistoryRow, Tracker, TrackerStats } from '../core/types'
 import { editTracker, isValidName } from '../core/classify'
 import { dayLabel } from '../core/stats'
@@ -85,6 +85,11 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
         {goalPct !== null && goalPct >= 100 && (
           <span className={`pop ml-2 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 align-middle text-xs font-medium ${c.chip}`}>
             <Check className="size-4" aria-hidden /> Objetivo cumplido
+          </span>
+        )}
+        {stats.streak >= 1 && (
+          <span key={stats.streak} className={`pop ml-2 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 align-middle text-xs font-medium ${c.chip}`}>
+            <Flame className="size-4" aria-hidden /> Racha: {stats.streak} {stats.streak === 1 ? 'semana' : 'semanas'}
           </span>
         )}
       </div>
