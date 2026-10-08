@@ -11,7 +11,7 @@ Una ficha de personaje RPG sobria y contemporánea: datos legibles, jerarquía c
 - Formatos: `Lv. 3`, `120 XP`, `+15 VILLAIN XP`, `3 / 4 sesiones esta semana`, `Aceptada 2/3`, `Rechazada 1/3`, `Cuenta en: Los del Gym · La Oficina`. Separador: ` · `.
 - Tono: directo, breve, sereno, en segunda persona. Sin exclamaciones en cadena ni bromas. La IA **propone**, no juzga: `La IA propone: VILLAIN`, nunca «mal hábito».
 - HERO/VILLAIN son ramas, no valoraciones. Sin verde/rojo; los votos se expresan con ✓/✕ más texto.
-- Botones con verbo en infinitivo: `Analizar con IA`, `Crear misión`, `Proponer`, `Ahora no`, `Volver`, `Añadir otra`, `Restablecer demo`.
+- Botones con verbo en infinitivo: `Analizar con IA`, `Crear misión`, `Proponer`, `Ahora no`, `Volver`, `Añadir otra`, `Borrar todo`.
 
 ## Color tokens
 Pegar en `app/src/index.css` (sustituye el `@theme` de V1):
@@ -93,7 +93,7 @@ Fuente del sistema (sans). Sin `font-black` ni `tracking-[0.3em]` (V1): usar la 
 - Solo `lucide-react`, trazo por defecto. `size-4` junto a texto, `size-5` en controles independientes y navegación. Siempre acompañan a una etiqueta; si un control es solo icono, lleva `aria-label`.
 - Navegación: `House` Inicio, `Shield` HERO, `Moon` VILLAIN, `Sparkles` Nuevo, `Users` Party.
 - Trackers: los de V1 (`Dumbbell`, `Swords`, `Footprints`, `BookOpen`, `Beer`, `Sandwich`); personalizados `Sparkles`.
-- Otros: `Check` / `X` en votos, `CircleAlert` en avisos, `ChevronRight` en filas navegables, `RotateCcw` en «Restablecer demo».
+- Otros: `Check` / `X` en votos, `CircleAlert` en avisos, `ChevronRight` en filas navegables, `Trash2` en «Borrar todo».
 
 ## Buttons
 Base común (todas las variantes):
@@ -106,7 +106,7 @@ Base común (todas las variantes):
 | Principal VILLAIN | Igual en VILLAIN | `bg-villain text-villain-on-accent hover:bg-villain/90 active:scale-[0.98] motion-reduce:transform-none` |
 | Principal neutral | `Analizar con IA`, `Proponer` | `bg-app-text text-app-surface hover:bg-app-text/90 active:scale-[0.98] motion-reduce:transform-none` |
 | Secundario | `Volver`, `Ahora no`, `Añadir algo nuevo`, `Añadir otra` | `border border-{ctx}-border bg-transparent text-{ctx}-text hover:bg-{ctx}-surface` (en neutral: `hover:bg-app-surface`) |
-| Discreto | `Restablecer demo` | `min-h-11 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text` |
+| Discreto | `Borrar todo` | `min-h-11 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text` |
 | Segmento | Selector de party, rama, tipo | Contenedor `grid grid-flow-col auto-cols-fr gap-1 rounded-lg border border-app-border bg-app-surface p-1`; opción `min-h-11 rounded-md text-sm font-medium text-app-muted`; activa `bg-app-text text-app-surface font-semibold` + `aria-pressed="true"` |
 
 - `/90` en hover solo opaca el acento sobre su propio fondo; no mezcla paletas.
@@ -127,7 +127,7 @@ Barra inferior fija, neutral, 5 destinos: `Inicio`, `HERO`, `VILLAIN`, `Nuevo`, 
 - Barras (`ProgressBar`): pista `h-2` (`h-1` en variante fina) `rounded-full` con `bg-{ctx}-track`; relleno sólido `bg-hero` / `bg-villain` / `bg-app-text`; `transition-[width] duration-500`. Siempre con valor textual cerca y `role="progressbar"` + `aria-valuenow`/`aria-label`.
 - Diferenciar «Distribución de XP» (dos segmentos) del progreso al siguiente nivel (una barra).
 - Números con `tabular-nums`. Valores cero se muestran como `0 XP`, `0 veces esta semana`; desconocido = «Sin datos».
-- Etiquetas de ejemplo visibles: `de ejemplo` (filas de party), `Party de ejemplo`, `Historial de ejemplo · Fecha demo: 7 oct 2026`.
+- Etiquetas de ejemplo visibles: `de ejemplo` (filas de party), `Party de ejemplo`.
 - Chip (confianza, `Nueva`, `de ejemplo`): `inline-flex items-center rounded-md border border-{ctx}-border px-2 py-0.5 text-xs font-medium text-{ctx}-muted`.
 
 ## Motion
@@ -147,7 +147,7 @@ Barra inferior fija, neutral, 5 destinos: `Inicio`, `HERO`, `VILLAIN`, `Nuevo`, 
 - Al cambiar de pantalla con la navegación: `window.scrollTo(0, 0)`; el foco se queda en el botón de navegación.
 - Contraste mínimo 4.5:1 texto normal, 3:1 indicadores. Los tokens de esta guía cumplen en sus parejas de contexto; no cruzar parejas.
 - Touch targets ≥ 44 px (`min-h-11`); navegación 56 px (`min-h-14`).
-- «Restablecer demo» pide confirmación nativa (`window.confirm('¿Restablecer la demo? Se borran tus registros y misiones nuevas.')`).
+- «Borrar todo» pide confirmación nativa (`window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')`).
 
 ## Migración desde V1 (hallazgos a corregir al implementar)
 - `index.css`: `--color-hero #22d3ee` (cian) y `body bg-slate-950` → tokens de esta guía.

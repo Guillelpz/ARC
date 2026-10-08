@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
-import { DEMO_DATE, SEED_EVENTS } from './core/seed'
+import { seedFor } from './core/seed'
+import { localDate } from './core/stats'
 import { EMPTY_CUSTOM, exportBackup, loadAll, parseBackup, saveCustom, saveEvents, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
@@ -15,7 +16,7 @@ import type { Gain } from './components/TrackerCard'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
-const nowStamp = () => `${DEMO_DATE}T${new Date().toTimeString().slice(0, 8)}`
+const nowStamp = (d = new Date()) => `${localDate(d)}T${d.toTimeString().slice(0, 8)}`
 
 const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
   : problems.some(p => p.backupKey === null)
@@ -32,6 +33,17 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
   const [overtake, setOvertake] = useState<Overtake | null>(null)
+
+  const [, refresh] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+  // ponytail: «hoy» se recalcula en cada render y al volver a la pestaña; con la app visible
+  // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
+  // interacción. Añadir un timer a medianoche si molesta.
+  const today = localDate(new Date())
 
   useEffect(() => saveEvents(events), [events])
   useEffect(() => saveCustom(custom), [custom])
@@ -53,10 +65,10 @@ export default function App() {
   }, [overtake, toast])
 
   const trackers = useMemo(() => allTrackers(custom.trackers), [custom.trackers])
-  const game = useMemo(() => deriveGame(events, DEMO_DATE, trackers), [events, trackers])
+  const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const partyStates = useMemo(
-    () => PARTIES.map(p => derivePartyState(p, events, DEMO_DATE, trackers, custom.proposals)),
-    [events, trackers, custom.proposals],
+    () => PARTIES.map(p => derivePartyState(p, events, today, trackers, custom.proposals)),
+    [events, today, trackers, custom.proposals],
   )
 
   function go(s: Screen) {
@@ -71,7 +83,7 @@ export default function App() {
     if (!amount) return
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount, occurredAt: nowStamp() }
     const next = [...events, ev]
-    const after = deriveGame(next, DEMO_DATE, trackers)
+    const after = deriveGame(next, today, trackers)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
     setEvents(next) // evento creado fuera del updater (StrictMode)
     setGain({ trackerId: t.id, xp: amount * t.xpPerUnit, branch: t.branch, key: ev.id })
@@ -79,7 +91,7 @@ export default function App() {
     // adelantamientos: tú superas a alguien (ranking HERO) o alguien te supera en HERO/VILLAIN/profundidad
     for (const [i, p] of PARTIES.entries()) {
       const before = partyStates[i]
-      const after = derivePartyState(p, next, DEMO_DATE, trackers, custom.proposals)
+      const after = derivePartyState(p, next, today, trackers, custom.proposals)
       const names = overtakes(after.ranking, before.ranking)
       if (names.length) { setOvertake({ key: ev.id, party: p.name, names, position: after.position }); break }
       const lost = ([t.branch, 'depth'] as const).map(metric => {
@@ -98,9 +110,11 @@ export default function App() {
     setCustom(c => ({ ...c, proposals: proposeTo(c.proposals, trackerId, partyIds, allTrackers(c.trackers), now) }))
   }
 
+  const loadExample = () => setEvents(seedFor(today))
+
   function reset() {
-    if (!window.confirm('¿Restablecer la demo? Se borran tus registros y misiones nuevas.')) return
-    setEvents(SEED_EVENTS); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
+    if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
+    setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
   function exportData() {
@@ -125,7 +139,7 @@ export default function App() {
     <>
       {screen === 'home' && (
         <HomeView game={game} partyStates={partyStates} onNavigate={go}
-          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset}
+          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')}
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}

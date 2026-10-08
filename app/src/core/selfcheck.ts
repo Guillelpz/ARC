@@ -1,7 +1,7 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
-import { DEMO_DATE, SEED_EVENTS } from './seed'
+import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, TRACKERS } from './trackers'
-import { addDays, byRecent, mondayOf } from './stats'
+import { addDays, byRecent, localDate, mondayOf } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
 import { classify, createTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -62,6 +62,11 @@ export function runSelfCheck() {
   ok(deriveGame([], DEMO_DATE).heroPct === null, 'sin eventos: heroPct null')
   const gc = deriveGame([...tap(SEED_EVENTS, 'running'), { id: 'check-undo', trackerId: 'running', amount: -5, occurredAt: `${DEMO_DATE}T12:01:00` }], DEMO_DATE)
   ok(sum0(gc) === sum0(g0), 'corrección −5 km deshace +5 km')
+  ok(localDate(new Date(2026, 9, 7, 23, 59)) === '2026-10-07' && localDate(new Date(2026, 0, 5, 0, 0)) === '2026-01-05', 'fecha local YYYY-MM-DD')
+  const sx = seedFor('2026-12-16') // miércoles, +10 semanas
+  ok(sx.length === 28 && sx[0].occurredAt === '2026-12-07T09:00:00' && sum0(deriveGame(sx, '2026-12-16')) === sum0(g0), 'seedFor: semanas enteras, mismas stats')
+  const sl = seedFor('2026-10-12') // lunes: mar y mié de la semana base caerían en el futuro
+  ok(sl.length === 16 && sl.every(e => e.occurredAt.slice(0, 10) <= '2026-10-12'), 'seedFor: sin eventos futuros')
 
 
   // ---- V2 (PRD-V2 §8) ----

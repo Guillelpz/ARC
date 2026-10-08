@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Upload, X } from 'lucide-react'
+import { ChevronRight, CircleAlert, Download, Moon, Plus, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { Branch, GameState, PartyState } from '../core/types'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -12,6 +12,7 @@ type Props = {
   onNavigate: (s: Screen) => void
   onOpenParty: (id: string) => void
   onReset: () => void
+  onLoadExample?: () => void
   onExport: () => void
   onImport: (text: string) => void
   onImportError: () => void
@@ -26,7 +27,7 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onExport, onImport, onImportError, notice, onDismissNotice }: Props) {
+export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onLoadExample, onExport, onImport, onImportError, notice, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b).length, weekXp: weeklyXp(game, b) }
@@ -73,6 +74,16 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
             </button>
           </div>
         )}
+        {onLoadExample && (
+          <section className="flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5 lg:col-span-2">
+            <h2 className="text-lg font-semibold">Empieza tu historial</h2>
+            <p className="text-sm leading-6">Registra tu primera actividad en HERO o VILLAIN. Si prefieres ver antes cómo funciona, carga un ejemplo de dos semanas; puedes borrarlo cuando quieras con «Borrar todo».</p>
+            <button type="button" onClick={onLoadExample}
+              className={`${btn} self-start border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-surface`}>
+              Cargar ejemplo
+            </button>
+          </section>
+        )}
         <div className="rise"><PlayerHeader game={game} /></div>
 
         <div className="rise flex flex-col gap-6" style={{ animationDelay: '80ms' }}>
@@ -108,10 +119,9 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
           </button>
 
           <footer className="flex flex-wrap items-center gap-x-1 text-xs leading-5 text-app-muted">
-            <span>Historial de ejemplo · Fecha demo: 7 oct 2026 ·</span>
             <button type="button" onClick={onReset}
               className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
-              <RotateCcw className="size-4" aria-hidden /> Restablecer demo
+              <Trash2 className="size-4" aria-hidden /> Borrar todo
             </button>
             <button type="button" onClick={onExport}
               className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">

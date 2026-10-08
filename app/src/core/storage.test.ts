@@ -46,7 +46,7 @@ describe('loadAll', () => {
   beforeEach(unlockStorage)
   test('store vacío', () => {
     const s = fakeStore()
-    expect(loadAll(s, D)).toEqual({ events: SEED_EVENTS, custom: EMPTY_CUSTOM, problems: [] })
+    expect(loadAll(s, D)).toEqual({ events: [], custom: EMPTY_CUSTOM, problems: [] })
     expect(s.writes()).toBe(0)
   })
   test('datos válidos', () => {
