@@ -3,7 +3,7 @@ import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
 import { localDate } from './core/stats'
-import { EMPTY_CUSTOM, exportBackup, loadAll, parseBackup, saveCustom, saveEvents, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, loadAll, loadLastExport, parseBackup, requestPersist, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -33,6 +33,7 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
   const [overtake, setOvertake] = useState<Overtake | null>(null)
+  const [lastExport, setLastExport] = useState(loadLastExport)
 
   const [, refresh] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
@@ -43,7 +44,9 @@ export default function App() {
   // ponytail: «hoy» se recalcula en cada render y al volver a la pestaña; con la app visible
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
-  const today = localDate(new Date())
+  const now = new Date(); const today = localDate(now)
+  const hasData = events.length > 0 || custom.trackers.length > 0
+  const copy = backupDue(lastExport, now, hasData)
 
   useEffect(() => saveEvents(events), [events])
   useEffect(() => saveCustom(custom), [custom])
@@ -113,16 +116,23 @@ export default function App() {
   const loadExample = () => setEvents(seedFor(today))
 
   function reset() {
+    if (copy.due && hasData && window.confirm('No tienes una copia reciente de tus datos. ¿Exportar una antes de borrar? Aceptar exporta y no borra nada; Cancelar sigue con el borrado.')) {
+      exportData(); setNotice('Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.'); return
+    }
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
+    if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
     setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
   function exportData() {
-    const now = new Date().toISOString()
-    const url = URL.createObjectURL(new Blob([exportBackup(events, custom, now)], { type: 'application/json' }))
+    const stamp = new Date().toISOString()
+    const url = URL.createObjectURL(new Blob([exportBackup(events, custom, stamp)], { type: 'application/json' }))
     const a = document.createElement('a')
-    a.href = url; a.download = `rpg-life-tracker-${now.slice(0, 10)}.json`; a.click()
-    URL.revokeObjectURL(url)
+    a.href = url; a.download = `rpg-life-tracker-${stamp.slice(0, 10)}.json`; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 10_000)
+    // ponytail: cuenta como copia al lanzar la descarga; el navegador no confirma que se guardó.
+    saveLastExport(stamp); setLastExport(stamp)
+    requestPersist() // en el primer gesto del usuario (no al arrancar: Firefox muestra un diálogo de permiso)
   }
 
   function importData(text: string) {
@@ -130,6 +140,7 @@ export default function App() {
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
     const n = b.events.length, m = b.custom.trackers.length
     if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
+    if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     unlockStorage()
     setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
@@ -140,7 +151,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeView game={game} partyStates={partyStates} onNavigate={go}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined}
-          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')}
+          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (

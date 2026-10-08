@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, exportBackup, loadAll, parseBackup, parseCustom, readCustom, readEvents, saveEvents, unlockStorage } from './storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -98,4 +98,67 @@ describe('exportBackup / parseBackup', () => {
     expect(parseBackup(exp({ events: undefined }))).toBeNull()
   })
   test('evento inválido', () => { expect(parseBackup(exp({ events: [null] }))?.dropped).toBe(1) })
+})
+
+describe('meta de exportación', () => {
+  const M = 'life-rpg-meta-v1'
+  test('loadLastExport', () => {
+    expect(loadLastExport(fakeStore())).toBeNull()
+    for (const v of ['{roto', '{"lastExportAt":"x"}', '[]']) expect(loadLastExport(fakeStore({ [M]: v }))).toBeNull()
+    expect(loadLastExport(fakeStore({ [M]: '{"lastExportAt":"2026-10-08T10:00:00.000Z"}' }))).toBe('2026-10-08T10:00:00.000Z')
+    expect(loadLastExport({ getItem: () => { throw new Error('x') } })).toBeNull()
+  })
+  test('roundtrip y fallo de escritura', () => {
+    const s = fakeStore()
+    saveLastExport('2026-10-08T10:00:00.000Z', s)
+    expect(loadLastExport(s)).toBe('2026-10-08T10:00:00.000Z')
+    expect(() => saveLastExport('2026-10-08T10:00:00.000Z', fakeStore({}, true))).not.toThrow()
+  })
+  const t0 = '2026-10-01T10:00:00.000Z', at = (ms: number) => new Date(Date.parse(t0) + ms)
+  const D = 86_400_000
+  test('exportAge', () => {
+    expect(exportAge(null, at(0))).toBeNull()
+    expect(exportAge(t0, at(0))).toBe(0)
+    expect(exportAge(t0, at(14 * D - 3_600_000))).toBe(13)
+    expect(exportAge(t0, at(14 * D))).toBe(14)
+    expect(exportAge(t0, at(-D))).toBe(0)
+  })
+  test('backupDue', () => {
+    expect(backupDue(null, at(0), false)).toEqual({ days: null, due: false })
+    expect(backupDue(null, at(0), true).due).toBe(true)
+    expect(backupDue(t0, at(13 * D), true).due).toBe(false)
+    expect(backupDue(t0, at(14 * D), true).due).toBe(true)
+  })
+})
+
+describe('backupCurrent', () => {
+  test('copia, omite ausentes y sobrescribe', () => {
+    const s = fakeStore({ [EV]: 'a', [CU]: 'b' })
+    backupCurrent(s)
+    expect(s.m.get(`${EV}.backup.last`)).toBe('a')
+    expect(s.m.get(`${CU}.backup.last`)).toBe('b')
+    s.m.set(EV, 'c'); backupCurrent(s)
+    expect(s.m.get(`${EV}.backup.last`)).toBe('c')
+    const s2 = fakeStore({ [EV]: 'a' }); backupCurrent(s2)
+    expect(s2.m.has(`${CU}.backup.last`)).toBe(false)
+  })
+  test('escrituras fallidas: false y no lanza', () => {
+    expect(backupCurrent(fakeStore({ [EV]: 'a' }, true))).toBe(false)
+  })
+  test('atómico: si falla la segunda escritura, revierte la primera', () => {
+    const s = fakeStore({ [EV]: 'a2', [CU]: 'b2', [`${EV}.backup.last`]: 'a1' })
+    let n = 0
+    const store = { getItem: s.getItem, removeItem: (k: string) => { s.m.delete(k) },
+      setItem: (k: string, v: string) => { if (++n === 3) throw new Error('quota'); s.setItem(k, v) } }
+    expect(backupCurrent(store)).toBe(false)
+    expect(s.m.get(`${EV}.backup.last`)).toBe('a1')
+    expect(s.m.has(`${EV}.backup.prev`)).toBe(false)
+    expect(s.m.has(`${CU}.backup.last`)).toBe(false)
+  })
+  test('rota last a prev', () => {
+    const s = fakeStore({ [EV]: 'a2', [`${EV}.backup.last`]: 'a1' })
+    expect(backupCurrent(s)).toBe(true)
+    expect(s.m.get(`${EV}.backup.prev`)).toBe('a1')
+    expect(s.m.get(`${EV}.backup.last`)).toBe('a2')
+  })
 })

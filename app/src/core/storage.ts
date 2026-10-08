@@ -35,7 +35,6 @@ export function readCustom(v: unknown): Parsed<CustomData> {
 
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM
 
-
 type Store = Pick<Storage, 'getItem' | 'setItem'>
 export type LoadProblem = { key: string; dropped: number | null; backupKey: string | null } // dropped null = ilegible; backupKey null = no se pudo copiar → clave bloqueada
 export type Loaded = { events: ActivityEvent[]; custom: CustomData; problems: LoadProblem[] }
@@ -81,4 +80,59 @@ export function parseBackup(raw: string): { events: ActivityEvent[]; custom: Cus
   if (!isObj(v) || v.app !== 'rpg-life-tracker' || v.version !== 1) return null
   const e = readEvents(v.events), c = readCustom(v.custom)
   return e && c ? { events: e.data, custom: c.data, dropped: e.dropped + c.dropped } : null
+}
+
+export type Meta = { lastExportAt: string } // ISO 8601 (Date.toISOString())
+export type CopyStatus = { days: number | null; due: boolean } // days null = nunca exportado
+
+const META_KEY = 'life-rpg-meta-v1'
+// ponytail: recordatorio fijo a 14 días; hacerlo configurable si alguien lo pide o cuando haya copias automáticas.
+export const EXPORT_REMIND_DAYS = 14
+
+export function loadLastExport(store: Pick<Storage, 'getItem'> = localStorage): string | null {
+  try {
+    const raw = store.getItem(META_KEY)
+    if (raw === null) return null
+    const v = json(raw)
+    return isObj(v) && typeof v.lastExportAt === 'string' && !Number.isNaN(Date.parse(v.lastExportAt)) ? v.lastExportAt : null
+  } catch { return null }
+}
+
+export function saveLastExport(iso: string, store: Pick<Storage, 'setItem'> = localStorage): void {
+  try { store.setItem(META_KEY, JSON.stringify({ lastExportAt: iso } satisfies Meta)) } catch { /* cuota */ }
+}
+
+export const exportAge = (lastExportAt: string | null, now: Date): number | null =>
+  lastExportAt === null ? null : Math.max(0, Math.floor((now.getTime() - Date.parse(lastExportAt)) / 86_400_000))
+
+export const backupDue = (lastExportAt: string | null, now: Date, hasData: boolean): CopyStatus => {
+  const days = exportAge(lastExportAt, now)
+  return { days, due: hasData && (days === null || days >= EXPORT_REMIND_DAYS) }
+}
+
+// ponytail: dos niveles (`.backup.last` y `.backup.prev`); tres operaciones destructivas seguidas pierden la más antigua; restaurar desde la app es P4.4.
+// Atómico: escribe todo o revierte lo escrito y devuelve false. Restauración manual (DevTools).
+export function backupCurrent(store: Store & Partial<Pick<Storage, 'removeItem'>> = localStorage): boolean {
+  const done: [string, string | null][] = [] // [clave, valor anterior]
+  const put = (k: string, v: string) => { const old = store.getItem(k); store.setItem(k, v); done.push([k, old]) }
+  try {
+    for (const k of [KEY, CUSTOM_KEY]) {
+      const raw = store.getItem(k)
+      if (raw === null) continue
+      const last = store.getItem(`${k}.backup.last`)
+      if (last !== null) put(`${k}.backup.prev`, last)
+      put(`${k}.backup.last`, raw)
+    }
+    return true
+  } catch {
+    for (const [k, old] of done.reverse()) {
+      try { if (old === null) store.removeItem?.(k); else store.setItem(k, old) } catch { /* mejor esfuerzo */ }
+    }
+    return false
+  }
+}
+
+// ponytail: persist() es una petición; el navegador puede ignorarla (Safari borra tras 7 días sin uso). La garantía real es exportar.
+export function requestPersist(): void {
+  navigator.storage?.persisted?.().then(p => p || navigator.storage.persist()).catch(() => {})
 }
