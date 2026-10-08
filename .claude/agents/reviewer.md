@@ -20,7 +20,7 @@ Revisas el ciclo N. Respondes en español. Solo lees y escribes `review.md`; no 
    - **selfcheck.ts:** ningún assert relajado sin que la spec lo diga; la lógica nueva no trivial tiene asserts.
    - **UI:** tokens, sin hex ni `slate-*`, paletas HERO/VILLAIN sin mezclar, tono de `docs/STYLE_GUIDE.md`.
    - **Exceso:** código que la spec no pide.
-4. Ejecuta `npm run build` y `npm run lint` en `app/` sobre `cycle-N`.
+4. Ejecuta `npm run build`, `npm run lint` y `npm test` en `app/` sobre `cycle-N`.
 
 ## Salida: `docs/cycles/cycle-N/review.md`
 

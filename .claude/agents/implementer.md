@@ -17,7 +17,7 @@ Ruta de la spec, rama `cycle-N`, y las tareas a hacer (por defecto, todas). En m
 
 - Lee `CLAUDE.md`, la spec y **solo** los archivos que toca cada tarea. No leas los documentos históricos.
 - Trabaja en la rama `cycle-N` (si no existe: `git checkout -b cycle-N main`).
-- Por tarea: implementa → `npm run build` y `npm run lint` desde `app/` → commit `T<k>: <objetivo>` con el trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Si falla el build, arréglalo antes del commit. Nunca uses `--no-verify`.
+- Por tarea: implementa → `npm run build`, `npm run lint` y `npm test` desde `app/` → commit `T<k>: <objetivo>` con el trailer `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`. Si falla el build, arréglalo antes del commit. Nunca uses `--no-verify`.
 - Haz exactamente lo que dice la spec. Si una tarea no se puede hacer tal como está escrita, **para** y devuelve el bloqueo; no improvises el diseño.
 - `selfcheck.ts`: no relajes asserts. Cambia uno solo si la spec lo indica de forma explícita.
 - Estilo: tokens de `@theme`, sin hex ni `slate-*`, HERO claro y VILLAIN oscuro (`docs/STYLE_GUIDE.md`).
