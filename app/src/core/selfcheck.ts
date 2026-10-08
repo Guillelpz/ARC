@@ -1,7 +1,7 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, TRACKERS } from './trackers'
-import { addDays, byRecent, clampAmount, dayTotal, localDate, mondayOf } from './stats'
+import { addDays, byRecent, clampAmount, dayTotal, history, localDate, mondayOf } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
 import { classify, createTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -151,6 +151,20 @@ export function runSelfCheck() {
   ok(dayTotal(dd, 'gym', '2026-10-05') === 2 && dayTotal(dd, 'gym', '2026-10-07') === 0, 'dayTotal')
   ok(clampAmount(dd, 'gym', '2026-10-05', -5) === -2 && clampAmount(dd, 'gym', '2026-10-07', -1) === 0, 'corrección: el día no baja de 0')
   ok(clampAmount(dd, 'beer', '2026-10-07', -1) === 0 && clampAmount(dd, 'gym', '2026-10-05', 2.6) === 3, 'día negativo: 0; positivos redondeados')
+
+  // A3 — history: orden, deshecho y canUndo
+  const hu: ActivityEvent[] = [
+    { id: 'h1', trackerId: 'running', amount: 5, occurredAt: '2026-10-05T09:00:00' },
+    { id: 'h2', trackerId: 'running', amount: 3, occurredAt: '2026-10-06T09:00:00' },
+    { id: 'h3', trackerId: 'running', amount: -5, occurredAt: '2026-10-05T09:00:00', undoes: 'h1' },
+  ]
+  const hr = history(hu, 'running')
+  ok(hr.map(r => r.event.id).join() === 'h2,h3,h1', 'history: orden desc, empate último primero')
+  ok(hr[2].undone && !hr[2].canUndo && hr[0].canUndo && !hr[1].canUndo, 'history: deshecho y canUndo')
+  // A4 — un registro compensado con «−» (sin undoes) no se puede deshacer
+  ok(!history([hu[0], { id: 'h4', trackerId: 'running', amount: -2, occurredAt: '2026-10-05T10:00:00' }], 'running')[1].canUndo, 'history: día insuficiente')
+  // A5 — límite de 10
+  ok(history(Array.from({ length: 12 }, (_, i) => ({ id: `l${i}`, trackerId: 'gym', amount: 1, occurredAt: NOW })), 'gym').length === 10, 'history: 10')
 
   console.info('[selfcheck] done')
 }
