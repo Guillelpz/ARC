@@ -229,3 +229,24 @@ describe('restaurar copia', () => {
     expect(hasLastBackup(fakeStore({ [L(CU)]: 'x' }))).toBe(true)
   })
 })
+
+describe('readCustom: campos de P4.3', () => {
+  const base = { id: 'c', name: 'X', branch: 'hero', type: 'count', unit: 'unidades', increment: 1, buttonLabel: '+1', xpPerUnit: 20, custom: true }
+  test('C1 formato antiguo', () => { expect(readCustom({ trackers: [base] })).toEqual({ data: { trackers: [base], proposals: [] }, dropped: 0 }) })
+  test('C2 weeklyGoal inválido', () => {
+    const r = readCustom({ trackers: ['x', null, 0, -1].map(w => ({ ...base, weeklyGoal: w })) })
+    expect(r?.data.trackers).toEqual([base, base, base, base]); expect(r?.dropped).toBe(4)
+  })
+  test('C3 villain con objetivo y archived no booleano', () => {
+    const r = readCustom({ trackers: [{ ...base, branch: 'villain', weeklyGoal: 3 }, { ...base, archived: 'yes' }] })
+    expect(r?.data.trackers).toEqual([{ ...base, branch: 'villain' }, base]); expect(r?.dropped).toBe(2)
+  })
+  test('C4 campos válidos', () => {
+    const ts = [{ ...base, weeklyGoal: 5, archived: true }, { ...base, archived: false }]
+    expect(readCustom({ trackers: ts })).toEqual({ data: { trackers: ts, proposals: [] }, dropped: 0 })
+  })
+  test('C5 export/import', () => {
+    const t = { ...base, weeklyGoal: 5, archived: true }
+    expect(parseBackup(exportBackup([], { trackers: [t] as never, proposals: [] }, 'x'))?.custom.trackers).toEqual([t])
+  })
+})

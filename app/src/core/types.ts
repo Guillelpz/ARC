@@ -11,7 +11,10 @@ export type Tracker = {
   xpPerUnit: number
   weeklyGoal?: number
   custom?: true
+  archived?: boolean // ausente = activo
 }
+
+export type TrackerEdit = { name: string; increment: number; weeklyGoal: number | null } // null = sin objetivo
 
 export type ActivityEvent = {
   id: string

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { BookOpen, Beer, Check, Dumbbell, Footprints, Minus, Sandwich, Sparkles, Swords, type LucideIcon } from 'lucide-react'
-import type { HistoryRow, TrackerStats } from '../core/types'
+import { Archive, BookOpen, Beer, Check, Dumbbell, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, type LucideIcon } from 'lucide-react'
+import type { HistoryRow, Tracker, TrackerStats } from '../core/types'
+import { editTracker, isValidName } from '../core/classify'
 import { dayLabel } from '../core/stats'
 import { ProgressBar } from './ProgressBar'
 
@@ -28,18 +29,32 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0')
 // km/min se añaden a la diferencia; sesiones/clases/unidades no
 const withUnit = (n: string, unit: string) => (unit === 'km' || unit === 'min' ? `${n} ${unit}` : n)
 
-type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; today: string; history: HistoryRow[]; onUndo: (e: HistoryRow['event']) => void; onAdd: (amount: number) => void; countsIn: string[] }
+type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; today: string; history: HistoryRow[]; onUndo: (e: HistoryRow['event']) => void; onAdd: (amount: number) => void; countsIn: string[]; onSave?: (t: Tracker) => void; nameTaken?: (name: string) => boolean }
 
-export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, onUndo, onAdd, countsIn }: Props) {
+export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, onUndo, onAdd, countsIn, onSave, nameTaken }: Props) {
   const { tracker: t, week, diff, allTime, goalPct, xp } = stats
   const Icon = ICONS[t.id] ?? Sparkles
   const c = THEME[t.branch]
   const [qty, setQty] = useState(String(t.increment))
   const n = Math.round(Number(qty))
   const valid = Number.isFinite(n) && n > 0
+  const [editing, setEditing] = useState(false)
+  const [eName, setEName] = useState(t.name)
+  const [eInc, setEInc] = useState(String(t.increment))
+  const [eGoal, setEGoal] = useState(t.weeklyGoal ? String(t.weeklyGoal) : '')
+  const nameErr = !isValidName(eName) ? '2–40 caracteres' : nameTaken?.(eName) ? 'Ya tienes una misión con ese nombre' : null
+  const incOk = Math.round(Number(eInc)) >= 1
+  const goalOk = eGoal.trim() === '' || Math.round(Number(eGoal)) >= 1
+  const canSave = !nameErr && incOk && goalOk
+  const field = `min-h-11 w-full rounded-lg border bg-transparent px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`
+  const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setEditing(true) }
+  const save = () => {
+    const next = editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal) })
+    onSave?.(next); setQty(String(next.increment)); setEditing(false)
+  }
 
   return (
-    <div className={`relative flex flex-col gap-3 rounded-xl border p-4 shadow-sm sm:p-5 ${c.card}`}>
+    <div role="group" aria-label={t.name} className={`relative flex flex-col gap-3 rounded-xl border p-4 shadow-sm sm:p-5 ${c.card}`}>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between gap-2">
           <div className={`flex min-w-0 items-center gap-2 text-sm font-semibold uppercase tracking-wide ${c.accent}`}>
@@ -51,7 +66,15 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
               </span>
             )}
           </div>
-          <span key={gain?.trackerId === t.id ? gain.key : undefined} className={`shrink-0 text-sm font-semibold tabular-nums ${gain?.trackerId === t.id ? 'bump' : ''}`}>{xp.xp} XP</span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span key={gain?.trackerId === t.id ? gain.key : undefined} className={`text-sm font-semibold tabular-nums ${gain?.trackerId === t.id ? 'bump' : ''}`}>{xp.xp} XP</span>
+            {t.custom && onSave && (
+              <button type="button" onClick={open} aria-label={`Editar ${t.name}`}
+                className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
+                <Pencil className="size-4" aria-hidden />
+              </button>
+            )}
+          </div>
         </div>
         <ProgressBar value={xp.progress} tone={t.branch} thin label={`XP ${t.name}`} />
       </div>
@@ -74,6 +97,35 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
         <span>Cuenta en: {countsIn.join(' · ') || 'ninguna party'}</span>
       </div>
 
+      {editing ? (
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-xs font-medium">Nombre
+            <input value={eName} onChange={e => setEName(e.target.value)} maxLength={40} className={field} />
+            {nameErr && <span className={`text-xs ${c.muted}`}>{nameErr}</span>}
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-medium">Incremento ({t.unit})
+            <input type="number" min={1} step={1} value={eInc} onChange={e => setEInc(e.target.value)} className={field} />
+          </label>
+          {t.branch === 'hero' && (
+            <label className="flex flex-col gap-1 text-xs font-medium">Objetivo semanal ({t.unit})
+              <input type="number" min={1} step={1} value={eGoal} onChange={e => setEGoal(e.target.value)} className={field} />
+            </label>
+          )}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setEditing(false)}
+              className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>Cancelar</button>
+            <button type="button" onClick={save} disabled={!canSave}
+              className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 ${c.button}`}>Guardar</button>
+          </div>
+          <div className="flex flex-col gap-2 border-t pt-3">
+            <p className={`text-xs leading-5 ${c.muted}`}>Archivar la oculta de esta lista. Sus registros siguen contando y puedes reactivarla desde Inicio.</p>
+            <button type="button" onClick={() => onSave?.({ ...t, archived: true })}
+              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
+              <Archive className="size-4" aria-hidden /> Archivar
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="relative">
         <div className="flex gap-2">
           <button
@@ -110,6 +162,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
           </span>
         )}
       </div>
+      )}
 
       {history.length > 0 && (
         <details className={`text-xs leading-5 ${c.muted}`}>

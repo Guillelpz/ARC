@@ -3,7 +3,7 @@ import { Search } from 'lucide-react'
 import type { ActivityEvent, Branch, GameState, PartyState, Tracker } from '../core/types'
 import { countsIn } from '../core/party'
 import { addDays, byRecent, dayLabel, dayTotal, history } from '../core/stats'
-import { normalizeText } from '../core/classify'
+import { isDuplicateName, normalizeText } from '../core/classify'
 import { ProgressBar } from './ProgressBar'
 import { TrackerCard, type Gain } from './TrackerCard'
 
@@ -16,9 +16,10 @@ type Props = {
   today: string
   onAdd: (t: Tracker, amount: number, day: string) => void
   onUndo: (t: Tracker, e: ActivityEvent) => void
+  onSave: (t: Tracker) => void
 }
 
-export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd, onUndo }: Props) {
+export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd, onUndo, onSave }: Props) {
   const hero = branch === 'hero'
   const name = hero ? 'HERO' : 'VILLAIN'
   const info = game[branch]
@@ -27,7 +28,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
   const [query, setQuery] = useState('')
   const q = normalizeText(query)
   const shown = game.trackers
-    .filter(s => s.tracker.branch === branch && normalizeText(s.tracker.name).includes(q))
+    .filter(s => s.tracker.branch === branch && !s.tracker.archived && normalizeText(s.tracker.name).includes(q))
     .sort((a, b) => order.indexOf(a.tracker.id) - order.indexOf(b.tracker.id))
   const [day, setDay] = useState(today)
   const yesterday = addDays(today, -1)
@@ -72,7 +73,9 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
           {shown.map((s, i) => (
             <div key={s.tracker.id} className="rise" style={{ animationDelay: `${i * 60}ms` }}>
             <TrackerCard stats={s} gain={gain} today={today} history={history(events, s.tracker.id)} onUndo={e => onUndo(s.tracker, e)} dayTotal={dayTotal(events, s.tracker.id, day)} dayNote={day === today ? undefined : dayLabel(day, today).toLowerCase()} onAdd={n => onAdd(s.tracker, n, day)}
-              countsIn={countsIn(s.tracker.id, partyStates)} />
+              countsIn={countsIn(s.tracker.id, partyStates)}
+              onSave={s.tracker.custom ? onSave : undefined}
+              nameTaken={n => isDuplicateName(n, game.trackers.map(x => x.tracker).filter(x => x.id !== s.tracker.id))} />
             </div>
           ))}
         </div>
