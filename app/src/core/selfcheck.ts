@@ -4,7 +4,7 @@ import { allTrackers, TRACKERS } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, history, localDate, mondayOf } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
-import { classify, createTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
+import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseCustom } from './storage'
 
 // Oráculo: §5 y §10 de TECH_SPEC. Si falla, se arregla el motor, nunca los asserts.
@@ -120,6 +120,17 @@ export function runSelfCheck() {
   ok(smo.game.hero.xp === 320, 'retroactivo: Oficina 300 → 320')
   ok(proposeTo(pm, med.id, [ofi.id], all, NOW).length === 2, 'no proponer dos veces')
   ok(proposeTo([], 'beer', [gymP.id], all, NOW).length === 0, 'no proponer un criterio existente')
+
+  // E1–E5 — editar actividades propias
+  ok(buttonLabel('unidades', 1) === '+1' && buttonLabel('unidades', 3) === '+3 unidades' && buttonLabel('km', 5) === '+5 km', 'E1 buttonLabel')
+  const e2 = editTracker(med, { name: '  meditar   mucho ', increment: 2.6, weeklyGoal: 4.4 })
+  ok(e2.name === 'Meditar mucho' && e2.increment === 3 && e2.buttonLabel === '+3 unidades' && e2.weeklyGoal === 4 &&
+    e2.id === med.id && e2.branch === med.branch && e2.unit === med.unit && e2.xpPerUnit === med.xpPerUnit && e2.custom === med.custom, 'E2 editTracker')
+  const e3 = editTracker(med, { name: 'Meditar', increment: 0, weeklyGoal: null })
+  ok(e3.increment === 1 && !('weeklyGoal' in e3) && !('weeklyGoal' in editTracker(pizza, { name: 'Pizza', increment: 1, weeklyGoal: 5 })), 'E3 editTracker límites')
+  ok(editTracker(TRACKERS[0], { name: 'X', increment: 9, weeklyGoal: 1 }) === TRACKERS[0], 'E4 fija intacta')
+  const sumE = (g: GameState) => [g.hero.xp, g.villain.xp, g.player.xp, g.weeklyHeroXp].join()
+  ok(sumE(deriveGame(em, DEMO_DATE, allTrackers([{ ...editTracker(med, { name: 'M2', increment: 5, weeklyGoal: 3 }), archived: true }, pizza]))) === sumE(deriveGame(em, DEMO_DATE, all)), 'E5 XP invariante')
 
   const vg = vote('villain', gymP), vo = vote('villain', ofi)
   ok(vg.accepted && vg.yes === 2 && vg.votes.find(v => v.name === 'Carlos')?.yes === false, 'VILLAIN: Gym 2/3, Carlos no')

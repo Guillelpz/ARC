@@ -32,12 +32,21 @@ export function readCustom(v: unknown): Parsed<CustomData> {
   if ((v.trackers !== undefined && !Array.isArray(v.trackers)) || (v.proposals !== undefined && !Array.isArray(v.proposals))) return null
   const rawT: unknown[] = v.trackers ?? []
   const rawP: unknown[] = v.proposals ?? []
-  const trackers = rawT.filter((t): t is Tracker => isObj(t) &&
-    typeof t.id === 'string' && typeof t.name === 'string' && (t.branch === 'hero' || t.branch === 'villain') &&
-    Number.isFinite(t.increment) && Number.isFinite(t.xpPerUnit))
+  let fixedN = 0
+  const trackers: Tracker[] = []
+  for (const t of rawT) {
+    if (!(isObj(t) && typeof t.id === 'string' && typeof t.name === 'string' && (t.branch === 'hero' || t.branch === 'villain') &&
+      Number.isFinite(t.increment) && Number.isFinite(t.xpPerUnit))) continue
+    const fixed = { ...t } as Tracker
+    let bad = false
+    if (t.weeklyGoal !== undefined && !(t.branch === 'hero' && typeof t.weeklyGoal === 'number' && Number.isFinite(t.weeklyGoal) && t.weeklyGoal > 0)) { delete fixed.weeklyGoal; bad = true }
+    if (t.archived !== undefined && typeof t.archived !== 'boolean') { delete fixed.archived; bad = true }
+    if (bad) fixedN++
+    trackers.push(fixed)
+  }
   const proposals = rawP.filter((p): p is Proposal => isObj(p) &&
     typeof p.trackerId === 'string' && typeof p.partyId === 'string')
-  return { data: { trackers, proposals }, dropped: rawT.length - trackers.length + rawP.length - proposals.length }
+  return { data: { trackers, proposals }, dropped: rawT.length - trackers.length + fixedN + rawP.length - proposals.length }
 }
 
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM

@@ -1,4 +1,4 @@
-import type { Classification, Tracker, TrackerDraft } from './types'
+import type { Classification, Tracker, TrackerDraft, TrackerEdit } from './types'
 
 export const normalizeText = (s: string): string =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim()
@@ -107,7 +107,18 @@ export function createTracker(d: TrackerDraft, id: string): Tracker {
     buttonLabel: buttonLabel(unit, increment), custom: true,
   }
 }
-export const buttonLabel = (unit: string, increment: number) => (unit === 'unidades' ? '+1' : `+${increment} ${unit}`)
+export const buttonLabel = (unit: string, increment: number) =>
+  unit === 'unidades' && increment === 1 ? '+1' : `+${increment} ${unit}`
+
+// Edición de una actividad propia: no toca id, rama, tipo, unidad ni xpPerUnit (no cambia XP pasada).
+export function editTracker(t: Tracker, e: TrackerEdit): Tracker {
+  if (!t.custom) return t
+  const increment = Math.max(1, Math.round(e.increment) || 1)
+  const next: Tracker = { ...t, name: trackerName(e.name), increment, buttonLabel: buttonLabel(t.unit, increment) }
+  if (t.branch === 'hero' && e.weeklyGoal !== null && Number.isFinite(e.weeklyGoal) && e.weeklyGoal >= 1) next.weeklyGoal = Math.round(e.weeklyGoal)
+  else delete next.weeklyGoal
+  return next
+}
 
 // sinónimos de las misiones base (nombres en inglés) para detectar "parecidas"
 const ALIASES: Record<string, string> = {
