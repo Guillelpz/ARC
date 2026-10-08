@@ -15,7 +15,7 @@ Orden: 8 → 9 → 10. El primero no cerrado de la lista es el siguiente a espec
 - Ciclo 7 — cerrado (ef60fdc).
 - Ciclo 9 (P9.2 + P9.3): aprobado.
 - Ciclo 10 (P9.1 + P9.4): aprobado.
-- Ciclo 8 (P7.2b) — paso 4 (spec). P7.2a no aprobada todavía.
+- Ciclo 8 (P7.2b) — paso 5 (implementación). P7.2a no aprobada todavía.
 
 ## Decisiones del usuario (2026-10-08)
 
