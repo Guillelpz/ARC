@@ -94,7 +94,8 @@ export function todaySummary(events: ActivityEvent[], stats: TrackerStats[], tod
   }
   const missing = live.flatMap(s => s.tracker.weeklyGoal && s.week < s.tracker.weeklyGoal
     ? [{ tracker: s.tracker, left: s.tracker.weeklyGoal - s.week }] : [])
-  return { xp, done, missing, daysLeft: daysLeftInWeek(today), best: null }
+  const top = live.reduce<TrackerStats | null>((m, s) => (s.streak > (m?.streak ?? 0) ? s : m), null) // empate: el primero
+  return { xp, done, missing, daysLeft: daysLeftInWeek(today), best: top && { tracker: top.tracker, weeks: top.streak } }
 }
 
 // orden por último uso (solo eventos positivos: una corrección no es uso); sin uso primero, así

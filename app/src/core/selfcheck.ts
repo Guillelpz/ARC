@@ -197,6 +197,10 @@ export function runSelfCheck() {
   const s6 = wk('2026-09-28', 4)
   ok(st(s6) === 1 && get(deriveGame(s6, DEMO_DATE), 'gym').streak === 1, 'S6 corte en el primer evento')
 
+  const s2b = [...s2, ...wk('2026-10-05', 3)]
+  const hb = todaySummary(s2b, deriveGame(s2b, DEMO_DATE).trackers, DEMO_DATE).best
+  ok(hb?.tracker.id === 'gym' && hb.weeks === 3 && todaySummary([], deriveGame([], DEMO_DATE).trackers, DEMO_DATE).best === null, 'H5 mejor racha')
+
   // H1–H4 — resumen de hoy
   const hv = [ev('gym', 1, DEMO_DATE), ev('beer', 1, DEMO_DATE), ev('running', 5, '2026-10-06')]
   const hs = todaySummary(hv, deriveGame(hv, DEMO_DATE).trackers, DEMO_DATE)

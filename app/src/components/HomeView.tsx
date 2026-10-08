@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { ArchiveRestore, ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { Branch, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
@@ -120,6 +120,12 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
               <h3 className="text-sm font-semibold">Registrado hoy</h3>
               <TodayList rows={summary.done.map(d => ({ t: d.tracker, text: `+${Math.round(d.amount)} ${d.tracker.unit}` }))} onGo={onNavigate} />
             </>
+          )}
+          {summary.best && (
+            <p className="flex items-center gap-2 text-sm">
+              <Flame className="size-4" aria-hidden />
+              Mejor racha: {summary.best.tracker.name} · {summary.best.weeks} {summary.best.weeks === 1 ? 'semana' : 'semanas'}
+            </p>
           )}
           {summary.missing.length > 0 && (
             <>

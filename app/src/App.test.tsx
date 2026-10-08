@@ -164,6 +164,8 @@ test('U12 racha', () => {
   fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
   fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
   expect(card('Gym').getByText('Racha: 3 semanas')).toBeTruthy()
+  go('Inicio')
+  expect(screen.getByText('Mejor racha: Gym · 3 semanas')).toBeTruthy()
 })
 
 test('U10 archivar y reactivar', () => {
