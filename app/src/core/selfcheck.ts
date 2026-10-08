@@ -1,7 +1,7 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, TRACKERS } from './trackers'
-import { addDays, byRecent, clampAmount, dayTotal, history, localDate, mondayOf, undoneIds } from './stats'
+import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, todaySummary, undoneIds } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -181,6 +181,17 @@ export function runSelfCheck() {
   const rp: ActivityEvent[] = [hu[0], { id: 'p', trackerId: 'running', amount: 5, occurredAt: hu[0].occurredAt, undoes: 'h1' }]
   ok(!undoneIds(rp).has('h1') && !history(rp, 'running').find(r => r.event.id === 'h1')!.undone, 'R1 positivo con undoes no anula')
   ok(undoneIds(hu).has('h1'), 'R2 deshecho ya anulado')
+
+  // H1–H4 — resumen de hoy
+  const ev = (trackerId: string, amount: number, day: string, id = `${trackerId}-${day}`): ActivityEvent => ({ id, trackerId, amount, occurredAt: `${day}T10:00:00` })
+  const hv = [ev('gym', 1, DEMO_DATE), ev('beer', 1, DEMO_DATE), ev('running', 5, '2026-10-06')]
+  const hs = todaySummary(hv, deriveGame(hv, DEMO_DATE).trackers, DEMO_DATE)
+  ok(hs.xp.hero === 30 && hs.xp.villain === 15 && hs.done.map(d => d.tracker.id).join() === 'gym,beer', 'H1 hoy: XP y registrado')
+  ok(hs.missing.map(x => `${x.tracker.id}:${x.left}`).join() === 'gym:3,bjj:3,running:15,reading:120' && hs.daysLeft === 5, 'H2 hoy: te faltan')
+  ok(daysLeftInWeek('2026-10-11') === 1 && daysLeftInWeek('2026-10-12') === 7, 'H3 días que quedan')
+  const arch = { ...med, archived: true }, ha = [ev(med.id, 1, DEMO_DATE)]
+  const hsa = todaySummary(ha, deriveGame(ha, DEMO_DATE, allTrackers([arch])).trackers, DEMO_DATE)
+  ok(!hsa.done.length && hsa.xp.hero === 0, 'H4 archivada fuera de hoy')
 
   console.info('[selfcheck] done')
 }

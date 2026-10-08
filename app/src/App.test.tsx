@@ -136,6 +136,20 @@ test('U9 editar', () => {
   expect(heroXp()).toBe(xp)
 })
 
+test('U11 hoy', () => {
+  render(<App />)
+  expect(screen.getByText('Aún nada hoy.')).toBeTruthy()
+  expect(screen.getByText('Te faltan · quedan 5 días')).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Gym 4 sesiones/ })).toBeTruthy()
+  go('HERO')
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  go('Inicio')
+  expect(screen.getByText('+30 HERO')).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Gym \+1 sesiones/ })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: /^Gym 3 sesiones/ }))
+  expect(screen.getByRole('heading', { name: 'Misiones HERO' })).toBeTruthy()
+})
+
 test('U10 archivar y reactivar', () => {
   preload(); render(<App />); go('HERO')
   const xp = heroXp()

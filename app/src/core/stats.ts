@@ -1,4 +1,4 @@
-import type { ActivityEvent, HistoryRow, Tracker } from './types'
+import type { ActivityEvent, HistoryRow, TodaySummary, Tracker, TrackerStats } from './types'
 
 export const addDays = (d: string, n: number): string => {
   const t = new Date(d + 'T00:00:00Z')
@@ -58,6 +58,25 @@ export function trackerStats(t: Tracker, events: ActivityEvent[], today: string)
     week, prev, diff: week - prev, allTime,
     goalPct: t.weeklyGoal ? (week / t.weeklyGoal) * 100 : null,
   }
+}
+
+// lunes = 7 … domingo = 1
+export const daysLeftInWeek = (today: string) => 7 - ((new Date(today + 'T00:00:00Z').getUTCDay() + 6) % 7)
+
+// archivadas fuera; XP neto por rama de hoy, registrado hoy, objetivos pendientes
+export function todaySummary(events: ActivityEvent[], stats: TrackerStats[], today: string): TodaySummary {
+  const live = stats.filter(s => !s.tracker.archived)
+  const todays = events.filter(e => e.occurredAt.slice(0, 10) === today)
+  const xp: TodaySummary['xp'] = { hero: 0, villain: 0 }
+  const done: TodaySummary['done'] = []
+  for (const { tracker: t } of live) {
+    const net = todays.reduce((n, e) => (e.trackerId === t.id ? n + e.amount : n), 0)
+    xp[t.branch] += net * t.xpPerUnit
+    if (net > 0) done.push({ tracker: t, amount: net })
+  }
+  const missing = live.flatMap(s => s.tracker.weeklyGoal && s.week < s.tracker.weeklyGoal
+    ? [{ tracker: s.tracker, left: s.tracker.weeklyGoal - s.week }] : [])
+  return { xp, done, missing, daysLeft: daysLeftInWeek(today), best: null }
 }
 
 // orden por último uso (solo eventos positivos: una corrección no es uso); sin uso primero, así
