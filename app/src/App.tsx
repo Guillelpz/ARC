@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
-import { SEED_EVENTS } from './core/seed'
+import { seedFor } from './core/seed'
 import { localDate } from './core/stats'
 import { EMPTY_CUSTOM, exportBackup, loadAll, parseBackup, saveCustom, saveEvents, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
@@ -110,9 +110,11 @@ export default function App() {
     setCustom(c => ({ ...c, proposals: proposeTo(c.proposals, trackerId, partyIds, allTrackers(c.trackers), now) }))
   }
 
+  const loadExample = () => setEvents(seedFor(today))
+
   function reset() {
-    if (!window.confirm('¿Restablecer la demo? Se borran tus registros y misiones nuevas.')) return
-    setEvents(SEED_EVENTS); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
+    if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
+    setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
   function exportData() {
@@ -137,7 +139,7 @@ export default function App() {
     <>
       {screen === 'home' && (
         <HomeView game={game} partyStates={partyStates} onNavigate={go}
-          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset}
+          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')}
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}

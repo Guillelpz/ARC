@@ -1,5 +1,4 @@
 import type { ActivityEvent, CustomData, Proposal, Tracker } from './types'
-import { SEED_EVENTS } from './seed'
 
 const KEY = 'life-rpg-demo-v1'
 const CUSTOM_KEY = 'life-rpg-custom-v1'
@@ -58,7 +57,7 @@ export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
     problems.push({ key, dropped: r ? r.dropped : null, backupKey })
     return r ? r.data : ifUnreadable
   }
-  const events = load(KEY, readEvents, SEED_EVENTS, [])
+  const events = load(KEY, readEvents, [], [])
   const custom = load(CUSTOM_KEY, readCustom, EMPTY_CUSTOM, EMPTY_CUSTOM)
   return { events, custom, problems }
 }
