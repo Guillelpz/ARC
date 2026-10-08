@@ -49,7 +49,7 @@ export type Loaded = { events: ActivityEvent[]; custom: CustomData; problems: Lo
 const locked = new Set<string>() // claves que no se pueden escribir en esta sesión
 export const unlockStorage = () => locked.clear()
 
-// ponytail: restaurar un backup interno es manual (DevTools → Local Storage). Añadir UI cuando un usuario real lo necesite.
+// ponytail: restaurar `.backup.<stamp>` es manual (DevTools); no se purgan; uno por incidente de datos dañados.
 export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
   const problems: LoadProblem[] = []
   function load<T>(key: string, read: (v: unknown) => Parsed<T>, ifMissing: T, ifUnreadable: T): T {
@@ -117,19 +117,14 @@ export const backupDue = (lastExportAt: string | null, now: Date, hasData: boole
   return { days, due: hasData && (days === null || days >= EXPORT_REMIND_DAYS) }
 }
 
-// ponytail: dos niveles (`.backup.last` y `.backup.prev`); tres operaciones destructivas seguidas pierden la más antigua; restaurar desde la app es P4.4.
-// Atómico: escribe todo o revierte lo escrito y devuelve false. Restauración manual (DevTools).
-export function backupCurrent(store: Store & Partial<Pick<Storage, 'removeItem'>> = localStorage): boolean {
+const EMPTY_RAW: Record<string, string> = { [KEY]: '[]', [CUSTOM_KEY]: JSON.stringify(EMPTY_CUSTOM) }
+type WStore = Store & Partial<Pick<Storage, 'removeItem'>>
+
+// Escribe todo o revierte lo escrito (removeItem si no existía). false si algo falla. No lanza.
+function writeAll(store: WStore, writes: [string, string][]): boolean {
   const done: [string, string | null][] = [] // [clave, valor anterior]
-  const put = (k: string, v: string) => { const old = store.getItem(k); store.setItem(k, v); done.push([k, old]) }
   try {
-    for (const k of [KEY, CUSTOM_KEY]) {
-      const raw = store.getItem(k)
-      if (raw === null) continue
-      const last = store.getItem(`${k}.backup.last`)
-      if (last !== null) put(`${k}.backup.prev`, last)
-      put(`${k}.backup.last`, raw)
-    }
+    for (const [k, v] of writes) { const old = store.getItem(k); store.setItem(k, v); done.push([k, old]) }
     return true
   } catch {
     for (const [k, old] of done.reverse()) {
@@ -137,6 +132,55 @@ export function backupCurrent(store: Store & Partial<Pick<Storage, 'removeItem'>
     }
     return false
   }
+}
+
+// ponytail: dos niveles (`.backup.last` y `.backup.prev`); tres operaciones destructivas seguidas pierden la más antigua; la app solo restaura `.backup.last`; `.backup.prev`, por DevTools.
+// Atómico: escribe todo o revierte lo escrito y devuelve false.
+export function backupCurrent(store: WStore = localStorage): boolean {
+  const writes: [string, string][] = []
+  try {
+    for (const k of [KEY, CUSTOM_KEY]) {
+      const raw = store.getItem(k)
+      if (raw === null) continue
+      const last = store.getItem(`${k}.backup.last`)
+      if (last !== null) writes.push([`${k}.backup.prev`, last])
+      writes.push([`${k}.backup.last`, raw])
+    }
+  } catch { return false }
+  return writeAll(store, writes)
+}
+
+// null en una rama = esa clave no tiene .backup.last
+export type LastBackup = { events: ActivityEvent[] | null; custom: CustomData | null; dropped: number }
+
+export function hasLastBackup(store: Pick<Storage, 'getItem'> = localStorage): boolean {
+  try { return [KEY, CUSTOM_KEY].some(k => store.getItem(`${k}.backup.last`) !== null) } catch { return false }
+}
+
+export function readLast(store: Pick<Storage, 'getItem'> = localStorage): LastBackup | 'none' | 'unreadable' {
+  const out: LastBackup = { events: null, custom: null, dropped: 0 }
+  try {
+    const ev = store.getItem(`${KEY}.backup.last`), cu = store.getItem(`${CUSTOM_KEY}.backup.last`)
+    if (ev !== null) { const r = readEvents(json(ev)); if (!r) return 'unreadable'; out.events = r.data; out.dropped += r.dropped }
+    if (cu !== null) { const r = readCustom(json(cu)); if (!r) return 'unreadable'; out.custom = r.data; out.dropped += r.dropped }
+  } catch { return 'unreadable' }
+  return out.events === null && out.custom === null ? 'none' : out
+}
+
+// Intercambia `.backup.last` con el estado actual. No usa backupCurrent: machacaría la copia.
+// ponytail: cada clave se trata por separado; si solo una tiene copia, la otra no cambia (no pasa con el flujo normal, App guarda ambas).
+export function restoreLast(r: LastBackup, store: WStore = localStorage): boolean {
+  const writes: [string, string][] = [], keys: string[] = []
+  try {
+    for (const [k, v] of [[KEY, r.events], [CUSTOM_KEY, r.custom]] as const) {
+      if (v === null) continue
+      writes.push([`${k}.backup.last`, store.getItem(k) ?? EMPTY_RAW[k]], [k, JSON.stringify(v)])
+      keys.push(k)
+    }
+  } catch { return false }
+  const ok = writeAll(store, writes)
+  if (ok) keys.forEach(k => locked.delete(k))
+  return ok
 }
 
 // ponytail: persist() es una petición; el navegador puede ignorarla (Safari borra tras 7 días sin uso). La garantía real es exportar.

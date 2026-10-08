@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -174,5 +174,58 @@ describe('backupCurrent', () => {
     expect(backupCurrent(s)).toBe(true)
     expect(s.m.get(`${EV}.backup.prev`)).toBe('a1')
     expect(s.m.get(`${EV}.backup.last`)).toBe('a2')
+  })
+})
+
+describe('restaurar copia', () => {
+  const L = (k: string) => `${k}.backup.last`
+  beforeEach(unlockStorage)
+  test('R1 readLast', () => {
+    expect(readLast(fakeStore())).toBe('none')
+    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, dropped: 0 })
+    expect(readLast(fakeStore({ [L(EV)]: '{roto' }))).toBe('unreadable')
+    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good, null]) }))).toMatchObject({ dropped: 1 })
+  })
+  test('R2 intercambio', () => {
+    const s = fakeStore({ [EV]: 'cur', [L(EV)]: JSON.stringify([good]), [`${EV}.backup.prev`]: 'p', [CU]: 'c' })
+    expect(restoreLast(readLast(s) as never, s)).toBe(true)
+    expect(s.m.get(EV)).toBe(JSON.stringify([good]))
+    expect(s.m.get(L(EV))).toBe('cur')
+    expect(s.m.get(`${EV}.backup.prev`)).toBe('p')
+    expect(s.m.get(CU)).toBe('c'); expect(s.m.has(L(CU))).toBe(false)
+  })
+  test('R3 doble restauración', () => {
+    const init = { [EV]: JSON.stringify([good]), [L(EV)]: '[]', [CU]: JSON.stringify(EMPTY_CUSTOM), [L(CU)]: JSON.stringify({ trackers: [], proposals: [] }) }
+    const s = fakeStore(init)
+    for (let i = 0; i < 2; i++) expect(restoreLast(readLast(s) as never, s)).toBe(true)
+    expect(Object.fromEntries(s.m)).toEqual(init)
+  })
+  test('R4 atómico', () => {
+    const init = { [EV]: 'a', [L(EV)]: JSON.stringify([good]), [CU]: 'b', [L(CU)]: JSON.stringify(EMPTY_CUSTOM) }
+    const s = fakeStore(init)
+    let n = 0
+    const store = { getItem: s.getItem, removeItem: (k: string) => { s.m.delete(k) },
+      setItem: (k: string, v: string) => { if (++n === 3) throw new Error('quota'); s.setItem(k, v) } }
+    expect(restoreLast(readLast(s) as never, store)).toBe(false)
+    expect(Object.fromEntries(s.m)).toEqual(init)
+  })
+  test('R5 actual ausente', () => {
+    const s = fakeStore({ [L(EV)]: JSON.stringify([good]) })
+    expect(restoreLast(readLast(s) as never, s)).toBe(true)
+    expect(s.m.get(L(EV))).toBe('[]')
+  })
+  test('R6 desbloqueo', () => {
+    const m = new Map([[EV, '{roto']]); let fail = true
+    const s = { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { if (fail) throw new Error('quota'); m.set(k, v) } }
+    loadAll(s, D)
+    m.set(L(EV), JSON.stringify([good])); fail = false
+    expect(restoreLast(readLast(s) as never, s)).toBe(true)
+    saveEvents([{ ...good, id: 'z' }], s)
+    expect(m.get(EV)).toBe(JSON.stringify([{ ...good, id: 'z' }]))
+  })
+  test('R7 hasLastBackup', () => {
+    expect(hasLastBackup(fakeStore())).toBe(false)
+    expect(hasLastBackup(fakeStore({ [L(EV)]: 'x' }))).toBe(true)
+    expect(hasLastBackup(fakeStore({ [L(CU)]: 'x' }))).toBe(true)
   })
 })
