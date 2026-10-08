@@ -6,7 +6,8 @@ Ver `docs/WORKFLOW.md`.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
-- Ciclo 3 (P3.3 + P3.2) — paso 4 (spec).
+- Ciclo 3 (P3.3 + P3.2) — paso 5 (implementación).
+- Ciclo 4 — paso 1 (proponer).
 
 ## Decisiones del usuario (2026-10-08)
 
