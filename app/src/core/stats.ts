@@ -27,6 +27,10 @@ export const dayTotal = (events: ActivityEvent[], trackerId: string, day: string
 export const clampAmount = (events: ActivityEvent[], trackerId: string, day: string, amount: number) =>
   Math.max(Math.round(amount), -Math.max(0, dayTotal(events, trackerId, day)))
 
+export const dayLabel = (day: string, today: string) =>
+  day === today ? 'Hoy' : day === addDays(today, -1) ? 'Ayer'
+    : new Date(day + 'T00:00:00Z').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
+
 export function trackerStats(t: Tracker, events: ActivityEvent[], today: string) {
   const thisStart = mondayOf(today)
   const thisEnd = addDays(today, 1) // exclusivo

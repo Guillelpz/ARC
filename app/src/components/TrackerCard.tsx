@@ -27,9 +27,9 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0')
 // km/min se añaden a la diferencia; sesiones/clases/unidades no
 const withUnit = (n: string, unit: string) => (unit === 'km' || unit === 'min' ? `${n} ${unit}` : n)
 
-type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; onAdd: (amount: number) => void; countsIn: string[] }
+type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; onAdd: (amount: number) => void; countsIn: string[] }
 
-export function TrackerCard({ stats, gain, dayTotal, onAdd, countsIn }: Props) {
+export function TrackerCard({ stats, gain, dayTotal, dayNote, onAdd, countsIn }: Props) {
   const { tracker: t, week, diff, allTime, goalPct, xp } = stats
   const Icon = ICONS[t.id] ?? Sparkles
   const c = THEME[t.branch]
@@ -100,7 +100,7 @@ export function TrackerCard({ stats, gain, dayTotal, onAdd, countsIn }: Props) {
             disabled={!valid}
             className={`inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.98] disabled:opacity-40 motion-reduce:transform-none ${c.button}`}
           >
-            {valid ? `+${n} ${t.unit}` : t.buttonLabel}
+            {valid ? `+${n} ${t.unit}${dayNote ? ` · ${dayNote}` : ''}` : t.buttonLabel}
           </button>
         </div>
         {gain?.trackerId === t.id && (

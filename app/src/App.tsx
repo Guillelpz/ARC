@@ -16,7 +16,7 @@ import type { Gain } from './components/TrackerCard'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
-const nowStamp = (d = new Date()) => `${localDate(d)}T${d.toTimeString().slice(0, 8)}`
+const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
 
 const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
   : problems.some(p => p.backupKey === null)
@@ -80,10 +80,11 @@ export default function App() {
   }
 
   // amount < 0 = corrección (evento negativo); no deja el día por debajo de 0
-  function add(t: Tracker, amount: number) {
-    amount = clampAmount(events, t.id, today, amount)
+  function add(t: Tracker, amount: number, day = today) {
+    if (day > today) day = today
+    amount = clampAmount(events, t.id, day, amount)
     if (!amount) return
-    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount, occurredAt: nowStamp() }
+    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount, occurredAt: nowStamp(day) }
     const next = [...events, ev]
     const after = deriveGame(next, today, trackers)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
