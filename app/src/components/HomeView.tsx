@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import { ArchiveRestore, ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
-import type { Branch, GameState, PartyState, Tracker } from '../core/types'
+import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import type { Branch, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -9,6 +9,7 @@ const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 
 type Props = {
   game: GameState
+  summary: TodaySummary
   partyStates: PartyState[]
   archived: Tracker[]
   onUnarchive: (t: Tracker) => void
@@ -32,7 +33,24 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, archived, onUnarchive, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
+function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string }[]; onGo: (s: Screen) => void }) {
+  return (
+    <ul className="divide-y divide-app-border rounded-lg border border-app-border">
+      {rows.map(({ t, text }) => (
+        <li key={t.id}>
+          <button type="button" onClick={() => onGo(t.branch)}
+            className="flex min-h-11 w-full items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
+            <span className="flex-1 text-sm font-semibold">{t.name}</span>
+            <span className="text-sm text-app-muted tabular-nums">{text}</span>
+            <ChevronRight className="size-4 shrink-0 text-app-muted" aria-hidden />
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
@@ -89,6 +107,33 @@ export function HomeView({ game, partyStates, archived, onUnarchive, onNavigate,
             </button>
           </section>
         )}
+        <section aria-labelledby="hoy" className="rise flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5 lg:col-span-2">
+          <h2 id="hoy" className="text-lg font-semibold">Hoy</h2>
+          {summary.done.length === 0
+            ? <p className="text-sm text-app-muted">Aún nada hoy.</p>
+            : <p className="text-sm font-semibold tabular-nums text-app-text">
+                {(['hero', 'villain'] as const).filter(b => summary.xp[b] !== 0)
+                  .map(b => `${summary.xp[b] > 0 ? '+' : '−'}${Math.abs(summary.xp[b])} ${b.toUpperCase()}`).join(' · ')}
+              </p>}
+          {summary.done.length > 0 && (
+            <>
+              <h3 className="text-sm font-semibold">Registrado hoy</h3>
+              <TodayList rows={summary.done.map(d => ({ t: d.tracker, text: `+${Math.round(d.amount)} ${d.tracker.unit}` }))} onGo={onNavigate} />
+            </>
+          )}
+          {summary.best && (
+            <p className="flex items-center gap-2 text-sm">
+              <Flame className="size-4" aria-hidden />
+              Mejor racha: {summary.best.tracker.name} · {summary.best.weeks} {summary.best.weeks === 1 ? 'semana' : 'semanas'}
+            </p>
+          )}
+          {summary.missing.length > 0 && (
+            <>
+              <h3 className="text-sm font-semibold">Te faltan · {summary.daysLeft === 1 ? 'queda 1 día' : `quedan ${summary.daysLeft} días`}</h3>
+              <TodayList rows={summary.missing.map(m => ({ t: m.tracker, text: `${Math.round(m.left)} ${m.tracker.unit}` }))} onGo={() => onNavigate('hero')} />
+            </>
+          )}
+        </section>
         <div className="rise"><PlayerHeader game={game} /></div>
 
         <div className="rise flex flex-col gap-6" style={{ animationDelay: '80ms' }}>
