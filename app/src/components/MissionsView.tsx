@@ -74,7 +74,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
             <div key={s.tracker.id} className="rise" style={{ animationDelay: `${i * 60}ms` }}>
             <TrackerCard stats={s} gain={gain} today={today} history={history(events, s.tracker.id)} onUndo={e => onUndo(s.tracker, e)} dayTotal={dayTotal(events, s.tracker.id, day)} dayNote={day === today ? undefined : dayLabel(day, today).toLowerCase()} onAdd={n => onAdd(s.tracker, n, day)}
               countsIn={countsIn(s.tracker.id, partyStates)}
-              onSave={s.tracker.custom ? onSave : undefined}
+              onSave={s.tracker.custom || s.tracker.weeklyGoal ? onSave : undefined}
               nameTaken={n => isDuplicateName(n, game.trackers.map(x => x.tracker).filter(x => x.id !== s.tracker.id))} />
             </div>
           ))}

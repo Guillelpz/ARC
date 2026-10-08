@@ -182,3 +182,24 @@ test('U10 archivar y reactivar', () => {
   expect(screen.getByRole('group', { name: 'Meditar' })).toBeTruthy()
   expect(JSON.parse(localStorage.getItem(CU)!).trackers[0].archived).toBe(false)
 })
+
+test('U13 objetivo de fijas', () => {
+  render(<App />); go('HERO')
+  const xp = heroXp()
+  const edit = (v: string) => {
+    fireEvent.click(btn('Editar objetivo de Gym'))
+    expect(screen.queryByText('Nombre')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Archivar' })).toBeNull()
+    fireEvent.change(card('Gym').getAllByRole('spinbutton')[0], { target: { value: v } })
+    fireEvent.click(btn('Guardar'))
+  }
+  edit('2')
+  expect(JSON.parse(localStorage.getItem(CU)!).goals).toEqual({ gym: 2 })
+  expect(card('Gym').getByText(/\/ 2 sesiones esta semana/)).toBeTruthy()
+  expect(heroXp()).toBe(xp)
+  edit('')
+  expect(JSON.parse(localStorage.getItem(CU)!).goals?.gym).toBeUndefined()
+  expect(card('Gym').getByText(/\/ 4 sesiones esta semana/)).toBeTruthy()
+  go('VILLAIN')
+  expect(screen.queryByRole('button', { name: 'Editar objetivo de Beer' })).toBeNull()
+})

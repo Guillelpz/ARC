@@ -5,7 +5,7 @@ import { seedFor } from './core/seed'
 import { clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
-import { allTrackers } from './core/trackers'
+import { allTrackers, setGoal } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
 import { BottomNav, type Screen } from './components/BottomNav'
 import { HomeView } from './components/HomeView'
@@ -46,7 +46,7 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
-  const hasData = events.length > 0 || custom.trackers.length > 0
+  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0
   const copy = backupDue(lastExport, now, hasData)
 
   useEffect(() => saveEvents(events), [events])
@@ -68,7 +68,7 @@ export default function App() {
     return () => clearTimeout(id)
   }, [overtake, toast])
 
-  const trackers = useMemo(() => allTrackers(custom.trackers), [custom.trackers])
+  const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals), [custom.trackers, custom.goals])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
@@ -113,7 +113,9 @@ export default function App() {
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
-  const saveTracker = (t: Tracker) => setCustom(c => ({ ...c, trackers: c.trackers.map(x => (x.id === t.id ? t : x)) }))
+  const saveTracker = (t: Tracker) => t.custom
+    ? setCustom(c => ({ ...c, trackers: c.trackers.map(x => (x.id === t.id ? t : x)) }))
+    : setCustom(c => ({ ...c, goals: setGoal(c.goals, t.id, t.weeklyGoal ?? null) }))
   // ponytail: UnknownView solo ve las activas; se puede crear una misión con el nombre de una archivada
   const active = useMemo(() => trackers.filter(t => !t.archived), [trackers])
   const archived = useMemo(() => custom.trackers.filter(t => t.archived), [custom.trackers])
