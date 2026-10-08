@@ -108,7 +108,6 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
           </button>
 
           <footer className="flex flex-wrap items-center gap-x-1 text-xs leading-5 text-app-muted">
-            <span>Historial de ejemplo · Fecha demo: 7 oct 2026 ·</span>
             <button type="button" onClick={onReset}
               className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
               <RotateCcw className="size-4" aria-hidden /> Restablecer demo

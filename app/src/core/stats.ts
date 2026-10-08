@@ -6,6 +6,10 @@ export const addDays = (d: string, n: number): string => {
   return t.toISOString().slice(0, 10)
 }
 
+// fecha local del navegador; no usar toISOString (UTC: desfasa el día cerca de medianoche)
+export const localDate = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
 export const mondayOf = (d: string): string =>
   addDays(d, -((new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7))
 
