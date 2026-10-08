@@ -9,6 +9,7 @@ type Props = {
   selectedId: string
   onSelect: (id: string) => void
   global: GameState
+  today: string
 }
 
 const PANEL: Record<Branch, string> = {
@@ -59,11 +60,11 @@ function Criteria({ branch, trackers, party }: { branch: Branch; trackers: Track
   )
 }
 
-export function PartyView({ states, selectedId, onSelect, global }: Props) {
+export function PartyView({ states, selectedId, onSelect, global, today }: Props) {
   const s = states.find(x => x.party.id === selectedId) ?? states[0]
   const { game } = s
   const [metric, setMetric] = useState<RankMetric>('hero')
-  const ranking = metric === 'hero' ? s.ranking : buildRanking(game, s.party.members, metric)
+  const ranking = metric === 'hero' ? s.ranking : buildRanking(game, s.party.members, metric, today)
   return (
     <div className="min-h-dvh bg-app-bg text-app-text">
       <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pt-6 pb-28 sm:max-w-2xl lg:max-w-4xl">
@@ -119,6 +120,7 @@ export function PartyView({ states, selectedId, onSelect, global }: Props) {
 
           <section className="flex flex-col gap-3">
             <h2 className="text-lg font-semibold">Ranking semanal · {METRIC_TITLE[metric]}</h2>
+            <p className="text-xs leading-5 text-app-muted">Amigos: su ritmo de la semana hasta hoy.</p>
             <Segmented label="Ranking" value={metric} onChange={setMetric} options={METRICS}
               toneFor={m => m === 'depth' ? 'neutral' : m} />
             <ol className="flex flex-col gap-3">

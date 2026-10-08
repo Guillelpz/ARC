@@ -203,3 +203,11 @@ test('U13 objetivo de fijas', () => {
   go('VILLAIN')
   expect(screen.queryByRole('button', { name: 'Editar objetivo de Beer' })).toBeNull()
 })
+
+test('U15 ranking prorrateado', () => {
+  render(<App />)
+  fireEvent.click(btn('Cargar ejemplo')); go('Party')
+  expect(screen.getByText('Amigos: su ritmo de la semana hasta hoy.')).toBeTruthy()
+  expect(document.querySelector('ol li')!.getAttribute('aria-current')).toBe('true')
+  expect(screen.getByText(/221 XP/)).toBeTruthy()
+})

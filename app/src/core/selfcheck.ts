@@ -1,9 +1,9 @@
-import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
+import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, setGoal, TRACKERS } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, undoneIds } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
-import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
+import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseCustom } from './storage'
 
@@ -37,7 +37,9 @@ export function runSelfCheck() {
   ok(g0.player.xp === 720 && g0.player.level === 3, 'player 720 Lv3')
   ok(g0.heroPct === 79, 'composición 79/21')
   ok(g0.weeklyHeroXp === 330, 'hero semanal 330')
-  ok(buildRanking(g0).map(r => r.id).join() === 'carlos,alex,you,dani', 'ranking inicial')
+  const SUN = '2026-10-11'
+  const rk = (g: GameState) => buildRanking(g, PARTIES[0].members, 'hero', SUN)
+  ok(rk(g0).map(r => r.id).join() === 'carlos,alex,you,dani', 'ranking inicial')
 
   const e1 = tap(SEED_EVENTS, 'gym')
   const g1 = deriveGame(e1, DEMO_DATE)
@@ -47,8 +49,8 @@ export function runSelfCheck() {
   ok(g1.hero.xp === 600 && g1.villain.xp === 150, '+Gym: hero 600, villain 150')
   const up = diffLevelUps(g0, g1)
   ok(up?.title === 'LEVEL UP — PLAYER 4' && up.detail === 'Gym Lv. 4 · Hero Lv. 4', '+Gym: toast')
-  ok(buildRanking(g1).map(r => r.id).join() === 'carlos,you,alex,dani' && g1.weeklyHeroXp === 360, 'ranking tras +Gym')
-  ok(overtakes(buildRanking(g1), buildRanking(g0)).join() === 'Alex' && !overtakes(buildRanking(g0), buildRanking(g1)).length, 'adelantamientos en ambos sentidos')
+  ok(rk(g1).map(r => r.id).join() === 'carlos,you,alex,dani' && g1.weeklyHeroXp === 360, 'ranking tras +Gym')
+  ok(overtakes(rk(g1), rk(g0)).join() === 'Alex' && !overtakes(rk(g0), rk(g1)).length, 'adelantamientos en ambos sentidos')
   const down = diffLevelDowns(g1, g0)
   ok(down?.title === 'LEVEL DOWN — PLAYER 3' && down.detail === 'Gym Lv. 3 · Hero Lv. 3', '−Gym: toast de bajada')
   ok(diffLevelDowns(g0, g1) === null && diffLevelUps(g1, g0) === null, 'subidas y bajadas no se cruzan')
@@ -74,20 +76,22 @@ export function runSelfCheck() {
   const NOW = `${DEMO_DATE}T12:00:00`
   const ids = (ts: { id: string }[]) => ts.map(t => t.id).join()
   const sum = (g: GameState) => [g.hero.xp, g.hero.level, g.villain.xp, g.villain.level, g.player.xp, g.player.level, g.weeklyHeroXp].join()
-  const ps = (events: ActivityEvent[], trackers: Tracker[] = TRACKERS, proposals: Proposal[] = []) =>
-    PARTIES.map(p => derivePartyState(p, events, DEMO_DATE, trackers, proposals))
+  const ps = (events: ActivityEvent[], trackers: Tracker[] = TRACKERS, proposals: Proposal[] = [], today = DEMO_DATE) =>
+    PARTIES.map(p => derivePartyState(p, events, today, trackers, proposals))
 
   ok(ids(partyCriteria(gymP, TRACKERS, [])) === 'gym,bjj,running,reading,beer,burgers', 'criterios Los del Gym')
   ok(ids(partyCriteria(ofi, TRACKERS, [])) === 'running,reading,burgers', 'criterios La Oficina')
   const [sg0, so0] = ps(SEED_EVENTS)
   ok(sum(sg0.game) === sum(g0), 'Los del Gym = global al abrir')
   ok(sum(so0.game) === '300,2,60,1,360,2,180', 'La Oficina: HERO 300 L2, VILLAIN 60 L1, PLAYER 360 L2, sem 180')
-  ok(ids(so0.ranking) === 'lucia,you,marta,pablo' && so0.position === 2, 'ranking La Oficina')
-  ok(ids(sg0.ranking) === 'carlos,alex,you,dani' && sg0.position === 3, 'ranking Los del Gym inicial')
-  ok(ids(buildRanking(sg0.game, gymP.members, 'villain')) === 'dani,alex,you,carlos', 'ranking VILLAIN Los del Gym')
-  ok(ids(buildRanking(so0.game, ofi.members, 'depth')) === 'lucia,pablo,marta,you', 'ranking profundidad La Oficina')
+  const [sgS, soS] = ps(SEED_EVENTS, TRACKERS, [], SUN)
+  ok(ids(soS.ranking) === 'lucia,you,marta,pablo' && soS.position === 2, 'ranking La Oficina')
+  ok(ids(sgS.ranking) === 'carlos,alex,you,dani' && sgS.position === 3, 'ranking Los del Gym inicial')
+  ok(ids(buildRanking(sgS.game, gymP.members, 'villain', SUN)) === 'dani,alex,you,carlos', 'ranking VILLAIN Los del Gym')
+  ok(ids(buildRanking(soS.game, ofi.members, 'depth', SUN)) === 'lucia,pablo,marta,you', 'ranking profundidad La Oficina')
   const [sg1, so1] = ps(e1)
-  ok(ids(sg1.ranking) === 'carlos,you,alex,dani' && sg1.game.weeklyHeroXp === 360, 'Los del Gym tras +Gym')
+  const sg1S = ps(e1, TRACKERS, [], SUN)[0]
+  ok(ids(sg1S.ranking) === 'carlos,you,alex,dani' && sg1S.game.weeklyHeroXp === 360, 'Los del Gym tras +Gym')
   ok(sum(so1.game) === sum(so0.game) && ids(so1.ranking) === ids(so0.ranking), '+Gym: La Oficina no cambia')
   const eb = tap(SEED_EVENTS, 'beer'); const [sgb, sob] = ps(eb)
   ok(deriveGame(eb, DEMO_DATE).villain.xp === 165 && sgb.game.villain.xp === 165 && sob.game.villain.xp === 60, '+Beer: 165 / 165 / 60')
@@ -220,6 +224,20 @@ export function runSelfCheck() {
   ok(streak(s3, gt[0], DEMO_DATE) === 3, 'G4 racha retroactiva con override')
   ok(Math.abs(get(gg, 'gym').goalPct! - 100 / 3) < 1e-9, 'G4 goalPct')
   ok(todaySummary(hv, gg.trackers, DEMO_DATE).missing.find(x => x.tracker.id === 'gym')?.left === 2, 'G4 te faltan')
+
+  // K1–K5 — ranking prorrateado: amigos a ritmo lineal (lun 1/7 … dom 7/7)
+  const MON = '2026-10-12'
+  const fr = (r: PartyMember[], id: string) => r.find(m => m.id === id)!
+  const rkMon = buildRanking(g0, gymP.members, 'hero', MON)
+  ok(fr(rkMon, 'carlos').weeklyHeroXp === 74 && fr(rkMon, 'carlos').weeklyVillainXp === 4 && fr(sg0.ranking, 'carlos').weeklyHeroXp === 221 &&
+    fr(rk(g0), 'carlos').weeklyHeroXp === 515 && gymP.members[0].weeklyHeroXp === 515, 'K1 prorrateo lun/mié/dom sin mutar PARTIES')
+  ok(ids(sg0.ranking) === 'you,carlos,alex,dani' && sg0.position === 1 && ids(so0.ranking) === 'you,lucia,marta,pablo' && so0.position === 1, 'K2 ranking HERO miércoles')
+  const depthO = buildRanking(so0.game, ofi.members, 'depth', DEMO_DATE)
+  ok(ids(buildRanking(sg0.game, gymP.members, 'villain', DEMO_DATE)) === 'dani,you,alex,carlos' && ids(depthO) === 'you,lucia,pablo,marta' &&
+    rankScore(fr(depthO, 'pablo'), 'depth') === 102, 'K3 VILLAIN y profundidad miércoles (suma de campos redondeados)')
+  ok(ids(sg1.ranking) === 'you,carlos,alex,dani' && !overtakes(sg1.ranking, sg0.ranking).length, 'K4 +Gym miércoles: sin adelantamiento')
+  const rm = (n: number) => buildRanking(deriveGame(Array.from({ length: n }, (_, i) => ev('gym', 1, MON, `mon${i}`)), MON), gymP.members, 'hero', MON)
+  ok(ids(rm(2)) === 'carlos,you,alex,dani' && ids(rm(3)) === 'you,carlos,alex,dani' && overtakes(rm(3), rm(2)).join() === 'Carlos', 'K5 adelantamiento en lunes')
 
   console.info('[selfcheck] done')
 }

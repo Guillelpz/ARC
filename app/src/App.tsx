@@ -103,8 +103,8 @@ export default function App() {
       const names = overtakes(after.ranking, before.ranking)
       if (names.length) { setOvertake({ key: ev.id, party: p.name, names, position: after.position }); break }
       const lost = ([t.branch, 'depth'] as const).map(metric => {
-        const a = buildRanking(after.game, p.members, metric)
-        const names = overtakes(buildRanking(before.game, p.members, metric), a)
+        const a = buildRanking(after.game, p.members, metric, today)
+        const names = overtakes(buildRanking(before.game, p.members, metric, today), a)
         return { key: ev.id, party: p.name, names, position: a.findIndex(m => m.isYou) + 1, lost: metric }
       }).find(o => o.names.length)
       if (lost) { setOvertake(lost); break }
@@ -187,7 +187,7 @@ export default function App() {
         <UnknownView trackers={active} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />
       )}
       {screen === 'party' && (
-        <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} />
+        <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
