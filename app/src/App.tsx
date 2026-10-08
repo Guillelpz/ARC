@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
-import { localDate } from './core/stats'
+import { clampAmount, localDate } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, loadAll, loadLastExport, parseBackup, requestPersist, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
@@ -79,10 +79,9 @@ export default function App() {
     transition(() => { setScreen(s); window.scrollTo(0, 0) }, 'screen')
   }
 
-  // amount < 0 = corrección (evento negativo); no deja la semana por debajo de 0
+  // amount < 0 = corrección (evento negativo); no deja el día por debajo de 0
   function add(t: Tracker, amount: number) {
-    const week = game.trackers.find(s => s.tracker.id === t.id)?.week ?? 0
-    amount = Math.max(Math.round(amount), -week)
+    amount = clampAmount(events, t.id, today, amount)
     if (!amount) return
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount, occurredAt: nowStamp() }
     const next = [...events, ev]
@@ -155,7 +154,7 @@ export default function App() {
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
-        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} onAdd={add} />
+        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} />
       )}
       {screen === 'new' && (
         <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />

@@ -27,9 +27,9 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0')
 // km/min se añaden a la diferencia; sesiones/clases/unidades no
 const withUnit = (n: string, unit: string) => (unit === 'km' || unit === 'min' ? `${n} ${unit}` : n)
 
-type Props = { stats: TrackerStats; gain: Gain | null; onAdd: (amount: number) => void; countsIn: string[] }
+type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; onAdd: (amount: number) => void; countsIn: string[] }
 
-export function TrackerCard({ stats, gain, onAdd, countsIn }: Props) {
+export function TrackerCard({ stats, gain, dayTotal, onAdd, countsIn }: Props) {
   const { tracker: t, week, diff, allTime, goalPct, xp } = stats
   const Icon = ICONS[t.id] ?? Sparkles
   const c = THEME[t.branch]
@@ -78,7 +78,7 @@ export function TrackerCard({ stats, gain, onAdd, countsIn }: Props) {
           <button
             type="button"
             onClick={() => onAdd(-n)}
-            disabled={!valid || week === 0}
+            disabled={!valid || dayTotal <= 0}
             aria-label={`Restar ${n} ${t.unit} a ${t.name}`}
             className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-95 disabled:opacity-40 motion-reduce:transform-none ${c.chip}`}
           >

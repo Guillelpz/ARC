@@ -19,6 +19,14 @@ export const total = (events: ActivityEvent[], trackerId: string, start = '', en
     .filter(e => e.trackerId === trackerId && e.occurredAt >= start && e.occurredAt < end)
     .reduce((s, e) => s + e.amount, 0)
 
+// total neto de un día [day, day+1)
+export const dayTotal = (events: ActivityEvent[], trackerId: string, day: string) =>
+  total(events, trackerId, day, addDays(day, 1))
+
+// redondea; una corrección no deja el día por debajo de 0 (si ya lo está, no resta nada)
+export const clampAmount = (events: ActivityEvent[], trackerId: string, day: string, amount: number) =>
+  Math.max(Math.round(amount), -Math.max(0, dayTotal(events, trackerId, day)))
+
 export function trackerStats(t: Tracker, events: ActivityEvent[], today: string) {
   const thisStart = mondayOf(today)
   const thisEnd = addDays(today, 1) // exclusivo

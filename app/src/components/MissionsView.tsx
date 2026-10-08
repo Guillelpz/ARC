@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import type { ActivityEvent, Branch, GameState, PartyState, Tracker } from '../core/types'
 import { countsIn } from '../core/party'
-import { byRecent } from '../core/stats'
+import { byRecent, dayTotal } from '../core/stats'
 import { normalizeText } from '../core/classify'
 import { ProgressBar } from './ProgressBar'
 import { TrackerCard, type Gain } from './TrackerCard'
@@ -13,10 +13,11 @@ type Props = {
   partyStates: PartyState[]
   gain: Gain | null
   events: ActivityEvent[]
+  today: string
   onAdd: (t: Tracker, amount: number) => void
 }
 
-export function MissionsView({ branch, game, partyStates, gain, events, onAdd }: Props) {
+export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd }: Props) {
   const hero = branch === 'hero'
   const name = hero ? 'HERO' : 'VILLAIN'
   const info = game[branch]
@@ -53,7 +54,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, onAdd }:
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((s, i) => (
             <div key={s.tracker.id} className="rise" style={{ animationDelay: `${i * 60}ms` }}>
-            <TrackerCard stats={s} gain={gain} onAdd={n => onAdd(s.tracker, n)}
+            <TrackerCard stats={s} gain={gain} dayTotal={dayTotal(events, s.tracker.id, today)} onAdd={n => onAdd(s.tracker, n)}
               countsIn={countsIn(s.tracker.id, partyStates)} />
             </div>
           ))}
