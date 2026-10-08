@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
-import { unlockStorage } from './core/storage'
+import { exportBackup, unlockStorage } from './core/storage'
 
 const EV = 'life-rpg-demo-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
@@ -10,6 +10,7 @@ beforeEach(() => {
   localStorage.clear(); unlockStorage()
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 7, 12, 0, 0))
   window.scrollTo = vi.fn() as never
+  window.confirm = vi.fn(() => false) // happy-dom no lo define
   let n = 0; vi.spyOn(crypto, 'randomUUID').mockImplementation(() => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}` as never)
   URL.createObjectURL = vi.fn(() => 'blob:x'); URL.revokeObjectURL = vi.fn()
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -63,4 +64,50 @@ test('U4 deshacer', () => {
   expect(ev[1]).toMatchObject({ amount: -1, undoes: ev[0].id })
   expect(card('Gym').getAllByText('deshecho').length).toBeGreaterThan(0)
   expect(card('Gym').queryByRole('button', { name: /^Deshacer/ })).toBeNull()
+})
+
+const importFile = (container: HTMLElement, text: string) =>
+  fireEvent.change(container.querySelector('input[type=file]')!, { target: { files: [{ text: () => Promise.resolve(text) }] } })
+const btn = (name: string | RegExp) => screen.getByRole('button', { name })
+
+test('U5 exportar', () => {
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+  expect(JSON.parse(localStorage.getItem('life-rpg-meta-v1')!).lastExportAt).toBeTruthy()
+  expect(screen.getByText('Última copia: hoy.')).toBeTruthy()
+})
+
+test('U6 importar', async () => {
+  const { container } = render(<App />)
+  importFile(container, '{roto')
+  expect(await screen.findByText('Ese archivo no es una copia válida de RPG Life Tracker.')).toBeTruthy()
+  expect(stored()).toEqual([])
+  const ev = [{ id: 'x1', trackerId: 'gym', amount: 1, occurredAt: '2026-10-05T09:00:00' }]
+  const copia = exportBackup(ev, { trackers: [], proposals: [] }, 'x')
+  vi.mocked(window.confirm).mockReturnValueOnce(false)
+  importFile(container, copia)
+  await vi.waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1))
+  expect(stored()).toEqual([])
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  importFile(container, copia)
+  expect(await screen.findByText('Copia importada: 1 registros y 0 misiones nuevas.')).toBeTruthy()
+  expect(stored()).toEqual(ev)
+})
+
+test('U7 borrar todo y U8 recuperar', () => {
+  render(<App />)
+  fireEvent.click(btn('Cargar ejemplo'))
+  expect(stored()).toHaveLength(28)
+  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(false)
+  fireEvent.click(btn('Borrar todo'))
+  expect(stored()).toHaveLength(28)
+  confirm.mockReturnValueOnce(false).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar todo'))
+  expect(stored()).toEqual([])
+  expect(localStorage.getItem('life-rpg-demo-v1.backup.last')).not.toBeNull()
+  confirm.mockReturnValueOnce(true)
+  fireEvent.click(btn('Recuperar copia anterior'))
+  expect(stored()).toHaveLength(28)
+  expect(screen.getByText('Copia recuperada: 28 registros y 0 misiones nuevas.')).toBeTruthy()
 })
