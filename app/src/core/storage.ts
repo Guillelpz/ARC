@@ -1,4 +1,5 @@
-import type { ActivityEvent, CustomData, Proposal, Tracker } from './types'
+import type { ActivityEvent, CustomData, Goals, Proposal, Tracker } from './types'
+import { defaultGoal } from './trackers'
 
 const KEY = 'life-rpg-demo-v1'
 const CUSTOM_KEY = 'life-rpg-custom-v1'
@@ -46,7 +47,18 @@ export function readCustom(v: unknown): Parsed<CustomData> {
   }
   const proposals = rawP.filter((p): p is Proposal => isObj(p) &&
     typeof p.trackerId === 'string' && typeof p.partyId === 'string')
-  return { data: { trackers, proposals }, dropped: rawT.length - trackers.length + fixedN + rawP.length - proposals.length }
+  let gDropped = 0
+  const goals: Goals = {}
+  if (v.goals !== undefined) {
+    if (!isObj(v.goals)) gDropped = 1
+    else for (const [id, g] of Object.entries(v.goals)) {
+      if (defaultGoal(id) !== undefined && typeof g === 'number' && Number.isInteger(g) && g >= 1) goals[id] = g
+      else gDropped++
+    }
+  }
+  const data: CustomData = { trackers, proposals }
+  if (Object.keys(goals).length > 0) data.goals = goals
+  return { data, dropped: rawT.length - trackers.length + fixedN + rawP.length - proposals.length + gDropped }
 }
 
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, type LucideIcon } from 'lucide-react'
 import type { HistoryRow, Tracker, TrackerStats } from '../core/types'
+import { defaultGoal } from '../core/trackers'
 import { editTracker, isValidName } from '../core/classify'
 import { dayLabel } from '../core/stats'
 import { ProgressBar } from './ProgressBar'
@@ -35,6 +36,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
   const { tracker: t, week, diff, allTime, goalPct, xp } = stats
   const Icon = ICONS[t.id] ?? Sparkles
   const c = THEME[t.branch]
+  const fixed = !t.custom
   const [qty, setQty] = useState(String(t.increment))
   const n = Math.round(Number(qty))
   const valid = Number.isFinite(n) && n > 0
@@ -45,10 +47,11 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
   const nameErr = !isValidName(eName) ? '2–40 caracteres' : nameTaken?.(eName) ? 'Ya tienes una misión con ese nombre' : null
   const incOk = Math.round(Number(eInc)) >= 1
   const goalOk = eGoal.trim() === '' || Math.round(Number(eGoal)) >= 1
-  const canSave = !nameErr && incOk && goalOk
+  const canSave = fixed ? goalOk : !nameErr && incOk && goalOk
   const field = `min-h-11 w-full rounded-lg border bg-transparent px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`
   const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setEditing(true) }
   const save = () => {
+    if (fixed) { onSave?.({ ...t, weeklyGoal: eGoal.trim() === '' ? undefined : Number(eGoal) }); setEditing(false); return }
     const next = editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal) })
     onSave?.(next); setQty(String(next.increment)); setEditing(false)
   }
@@ -68,8 +71,8 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span key={gain?.trackerId === t.id ? gain.key : undefined} className={`text-sm font-semibold tabular-nums ${gain?.trackerId === t.id ? 'bump' : ''}`}>{xp.xp} XP</span>
-            {t.custom && onSave && (
-              <button type="button" onClick={open} aria-label={`Editar ${t.name}`}
+            {onSave && (
+              <button type="button" onClick={open} aria-label={fixed ? `Editar objetivo de ${t.name}` : `Editar ${t.name}`}
                 className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
                 <Pencil className="size-4" aria-hidden />
               </button>
@@ -104,16 +107,19 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
 
       {editing ? (
         <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-1 text-xs font-medium">Nombre
-            <input value={eName} onChange={e => setEName(e.target.value)} maxLength={40} className={field} />
-            {nameErr && <span className={`text-xs ${c.muted}`}>{nameErr}</span>}
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-medium">Incremento ({t.unit})
-            <input type="number" min={1} step={1} value={eInc} onChange={e => setEInc(e.target.value)} className={field} />
-          </label>
+          {!fixed && (<>
+            <label className="flex flex-col gap-1 text-xs font-medium">Nombre
+              <input value={eName} onChange={e => setEName(e.target.value)} maxLength={40} className={field} />
+              {nameErr && <span className={`text-xs ${c.muted}`}>{nameErr}</span>}
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-medium">Incremento ({t.unit})
+              <input type="number" min={1} step={1} value={eInc} onChange={e => setEInc(e.target.value)} className={field} />
+            </label>
+          </>)}
           {t.branch === 'hero' && (
             <label className="flex flex-col gap-1 text-xs font-medium">Objetivo semanal ({t.unit})
-              <input type="number" min={1} step={1} value={eGoal} onChange={e => setEGoal(e.target.value)} className={field} />
+              <input type="number" min={1} step={1} value={eGoal} onChange={e => setEGoal(e.target.value)} placeholder={fixed ? String(defaultGoal(t.id)) : undefined} className={field} />
+              {fixed && <span className={`text-xs ${c.muted}`}>Déjalo vacío para volver a {defaultGoal(t.id)} {t.unit}.</span>}
             </label>
           )}
           <div className="flex gap-2">
@@ -122,13 +128,13 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
             <button type="button" onClick={save} disabled={!canSave}
               className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 ${c.button}`}>Guardar</button>
           </div>
-          <div className="flex flex-col gap-2 border-t pt-3">
+          {!fixed && <div className="flex flex-col gap-2 border-t pt-3">
             <p className={`text-xs leading-5 ${c.muted}`}>Archivar la oculta de esta lista. Sus registros siguen contando y puedes reactivarla desde Inicio.</p>
             <button type="button" onClick={() => onSave?.({ ...t, archived: true })}
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
               <Archive className="size-4" aria-hidden /> Archivar
             </button>
-          </div>
+          </div>}
         </div>
       ) : (
       <div className="relative">

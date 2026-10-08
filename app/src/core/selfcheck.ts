@@ -1,6 +1,6 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
-import { allTrackers, TRACKERS } from './trackers'
+import { allTrackers, setGoal, TRACKERS } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, undoneIds } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
@@ -210,6 +210,16 @@ export function runSelfCheck() {
   const arch = { ...med, archived: true }, ha = [ev(med.id, 1, DEMO_DATE)]
   const hsa = todaySummary(ha, deriveGame(ha, DEMO_DATE, allTrackers([arch])).trackers, DEMO_DATE)
   ok(!hsa.done.length && hsa.xp.hero === 0, 'H4 archivada fuera de hoy')
+
+  // G1–G4 — objetivos editables de las fijas
+  const ga = allTrackers([], { gym: 2 })
+  ok(ga[0].weeklyGoal === 2 && ga[1].weeklyGoal === 3 && TRACKERS[0].weeklyGoal === 4 && allTrackers([]).length === 6, 'G1 override sin mutar TRACKERS')
+  ok(JSON.stringify(setGoal({}, 'gym', 2.6)) === '{"gym":3}' && [setGoal({ gym: 3 }, 'gym', null), setGoal({ gym: 3 }, 'gym', 4), setGoal({ gym: 3 }, 'gym', 0), setGoal({}, 'beer', 5), setGoal({}, 'custom-x', 5)].every(g => Object.keys(g).length === 0), 'G2 setGoal')
+  ok(sumE(deriveGame(SEED_EVENTS, DEMO_DATE, allTrackers([], { gym: 1, running: 50 }))) === sumE(deriveGame(SEED_EVENTS, DEMO_DATE)), 'G3 XP invariante')
+  const gt = allTrackers([], { gym: 3 }), gg = deriveGame(hv, DEMO_DATE, gt)
+  ok(streak(s3, gt[0], DEMO_DATE) === 3, 'G4 racha retroactiva con override')
+  ok(Math.abs(get(gg, 'gym').goalPct! - 100 / 3) < 1e-9, 'G4 goalPct')
+  ok(todaySummary(hv, gg.trackers, DEMO_DATE).missing.find(x => x.tracker.id === 'gym')?.left === 2, 'G4 te faltan')
 
   console.info('[selfcheck] done')
 }

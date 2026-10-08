@@ -250,3 +250,27 @@ describe('readCustom: campos de P4.3', () => {
     expect(parseBackup(exportBackup([], { trackers: [t] as never, proposals: [] }, 'x'))?.custom.trackers).toEqual([t])
   })
 })
+
+describe('readCustom: goals', () => {
+  test('C6 sin goals', () => {
+    const r = readCustom({ trackers: [], proposals: [] })
+    expect(r).toEqual({ data: { trackers: [], proposals: [] }, dropped: 0 })
+    expect(r!.data).not.toHaveProperty('goals')
+  })
+  test('C7 válidos', () => {
+    expect(readCustom({ goals: { gym: 2, reading: 60 } })).toEqual({ data: { trackers: [], proposals: [], goals: { gym: 2, reading: 60 } }, dropped: 0 })
+  })
+  test('C8 inválidos', () => {
+    const t = { id: 'c', name: 'C', branch: 'hero', increment: 1, xpPerUnit: 1 }
+    const a = readCustom({ trackers: [t], goals: 'x' })
+    expect(a!.data.goals).toBeUndefined()
+    expect(a!.dropped).toBe(1)
+    expect(a!.data.trackers).toHaveLength(1)
+    const b = readCustom({ goals: { beer: 3, 'custom-x': 3, nope: 3, gym: 0, bjj: 2.5, running: '5', reading: 90 } })
+    expect(b!.data.goals).toEqual({ reading: 90 })
+    expect(b!.dropped).toBe(6)
+  })
+  test('C9 export/import', () => {
+    expect(parseBackup(exportBackup([], { trackers: [], proposals: [], goals: { gym: 2 } }, 'x'))?.custom.goals).toEqual({ gym: 2 })
+  })
+})
