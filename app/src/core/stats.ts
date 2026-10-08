@@ -27,9 +27,13 @@ export const dayTotal = (events: ActivityEvent[], trackerId: string, day: string
 export const clampAmount = (events: ActivityEvent[], trackerId: string, day: string, amount: number) =>
   Math.max(Math.round(amount), -Math.max(0, dayTotal(events, trackerId, day)))
 
+// solo un negativo con undoes anula; un positivo con undoes (datos importados/editados) no
+export const undoneIds = (events: ActivityEvent[]) =>
+  new Set(events.flatMap(e => (e.undoes && e.amount < 0 ? [e.undoes] : [])))
+
 // ponytail: recorre todos los eventos por tarjeta y render (O(n·tarjetas)); indexar por trackerId si se nota.
 export function history(events: ActivityEvent[], trackerId: string, limit = 10): HistoryRow[] {
-  const undone = new Set(events.flatMap(e => (e.undoes ? [e.undoes] : [])))
+  const undone = undoneIds(events)
   return events.filter(e => e.trackerId === trackerId).reverse() // empate: último insertado primero
     .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0)) // sort estable
     .slice(0, limit)

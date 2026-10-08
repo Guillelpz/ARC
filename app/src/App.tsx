@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
-import { clampAmount, localDate } from './core/stats'
+import { clampAmount, localDate, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
@@ -84,6 +84,7 @@ export default function App() {
   // undo = registro positivo que se anula entero
   function add(t: Tracker, amount: number, day = today, undo?: ActivityEvent) {
     if (day > today) day = today
+    if (undo && undoneIds(events).has(undo.id)) return
     amount = clampAmount(events, t.id, day, amount)
     if (!amount || (undo && amount !== -undo.amount)) return
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,

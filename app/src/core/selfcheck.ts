@@ -1,7 +1,7 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, TRACKERS } from './trackers'
-import { addDays, byRecent, clampAmount, dayTotal, history, localDate, mondayOf } from './stats'
+import { addDays, byRecent, clampAmount, dayTotal, history, localDate, mondayOf, undoneIds } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -176,6 +176,11 @@ export function runSelfCheck() {
   ok(!history([hu[0], { id: 'h4', trackerId: 'running', amount: -2, occurredAt: '2026-10-05T10:00:00' }], 'running')[1].canUndo, 'history: día insuficiente')
   // A5 — límite de 10
   ok(history(Array.from({ length: 12 }, (_, i) => ({ id: `l${i}`, trackerId: 'gym', amount: 1, occurredAt: NOW })), 'gym').length === 10, 'history: 10')
+
+  // R1/R2 — solo un negativo con undoes anula; un deshecho ya anulado no se repite
+  const rp: ActivityEvent[] = [hu[0], { id: 'p', trackerId: 'running', amount: 5, occurredAt: hu[0].occurredAt, undoes: 'h1' }]
+  ok(!undoneIds(rp).has('h1') && !history(rp, 'running').find(r => r.event.id === 'h1')!.undone, 'R1 positivo con undoes no anula')
+  ok(undoneIds(hu).has('h1'), 'R2 deshecho ya anulado')
 
   console.info('[selfcheck] done')
 }
