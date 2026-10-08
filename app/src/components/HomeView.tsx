@@ -1,4 +1,5 @@
-import { ChevronRight, Moon, Plus, RotateCcw, Shield, Sparkles } from 'lucide-react'
+import { useRef } from 'react'
+import { ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Upload, X } from 'lucide-react'
 import type { Branch, GameState, PartyState } from '../core/types'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -11,6 +12,11 @@ type Props = {
   onNavigate: (s: Screen) => void
   onOpenParty: (id: string) => void
   onReset: () => void
+  onExport: () => void
+  onImport: (text: string) => void
+  onImportError: () => void
+  notice: string | null
+  onDismissNotice: () => void
 }
 
 const btn = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2'
@@ -20,7 +26,8 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset }: Props) {
+export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onExport, onImport, onImportError, notice, onDismissNotice }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b).length, weekXp: weeklyXp(game, b) }
   }
@@ -56,6 +63,16 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset }
       </nav>
 
       <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pt-6 pb-28 sm:max-w-2xl lg:grid lg:max-w-4xl lg:grid-cols-2 lg:items-start">
+        {notice && (
+          <div role="status" className="flex items-start gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm lg:col-span-2">
+            <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
+            <p className="flex-1 text-sm text-app-text">{notice}</p>
+            <button type="button" onClick={onDismissNotice} aria-label="Cerrar aviso"
+              className="-m-2 grid min-h-11 min-w-11 place-items-center rounded-lg hover:bg-app-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              <X className="size-4" aria-hidden />
+            </button>
+          </div>
+        )}
         <div className="rise"><PlayerHeader game={game} /></div>
 
         <div className="rise flex flex-col gap-6" style={{ animationDelay: '80ms' }}>
@@ -96,6 +113,20 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset }
               className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
               <RotateCcw className="size-4" aria-hidden /> Restablecer demo
             </button>
+            <button type="button" onClick={onExport}
+              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              <Download className="size-4" aria-hidden /> Exportar copia
+            </button>
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              <Upload className="size-4" aria-hidden /> Importar copia
+            </button>
+            <input ref={fileRef} type="file" accept=".json,application/json" hidden
+              onChange={e => {
+                const input = e.currentTarget, file = input.files?.[0]
+                if (file) file.text().then(onImport, onImportError)
+                input.value = ''
+              }} />
           </footer>
         </div>
       </main>

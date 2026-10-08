@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { DEMO_DATE, SEED_EVENTS } from './core/seed'
-import { EMPTY_CUSTOM, loadCustom, loadEvents, saveCustom, saveEvents } from './core/storage'
+import { EMPTY_CUSTOM, exportBackup, loadAll, parseBackup, saveCustom, saveEvents, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -17,9 +17,16 @@ import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast }
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = () => `${DEMO_DATE}T${new Date().toTimeString().slice(0, 8)}`
 
+const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
+  : problems.some(p => p.backupKey === null)
+    ? 'Parte de tus datos guardados no se pudo leer ni copiar. Tus cambios no se guardarán en este navegador hasta que importes una copia.'
+    : 'Parte de tus datos guardados no se pudo leer. El original está copiado aparte en este navegador. Exporta una copia para conservar lo que ves.'
+
 export default function App() {
-  const [events, setEvents] = useState<ActivityEvent[]>(loadEvents)
-  const [custom, setCustom] = useState<CustomData>(loadCustom)
+  const [loaded] = useState(loadAll)
+  const [events, setEvents] = useState<ActivityEvent[]>(loaded.events)
+  const [custom, setCustom] = useState<CustomData>(loaded.custom)
+  const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
   const [partyId, setPartyId] = useState(PARTIES[0].id)
   const [toast, setToast] = useState<Toast | null>(null)
@@ -96,11 +103,31 @@ export default function App() {
     setEvents(SEED_EVENTS); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
+  function exportData() {
+    const now = new Date().toISOString()
+    const url = URL.createObjectURL(new Blob([exportBackup(events, custom, now)], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = url; a.download = `rpg-life-tracker-${now.slice(0, 10)}.json`; a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function importData(text: string) {
+    const b = parseBackup(text)
+    if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
+    const n = b.events.length, m = b.custom.trackers.length
+    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
+    unlockStorage()
+    setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
+    setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
+  }
+
   return (
     <>
       {screen === 'home' && (
         <HomeView game={game} partyStates={partyStates} onNavigate={go}
-          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} />
+          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset}
+          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')}
+          notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
         <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} onAdd={add} />
