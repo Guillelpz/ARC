@@ -151,7 +151,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeView game={game} partyStates={partyStates} onNavigate={go}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined}
-          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')}
+          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (

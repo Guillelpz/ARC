@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { ChevronRight, CircleAlert, Download, Moon, Plus, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { Branch, GameState, PartyState } from '../core/types'
+import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
 import { PlayerHeader } from './PlayerHeader'
@@ -16,6 +17,7 @@ type Props = {
   onExport: () => void
   onImport: (text: string) => void
   onImportError: () => void
+  copy: CopyStatus
   notice: string | null
   onDismissNotice: () => void
 }
@@ -27,7 +29,7 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onLoadExample, onExport, onImport, onImportError, notice, onDismissNotice }: Props) {
+export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onLoadExample, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b).length, weekXp: weeklyXp(game, b) }
@@ -118,26 +120,43 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
             <Sparkles className="size-4" aria-hidden /> Añadir algo nuevo
           </button>
 
-          <footer className="flex flex-wrap items-center gap-x-1 text-xs leading-5 text-app-muted">
+          <section aria-labelledby="tus-datos" className="flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5">
+            <h2 id="tus-datos" className="text-lg font-semibold">Tus datos</h2>
+            {copy.due ? (
+              <p className="flex items-start gap-2 text-sm leading-6 text-app-text">
+                <CircleAlert className="mt-1 size-4 shrink-0" aria-hidden />
+                {copy.days === null
+                  ? 'Aún no has exportado ninguna copia. Tus datos solo están en este navegador.'
+                  : `Tu última copia es de hace ${copy.days} días. Exporta otra para no perder lo reciente.`}
+              </p>
+            ) : (
+              <p className="text-xs leading-5 text-app-muted">
+                {copy.days === null ? 'Tus datos se guardan solo en este navegador.'
+                  : copy.days === 0 ? 'Última copia: hoy.'
+                  : `Última copia: hace ${copy.days} ${copy.days === 1 ? 'día' : 'días'}.`}
+              </p>
+            )}
+            <div className="flex flex-wrap gap-3">
+              <button type="button" onClick={onExport}
+                className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
+                <Download className="size-4" aria-hidden /> Exportar copia
+              </button>
+              <button type="button" onClick={() => fileRef.current?.click()}
+                className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
+                <Upload className="size-4" aria-hidden /> Importar copia
+              </button>
+              <input ref={fileRef} type="file" accept=".json,application/json" hidden
+                onChange={e => {
+                  const input = e.currentTarget, file = input.files?.[0]
+                  if (file) file.text().then(onImport, onImportError)
+                  input.value = ''
+                }} />
+            </div>
             <button type="button" onClick={onReset}
-              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              className="inline-flex min-h-11 items-center gap-1 self-start px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
               <Trash2 className="size-4" aria-hidden /> Borrar todo
             </button>
-            <button type="button" onClick={onExport}
-              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
-              <Download className="size-4" aria-hidden /> Exportar copia
-            </button>
-            <button type="button" onClick={() => fileRef.current?.click()}
-              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
-              <Upload className="size-4" aria-hidden /> Importar copia
-            </button>
-            <input ref={fileRef} type="file" accept=".json,application/json" hidden
-              onChange={e => {
-                const input = e.currentTarget, file = input.files?.[0]
-                if (file) file.text().then(onImport, onImportError)
-                input.value = ''
-              }} />
-          </footer>
+          </section>
         </div>
       </main>
     </div>
