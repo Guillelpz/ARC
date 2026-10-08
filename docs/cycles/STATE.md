@@ -9,8 +9,8 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 3 — cerrado.
 - Ciclo 4 — cerrado.
 - Ciclo 5 — cerrado (bc660e8).
-- Ciclo 6 (P4.3 + P4.5) — paso 5 (implementación).
-- Ciclo 7 (P7.4 → P7.3 + P7.1): aprobado.
+- Ciclo 6 (P4.3 + P4.5) — fusionado; paso 8 (análisis).
+- Ciclo 7 (P7.4 → P7.3 + P7.1) — paso 4 (spec).
 - Ciclo 8 (P7.2b): aprobado. P7.2a no aprobada todavía.
 
 ## Decisiones del usuario (2026-10-08)
