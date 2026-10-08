@@ -34,6 +34,10 @@ La sesión principal de Claude Code orquesta. Los agentes de `.claude/agents/` h
 - Los agentes leen primero con Grep y diffs; los documentos históricos de la demo solo cuando hacen falta.
 - Opus solo donde el criterio importa (proponer, evaluar, especificar).
 
+## Invocación
+
+Si un agente de `.claude/agents/` no está registrado en la sesión (pasa con los que se crean a mitad de sesión), se lanza `general-purpose` con el modelo del frontmatter y la instrucción «Lee `.claude/agents/<nombre>.md` y actúa según ese rol».
+
 ## Estado
 
 `docs/cycles/STATE.md` es la memoria del workflow: ciclo en curso, paso, propuestas aprobadas, rechazadas o pendientes. Lo actualiza solo el orquestador.
