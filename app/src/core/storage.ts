@@ -71,3 +71,15 @@ export const saveCustom = (c: CustomData, store: Store = localStorage) => {
   if (locked.has(CUSTOM_KEY)) return
   try { store.setItem(CUSTOM_KEY, JSON.stringify(c)) } catch { /* cuota */ }
 }
+
+export type Backup = { app: 'rpg-life-tracker'; version: 1; exportedAt: string; events: ActivityEvent[]; custom: CustomData }
+
+export const exportBackup = (events: ActivityEvent[], custom: CustomData, exportedAt: string): string =>
+  JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt, events, custom } satisfies Backup, null, 2)
+
+export function parseBackup(raw: string): { events: ActivityEvent[]; custom: CustomData; dropped: number } | null {
+  const v = json(raw)
+  if (!isObj(v) || v.app !== 'rpg-life-tracker' || v.version !== 1) return null
+  const e = readEvents(v.events), c = readCustom(v.custom)
+  return e && c ? { events: e.data, custom: c.data, dropped: e.dropped + c.dropped } : null
+}

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, loadAll, parseCustom, readCustom, readEvents, saveEvents, unlockStorage } from './storage'
+import { EMPTY_CUSTOM, exportBackup, loadAll, parseBackup, parseCustom, readCustom, readEvents, saveEvents, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -79,4 +79,23 @@ describe('loadAll', () => {
     saveEvents([good], s)
     expect(s.m.get(EV)).toBe('{roto')
   })
+})
+
+describe('exportBackup / parseBackup', () => {
+  const custom = {
+    trackers: [{ id: 'c1', name: 'X', branch: 'hero' as const, increment: 1, xpPerUnit: 2 }],
+    proposals: [{ trackerId: 'c1', partyId: 'p1' }],
+  }
+  const exp = (o: object = {}) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: EMPTY_CUSTOM, ...o })
+  test('roundtrip', () => {
+    const r = parseBackup(exportBackup(SEED_EVENTS, custom as never, '2026-10-08T00:00:00Z'))
+    expect(r).toEqual({ events: SEED_EVENTS, custom, dropped: 0 })
+  })
+  test('rechaza ajenos', () => {
+    expect(parseBackup(exp({ app: 'otro' }))).toBeNull()
+    expect(parseBackup(exp({ version: 2 }))).toBeNull()
+    expect(parseBackup('{roto')).toBeNull()
+    expect(parseBackup(exp({ events: undefined }))).toBeNull()
+  })
+  test('evento inválido', () => { expect(parseBackup(exp({ events: [null] }))?.dropped).toBe(1) })
 })

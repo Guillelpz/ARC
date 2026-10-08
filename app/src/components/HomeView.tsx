@@ -1,4 +1,5 @@
-import { ChevronRight, CircleAlert, Moon, Plus, RotateCcw, Shield, Sparkles, X } from 'lucide-react'
+import { useRef } from 'react'
+import { ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Upload, X } from 'lucide-react'
 import type { Branch, GameState, PartyState } from '../core/types'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -11,6 +12,9 @@ type Props = {
   onNavigate: (s: Screen) => void
   onOpenParty: (id: string) => void
   onReset: () => void
+  onExport: () => void
+  onImport: (text: string) => void
+  onImportError: () => void
   notice: string | null
   onDismissNotice: () => void
 }
@@ -22,7 +26,8 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, notice, onDismissNotice }: Props) {
+export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onExport, onImport, onImportError, notice, onDismissNotice }: Props) {
+  const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b).length, weekXp: weeklyXp(game, b) }
   }
@@ -108,6 +113,20 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
               className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
               <RotateCcw className="size-4" aria-hidden /> Restablecer demo
             </button>
+            <button type="button" onClick={onExport}
+              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              <Download className="size-4" aria-hidden /> Exportar copia
+            </button>
+            <button type="button" onClick={() => fileRef.current?.click()}
+              className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-medium text-app-muted underline underline-offset-2 hover:text-app-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              <Upload className="size-4" aria-hidden /> Importar copia
+            </button>
+            <input ref={fileRef} type="file" accept=".json,application/json" hidden
+              onChange={e => {
+                const input = e.currentTarget, file = input.files?.[0]
+                if (file) file.text().then(onImport, onImportError)
+                input.value = ''
+              }} />
           </footer>
         </div>
       </main>
