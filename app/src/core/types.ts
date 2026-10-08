@@ -79,7 +79,8 @@ export type Friend = PartyMember & { stance: Record<Branch, boolean> }
 export type Party = { id: string; name: string; members: Friend[]; seedCriteria: string[] }
 
 export type Proposal = { trackerId: string; partyId: string; proposedAt: string } // 'YYYY-MM-DDTHH:mm:ss'
-export type CustomData = { trackers: Tracker[]; proposals: Proposal[] }
+export type Goals = Record<string, number> // trackerId fijo HERO → weeklyGoal (entero ≥ 1)
+export type CustomData = { trackers: Tracker[]; proposals: Proposal[]; goals?: Goals } // goals ausente = sin overrides
 
 export type VoteResult = {
   partyId: string
