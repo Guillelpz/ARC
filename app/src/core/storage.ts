@@ -16,8 +16,15 @@ export type Parsed<T> = { data: T; dropped: number } | null // null = ilegible
 
 export function readEvents(v: unknown): Parsed<ActivityEvent[]> {
   if (!Array.isArray(v)) return null
-  const data = v.filter(isEvent)
-  return { data, dropped: v.length - data.length }
+  let dropped = 0
+  const data: ActivityEvent[] = []
+  for (const e of v) {
+    if (!isEvent(e)) { dropped++; continue }
+    if (e.undoes !== undefined && (typeof e.undoes !== 'string' || e.undoes === '')) {
+      const fixed = { ...e }; delete fixed.undoes; data.push(fixed); dropped++ // reparado: se conserva sin el campo
+    } else data.push(e)
+  }
+  return { data, dropped }
 }
 
 export function readCustom(v: unknown): Parsed<CustomData> {

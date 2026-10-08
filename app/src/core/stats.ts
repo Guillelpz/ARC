@@ -1,4 +1,4 @@
-import type { ActivityEvent, Tracker } from './types'
+import type { ActivityEvent, HistoryRow, Tracker } from './types'
 
 export const addDays = (d: string, n: number): string => {
   const t = new Date(d + 'T00:00:00Z')
@@ -18,6 +18,31 @@ export const total = (events: ActivityEvent[], trackerId: string, start = '', en
   events
     .filter(e => e.trackerId === trackerId && e.occurredAt >= start && e.occurredAt < end)
     .reduce((s, e) => s + e.amount, 0)
+
+// total neto de un día [day, day+1)
+export const dayTotal = (events: ActivityEvent[], trackerId: string, day: string) =>
+  total(events, trackerId, day, addDays(day, 1))
+
+// redondea; una corrección no deja el día por debajo de 0 (si ya lo está, no resta nada)
+export const clampAmount = (events: ActivityEvent[], trackerId: string, day: string, amount: number) =>
+  Math.max(Math.round(amount), -Math.max(0, dayTotal(events, trackerId, day)))
+
+// ponytail: recorre todos los eventos por tarjeta y render (O(n·tarjetas)); indexar por trackerId si se nota.
+export function history(events: ActivityEvent[], trackerId: string, limit = 10): HistoryRow[] {
+  const undone = new Set(events.flatMap(e => (e.undoes ? [e.undoes] : [])))
+  return events.filter(e => e.trackerId === trackerId).reverse() // empate: último insertado primero
+    .sort((a, b) => (a.occurredAt < b.occurredAt ? 1 : a.occurredAt > b.occurredAt ? -1 : 0)) // sort estable
+    .slice(0, limit)
+    .map(e => ({
+      event: e,
+      undone: undone.has(e.id),
+      canUndo: e.amount > 0 && !undone.has(e.id) && dayTotal(events, trackerId, e.occurredAt.slice(0, 10)) >= e.amount,
+    }))
+}
+
+export const dayLabel = (day: string, today: string) =>
+  day === today ? 'Hoy' : day === addDays(today, -1) ? 'Ayer'
+    : new Date(day + 'T00:00:00Z').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 
 export function trackerStats(t: Tracker, events: ActivityEvent[], today: string) {
   const thisStart = mondayOf(today)

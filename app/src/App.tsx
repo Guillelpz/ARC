@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
-import { localDate } from './core/stats'
+import { clampAmount, localDate } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, loadAll, loadLastExport, parseBackup, requestPersist, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
@@ -16,7 +16,7 @@ import type { Gain } from './components/TrackerCard'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
-const nowStamp = (d = new Date()) => `${localDate(d)}T${d.toTimeString().slice(0, 8)}`
+const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
 
 const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
   : problems.some(p => p.backupKey === null)
@@ -79,12 +79,14 @@ export default function App() {
     transition(() => { setScreen(s); window.scrollTo(0, 0) }, 'screen')
   }
 
-  // amount < 0 = corrección (evento negativo); no deja la semana por debajo de 0
-  function add(t: Tracker, amount: number) {
-    const week = game.trackers.find(s => s.tracker.id === t.id)?.week ?? 0
-    amount = Math.max(Math.round(amount), -week)
-    if (!amount) return
-    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount, occurredAt: nowStamp() }
+  // amount < 0 = corrección (evento negativo); no deja el día por debajo de 0
+  // undo = registro positivo que se anula entero
+  function add(t: Tracker, amount: number, day = today, undo?: ActivityEvent) {
+    if (day > today) day = today
+    amount = clampAmount(events, t.id, day, amount)
+    if (!amount || (undo && amount !== -undo.amount)) return
+    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,
+      occurredAt: undo ? undo.occurredAt : nowStamp(day), ...(undo && { undoes: undo.id }) }
     const next = [...events, ev]
     const after = deriveGame(next, today, trackers)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
@@ -105,6 +107,8 @@ export default function App() {
       if (lost) { setOvertake(lost); break }
     }
   }
+
+  const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
 
@@ -155,7 +159,7 @@ export default function App() {
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
-        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} onAdd={add} />
+        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} />
       )}
       {screen === 'new' && (
         <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />

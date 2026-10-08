@@ -19,6 +19,20 @@ describe('readEvents', () => {
   })
 })
 
+describe('undoes', () => {
+  const g = { id: 'a', trackerId: 't', amount: -1, occurredAt: '2026-10-07T10:00:00' }
+  test('S1: válido se conserva', () => {
+    expect(readEvents([{ ...g, undoes: 'a' }])).toEqual({ data: [{ ...g, undoes: 'a' }], dropped: 0 })
+  })
+  test('S2: inválido se repara', () => {
+    expect(readEvents([{ ...g, undoes: 3 }, { ...g, id: 'b', undoes: '' }])).toEqual({ data: [g, { ...g, id: 'b' }], dropped: 2 })
+  })
+  test('S3: sobrevive a export/import', () => {
+    const e = { ...g, undoes: 'x' }
+    expect(parseBackup(exportBackup([e], EMPTY_CUSTOM, 'x'))?.events).toEqual([e])
+  })
+})
+
 describe('readCustom', () => {
   test('vacío', () => { expect(readCustom({})).toEqual({ data: EMPTY_CUSTOM, dropped: 0 }) })
   test('trackers no array', () => { expect(readCustom({ trackers: 'x' })).toBeNull() })

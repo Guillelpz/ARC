@@ -18,7 +18,10 @@ export type ActivityEvent = {
   trackerId: string
   amount: number
   occurredAt: string // 'YYYY-MM-DDTHH:mm:ss' local, sin zona
+  undoes?: string    // id del evento positivo que este negativo deshace
 }
+
+export type HistoryRow = { event: ActivityEvent; undone: boolean; canUndo: boolean }
 
 export type LevelInfo = {
   xp: number

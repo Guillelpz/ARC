@@ -1,7 +1,7 @@
 import type { ActivityEvent, GameState, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, TRACKERS } from './trackers'
-import { addDays, byRecent, localDate, mondayOf } from './stats'
+import { addDays, byRecent, clampAmount, dayTotal, history, localDate, mondayOf } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, vote } from './party'
 import { classify, createTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -138,6 +138,33 @@ export function runSelfCheck() {
 
   ok(ids(byRecent(TRACKERS, SEED_EVENTS)) === 'gym,bjj,running,reading,beer,burgers', 'orden por uso: seed')
   ok(ids(byRecent([...TRACKERS, med], [...tap(SEED_EVENTS, 'burgers'), { id: 'check-fix', trackerId: 'gym', amount: -1, occurredAt: `${DEMO_DATE}T13:00:00` }])) === 'custom-meditar,burgers,gym,bjj,running,reading,beer', 'orden por uso: sin uso primero, corrección no cuenta')
+
+  // A1 — un evento en un día pasado cuenta en su semana (mar 29 sep: tramo comparable de la semana anterior a DEMO_DATE)
+  const past = get(deriveGame([...SEED_EVENTS, { id: 'check-past', trackerId: 'gym', amount: 1, occurredAt: '2026-09-29T20:00:00' }], DEMO_DATE), 'gym')
+  ok(past.week === 3 && past.prev === 3 && past.allTime === 6, 'día pasado: cuenta en su semana')
+  // A2 — límite de la corrección por día
+  const dd: ActivityEvent[] = [
+    { id: 'd1', trackerId: 'gym', amount: 2, occurredAt: '2026-10-05T10:00:00' },
+    { id: 'd2', trackerId: 'gym', amount: 1, occurredAt: '2026-10-06T10:00:00' },
+    { id: 'd3', trackerId: 'beer', amount: -1, occurredAt: '2026-10-07T10:00:00' },
+  ]
+  ok(dayTotal(dd, 'gym', '2026-10-05') === 2 && dayTotal(dd, 'gym', '2026-10-07') === 0, 'dayTotal')
+  ok(clampAmount(dd, 'gym', '2026-10-05', -5) === -2 && clampAmount(dd, 'gym', '2026-10-07', -1) === 0, 'corrección: el día no baja de 0')
+  ok(clampAmount(dd, 'beer', '2026-10-07', -1) === 0 && clampAmount(dd, 'gym', '2026-10-05', 2.6) === 3, 'día negativo: 0; positivos redondeados')
+
+  // A3 — history: orden, deshecho y canUndo
+  const hu: ActivityEvent[] = [
+    { id: 'h1', trackerId: 'running', amount: 5, occurredAt: '2026-10-05T09:00:00' },
+    { id: 'h2', trackerId: 'running', amount: 3, occurredAt: '2026-10-06T09:00:00' },
+    { id: 'h3', trackerId: 'running', amount: -5, occurredAt: '2026-10-05T09:00:00', undoes: 'h1' },
+  ]
+  const hr = history(hu, 'running')
+  ok(hr.map(r => r.event.id).join() === 'h2,h3,h1', 'history: orden desc, empate último primero')
+  ok(hr[2].undone && !hr[2].canUndo && hr[0].canUndo && !hr[1].canUndo, 'history: deshecho y canUndo')
+  // A4 — un registro compensado con «−» (sin undoes) no se puede deshacer
+  ok(!history([hu[0], { id: 'h4', trackerId: 'running', amount: -2, occurredAt: '2026-10-05T10:00:00' }], 'running')[1].canUndo, 'history: día insuficiente')
+  // A5 — límite de 10
+  ok(history(Array.from({ length: 12 }, (_, i) => ({ id: `l${i}`, trackerId: 'gym', amount: 1, occurredAt: NOW })), 'gym').length === 10, 'history: 10')
 
   console.info('[selfcheck] done')
 }
