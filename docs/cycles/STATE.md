@@ -5,8 +5,8 @@ Ver `docs/WORKFLOW.md`.
 ## En curso
 
 - Ciclo 1 — cerrado (a712108).
-- Ciclo 2 (P1.1 + P1.2 + P3.1 CI) — fusionado; paso 8 (análisis).
-- Ciclo 3 (P3.3 + P3.2; P3.1 hecha en el ciclo 2): aprobado, siguiente spec.
+- Ciclo 2 — cerrado (7982124).
+- Ciclo 3 (P3.3 + P3.2) — paso 4 (spec).
 
 ## Decisiones del usuario (2026-10-08)
 

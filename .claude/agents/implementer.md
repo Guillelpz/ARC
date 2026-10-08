@@ -23,6 +23,7 @@ Ruta de la spec, rama `cycle-N`, y las tareas a hacer (por defecto, todas). En m
 - Estilo: tokens de `@theme`, sin hex ni `slate-*`, HERO claro y VILLAIN oscuro (`docs/STYLE_GUIDE.md`).
 - Simplificaciones con un límite conocido: comentario `ponytail:`.
 - Dependencias de desarrollo: permitidas si la spec las pide. Dependencias de runtime: solo si la spec dice que están aprobadas.
+- Para comprobar el lockfile usa `npm ci --dry-run`; un `npm ci` real falla con EPERM en Windows si hay un dev server abierto.
 - No toques `docs/cycles/STATE.md`. Actualiza `docs/ESTADO-ACTUAL.md` solo si es una tarea del backlog.
 
 ## Salida

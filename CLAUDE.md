@@ -26,10 +26,10 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
   - `rpg.ts` — `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps()` compara dos `GameState` para el toast.
   - `party.ts` — parties y amigos hardcodeados (`PARTIES`); votación simulada por `stance` de rama (mayoría estricta); cada party deriva su propio `GameState` solo con sus criterios aceptados.
   - `classify.ts` — `classifyAI()` llama a Claude Haiku vía el proxy de Vite `/api/claude` (key en `app/.env.local` como `ANTHROPIC_API_KEY`); ante cualquier fallo usa `classify()`, la heurística determinista por palabras clave que comprueba el selfcheck.
-  - `trackers.ts` (trackers fijos + custom), `seed.ts` (28 eventos; `DEMO_DATE = '2026-10-07'` fija “hoy”), `types.ts`.
-  - `storage.ts` — única capa de persistencia: localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (trackers custom + propuestas), con validación y fallback a seed/vacío si está corrupto.
+  - `trackers.ts` (trackers fijos + custom), `seed.ts` (`seedFor(today)` desplaza los 28 eventos de ejemplo por semanas; `DEMO_DATE` solo fija la fecha del selfcheck), `types.ts`.
+  - `storage.ts` — única capa de persistencia: localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (trackers custom + propuestas), con validación; clave ausente → vacío, clave corrupta → backup `<clave>.backup.<stamp>` + aviso. Exportar/importar copia en JSON.
 - `App.tsx` tiene todo el estado y la navegación por `screen` (`home | hero | villain | new | party`), sin router. Los componentes de `src/components/` son presentacionales y reciben callbacks.
-- Fechas: los eventos nuevos usan `DEMO_DATE` + hora actual (`nowStamp`), no la fecha real.
+- Fechas: fecha local real (`localDate` en `stats.ts`; `nowStamp` en `App.tsx`). Usuario nuevo arranca vacío con «Cargar ejemplo».
 
 ## Restricciones
 
