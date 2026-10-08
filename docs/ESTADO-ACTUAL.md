@@ -1,6 +1,6 @@
 # Estado actual — RPG Life Tracker
 
-> Fecha de corte: 2026-10-08 (tras ciclo 8). El proyecto nació como demo de hackathon (Build Day) y pasa a desarrollo real.
+> Fecha de corte: 2026-10-08 (tras ciclo 9). El proyecto nació como demo de hackathon (Build Day) y pasa a desarrollo real.
 > Este documento describe **lo que hay hoy en el código** y lo que lo separa de un producto en producción. Es la referencia principal; los PRD y specs anteriores quedan como histórico (ver §7).
 
 ## 1. Qué es
@@ -20,7 +20,7 @@ App web (móvil primero) que convierte actividades de la vida real en un persona
 | HERO / VILLAIN (`hero`, `villain`) | Tarjetas de actividad: registro con incremento fijo, selector de día («Hoy», «Ayer» o fecha pasada) para registrar y corregir, corrección (evento negativo, limitada al total de ese día), «Últimos registros» (10 más recientes) con «Deshacer», semana actual vs. mismo tramo de la anterior, objetivo semanal con chip de racha semanal (semanas seguidas cumpliendo el objetivo; no da XP), XP y nivel por actividad, en qué parties cuenta. |
 | Actividades propias | (Las 4 fijas HERO editan solo su objetivo semanal; campo vacío = valor por defecto.) En su tarjeta (HERO/VILLAIN) se pueden editar nombre, incremento y objetivo semanal (solo HERO) y archivar; no se cambia rama, tipo, unidad ni XP/unidad. Las archivadas se ocultan de las tarjetas, pero su XP, histórico y parties siguen contando; se reactivan desde Inicio. |
 | Nuevo (`new`) | Crear actividad propia: texto libre → clasificación (Claude Haiku o heurística local) → el usuario confirma rama, tipo, unidad y XP/unidad. Detecta actividades parecidas ya existentes. Permite proponerla a parties. |
-| Party (`party`) | Dos parties fijas (*Los del Gym*, *La Oficina*), criterios aceptados/rechazados, ranking semanal (HERO, VILLAIN, profundidad) y nivel del usuario calculado solo con los criterios de esa party. |
+| Party (`party`) | Dos parties fijas (*Los del Gym*, *La Oficina*), criterios aceptados/rechazados, ranking semanal (HERO, VILLAIN, profundidad; los amigos simulados puntúan prorrateados por día de la semana), «proponer actividad existente» desde una tarjeta custom a parties donde aún no hay criterio ni rechazo, y nivel del usuario calculado solo con los criterios de esa party. |
 
 Feedback: toast de level-up / level-down, XP flotante, aviso de adelantamientos en el ranking. Transiciones con View Transitions API (`src/viewTransition.ts`).
 
@@ -41,7 +41,7 @@ Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `s
 | `trackers.ts` | 6 actividades fijas + `allTrackers(custom, goals)` (aplica overrides de objetivo a las fijas HERO), `defaultGoal`, `setGoal`. |
 | `stats.ts` | Semanas lun–dom sobre strings `YYYY-MM-DD`, rangos `[start, end)` lexicográficos. `localDate(Date)` da la fecha local real. `dayTotal`, `clampAmount` (la corrección no baja el día de 0), `history()` (últimos registros con `undone`/`canUndo`), `undoneIds` (solo un negativo con `undoes` anula; `add` ignora deshacer algo ya deshecho), `streak` (campo de `TrackerStats`), `todaySummary`, `daysLeftInWeek` y `dayLabel`. |
 | `rpg.ts` | `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps/Downs()`. |
-| `party.ts` | `PARTIES` hardcodeadas; votación simulada por `stance` (mayoría estricta); estado por party con su propio `deriveGame`. |
+| `party.ts` | `PARTIES` hardcodeadas; votación simulada por `stance` (mayoría estricta); estado por party con su propio `deriveGame`; `buildRanking(…, today)` prorratea a los amigos (semanal × días transcurridos / 7). |
 | `classify.ts` | `classifyAI()` (Claude Haiku vía proxy) con fallback a `classify()` (palabras clave). `editTracker()` edita nombre/incremento/objetivo de una custom sin tocar `xpPerUnit`. `findSimilar()` (prefijo + Levenshtein). |
 | `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents` (repara un `undoes` inválido conservando el evento)/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar, `restoreLast` (intercambio atómico con `.backup.last`) y helper privado `writeAll`. |
 | `seed.ts` | `seedFor(today)`: 28 eventos de ejemplo relativos a semanas enteras respecto a `today`. `DEMO_DATE` y `SEED_EVENTS` solo los usan selfcheck y tests. |
@@ -67,7 +67,7 @@ Cosas que funcionan pero son atajos de hackathon. Ninguna está decidida; cada u
 | Calidad | `npm test` cubre selfcheck, storage y los flujos críticos de UI (`App.test.tsx`, ciclo 6); sin e2e en navegador real. CI ya existe (ciclo 2). | Ampliar `App.test.tsx` al añadir flujos; los tests dependen de textos de la UI. |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Revisar cuando se quiten los atajos anteriores. |
 
-Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `App.tsx` (`UnknownView` solo ve las activas: se puede crear una misión con el nombre de una archivada) y `App.tsx`/`trackers.ts` (`setGoal` persiste `goals: {}` al volver al valor por defecto; inocuo) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas); `streak` usa el `weeklyGoal` actual en semanas pasadas, O(semanas·eventos) por tarjeta).
+Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `party.ts` (amigos simulados a ritmo lineal; lun 1/7 … dom 7/7) y `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `App.tsx` (`UnknownView` solo ve las activas: se puede crear una misión con el nombre de una archivada) y `App.tsx`/`trackers.ts` (`setGoal` persiste `goals: {}` al volver al valor por defecto; inocuo) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas); `streak` usa el `weeklyGoal` actual en semanas pasadas, O(semanas·eventos) por tarjeta).
 
 ## 6. Cómo trabajar
 
