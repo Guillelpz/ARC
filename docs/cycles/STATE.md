@@ -5,8 +5,8 @@ Ver `docs/WORKFLOW.md`.
 ## En curso
 
 - Ciclo 1 — cerrado (a712108).
-- Ciclo 2 (P1.1 + P1.2 + P3.1 CI, adelantada por ser independiente): paso 5 (implementación).
-- Ciclo 3 (P3.1 + P3.3/P3.2): aprobado; P3.1 puede ir en paralelo al ciclo 2.
+- Ciclo 2 (P1.1 + P1.2 + P3.1 CI) — fusionado; paso 8 (análisis).
+- Ciclo 3 (P3.3 + P3.2; P3.1 hecha en el ciclo 2): aprobado, siguiente spec.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -24,7 +24,7 @@ Ver `docs/WORKFLOW.md`.
 | P1.2 | Onboarding vacío + «Cargar ejemplo» (con cambios, sin renombrar claves) | aprobada | 2 |
 | P1.3 | No perder datos: validar al leer + exportar/importar (con cambios) | aprobada | 1 |
 | P1.4 | Tests ejecutables `npm test` (con cambios) | aprobada | 1 |
-| P3.1 | CI build+lint+test (GitHub Actions, push + PR; sin remoto todavía) | aprobada | 3 |
+| P3.1 | CI build+lint+test (GitHub Actions, push + PR; sin remoto todavía) | hecha | 2 |
 | P3.2 | Almacenamiento persistente + aviso de copia → dentro de P3.3 | aprobada | 3 |
 | P3.3 | Bloque «Tus datos» en la home (después de P1.1/P1.2) | aprobada | 3 |
 | P3.4 | Despliegue + endpoint de IA | pospuesta (decisión del usuario: hosting, key, KV) | — |
