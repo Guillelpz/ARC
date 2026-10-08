@@ -10,9 +10,10 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 4 — cerrado.
 - Ciclo 5 — cerrado (bc660e8).
 - Ciclo 6 — cerrado (df87f37).
-- Ciclo 7 (P7.4 → P7.3 + P7.1) — paso 5 (implementación).
-- Ciclo 9 — paso 1 (proponer).
-- Ciclo 8 (P7.2b): aprobado. P7.2a no aprobada todavía.
+- Ciclo 7 (P7.4 → P7.3 + P7.1) — fusionado; paso 8 (análisis).
+- Ciclo 9 (P9.2 + P9.3): aprobado.
+- Ciclo 10 (P9.1 + P9.4): aprobado.
+- Ciclo 8 (P7.2b) — paso 4 (spec). P7.2a no aprobada todavía.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -22,6 +23,7 @@ Ver `docs/WORKFLOW.md`.
 - Claves de localStorage `*-demo-v1`: no se renombran.
 - P4.2: campo opcional `undoes?` en `ActivityEvent` aprobado.
 - P7.1 rachas: semanal por actividad, sin XP, la semana en curso no la rompe, objetivo actual también hacia atrás; `pop` en tarjeta + mejor racha en «Hoy».
+- P9.3: prorrateo lineal de la XP semanal de los amigos simulados por día transcurrido; asserts de ranking actuales se mueven al domingo 2026-10-11 + asserts nuevos de miércoles y lunes.
 - Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
 
 ## Propuestas
@@ -47,3 +49,7 @@ Ver `docs/WORKFLOW.md`.
 | P7.2b | Objetivos editables en las 6 fijas | aprobada | 8 |
 | P7.3 | Bloque «Hoy» en la home | aprobada | 7 |
 | P7.4 | Cerrar menores del ciclo 4 (deshacer) | aprobada | 7 |
+| P9.1 | Cerrar menores del ciclo 6 (después del ciclo 8) | aprobada | 10 |
+| P9.2 | Proponer a una party una actividad existente | aprobada | 9 |
+| P9.3 | Ranking prorrateado (regla aprobada) | aprobada | 9 |
+| P9.4 | Avisos accesibles + axe | aprobada | 10 |
