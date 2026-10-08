@@ -142,7 +142,23 @@ describe('backupCurrent', () => {
     const s2 = fakeStore({ [EV]: 'a' }); backupCurrent(s2)
     expect(s2.m.has(`${CU}.backup.last`)).toBe(false)
   })
-  test('escrituras fallidas no lanzan', () => {
-    expect(() => backupCurrent(fakeStore({ [EV]: 'a' }, true))).not.toThrow()
+  test('escrituras fallidas: false y no lanza', () => {
+    expect(backupCurrent(fakeStore({ [EV]: 'a' }, true))).toBe(false)
+  })
+  test('atómico: si falla la segunda escritura, revierte la primera', () => {
+    const s = fakeStore({ [EV]: 'a2', [CU]: 'b2', [`${EV}.backup.last`]: 'a1' })
+    let n = 0
+    const store = { getItem: s.getItem, removeItem: (k: string) => { s.m.delete(k) },
+      setItem: (k: string, v: string) => { if (++n === 3) throw new Error('quota'); s.setItem(k, v) } }
+    expect(backupCurrent(store)).toBe(false)
+    expect(s.m.get(`${EV}.backup.last`)).toBe('a1')
+    expect(s.m.has(`${EV}.backup.prev`)).toBe(false)
+    expect(s.m.has(`${CU}.backup.last`)).toBe(false)
+  })
+  test('rota last a prev', () => {
+    const s = fakeStore({ [EV]: 'a2', [`${EV}.backup.last`]: 'a1' })
+    expect(backupCurrent(s)).toBe(true)
+    expect(s.m.get(`${EV}.backup.prev`)).toBe('a1')
+    expect(s.m.get(`${EV}.backup.last`)).toBe('a2')
   })
 })

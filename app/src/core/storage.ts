@@ -110,13 +110,25 @@ export const backupDue = (lastExportAt: string | null, now: Date, hasData: boole
   return { days, due: hasData && (days === null || days >= EXPORT_REMIND_DAYS) }
 }
 
-// ponytail: una sola copia interna por clave (`.backup.last`), sobrescrita en cada import/borrado y restaurable a mano; si falla la escritura, se sigue.
-export function backupCurrent(store: Store = localStorage): void {
-  for (const k of [KEY, CUSTOM_KEY]) {
-    try {
+// ponytail: dos niveles (`.backup.last` y `.backup.prev`); tres operaciones destructivas seguidas pierden la más antigua; restaurar desde la app es P4.4.
+// Atómico: escribe todo o revierte lo escrito y devuelve false. Restauración manual (DevTools).
+export function backupCurrent(store: Store & Partial<Pick<Storage, 'removeItem'>> = localStorage): boolean {
+  const done: [string, string | null][] = [] // [clave, valor anterior]
+  const put = (k: string, v: string) => { const old = store.getItem(k); store.setItem(k, v); done.push([k, old]) }
+  try {
+    for (const k of [KEY, CUSTOM_KEY]) {
       const raw = store.getItem(k)
-      if (raw !== null) store.setItem(`${k}.backup.last`, raw)
-    } catch { /* se sigue */ }
+      if (raw === null) continue
+      const last = store.getItem(`${k}.backup.last`)
+      if (last !== null) put(`${k}.backup.prev`, last)
+      put(`${k}.backup.last`, raw)
+    }
+    return true
+  } catch {
+    for (const [k, old] of done.reverse()) {
+      try { if (old === null) store.removeItem?.(k); else store.setItem(k, old) } catch { /* mejor esfuerzo */ }
+    }
+    return false
   }
 }
 

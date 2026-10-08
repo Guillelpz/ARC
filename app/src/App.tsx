@@ -120,7 +120,7 @@ export default function App() {
       exportData(); setNotice('Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.'); return
     }
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
-    if (hasData) backupCurrent()
+    if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
     setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
@@ -140,7 +140,7 @@ export default function App() {
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
     const n = b.events.length, m = b.custom.trackers.length
     if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
-    if (hasData) backupCurrent()
+    if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     unlockStorage()
     setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
