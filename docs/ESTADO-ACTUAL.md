@@ -16,7 +16,7 @@ App web (móvil primero) que convierte actividades de la vida real en un persona
 
 | Pantalla (`screen`) | Qué hace |
 |---|---|
-| Inicio (`home`) | Nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, estado vacío de bienvenida para usuario nuevo, bloque «Tus datos» (estado de la última copia y aviso si pasan 14 días con datos), «Cargar ejemplo» / «Borrar todo» (con confirmación; «Borrar todo» ofrece exportar antes), «Exportar copia» / «Importar copia» (JSON, con confirmación) y aviso si al cargar se perdieron o descartaron datos. |
+| Inicio (`home`) | Nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, estado vacío de bienvenida para usuario nuevo, bloque «Tus datos» (estado de la última copia y aviso si pasan 14 días con datos), «Cargar ejemplo» / «Borrar todo» (con confirmación; «Borrar todo» ofrece exportar antes), «Exportar copia» / «Importar copia» (JSON, con confirmación), «Recuperar copia anterior» (intercambia el estado actual con `.backup.last`; repetirlo deshace) y aviso si al cargar se perdieron o descartaron datos. |
 | HERO / VILLAIN (`hero`, `villain`) | Tarjetas de actividad: registro con incremento fijo, selector de día («Hoy», «Ayer» o fecha pasada) para registrar y corregir, corrección (evento negativo, limitada al total de ese día), «Últimos registros» (10 más recientes) con «Deshacer», semana actual vs. mismo tramo de la anterior, objetivo semanal, XP y nivel por actividad, en qué parties cuenta. |
 | Nuevo (`new`) | Crear actividad propia: texto libre → clasificación (Claude Haiku o heurística local) → el usuario confirma rama, tipo, unidad y XP/unidad. Detecta actividades parecidas ya existentes. Permite proponerla a parties. |
 | Party (`party`) | Dos parties fijas (*Los del Gym*, *La Oficina*), criterios aceptados/rechazados, ranking semanal (HERO, VILLAIN, profundidad) y nivel del usuario calculado solo con los criterios de esa party. |
@@ -27,7 +27,7 @@ Feedback: toast de level-up / level-down, XP flotante, aviso de adelantamientos 
 
 React 19 + TypeScript 6 + Vite 8 + Tailwind CSS v4 (sin config, tokens en `@theme` de `src/index.css`) + lucide-react. Lint con oxlint. Versiones exactas en `app/package.json`.
 
-Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `selfcheck.ts` más tests de las funciones puras de `storage.ts`. CI en GitHub Actions (`.github/workflows/ci.yml`: lint, build y test en cada push/PR).
+Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `selfcheck.ts` más tests de las funciones puras de `storage.ts` (incl. restauración). CI en GitHub Actions (`.github/workflows/ci.yml`: lint, build y test en cada push/PR).
 
 ## 4. Arquitectura
 
@@ -42,12 +42,12 @@ Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `s
 | `rpg.ts` | `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps/Downs()`. |
 | `party.ts` | `PARTIES` hardcodeadas; votación simulada por `stance` (mayoría estricta); estado por party con su propio `deriveGame`. |
 | `classify.ts` | `classifyAI()` (Claude Haiku vía proxy) con fallback a `classify()` (palabras clave). `findSimilar()` (prefijo + Levenshtein). |
-| `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents` (repara un `undoes` inválido conservando el evento)/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar. |
+| `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents` (repara un `undoes` inválido conservando el evento)/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar, `restoreLast` (intercambio atómico con `.backup.last`) y helper privado `writeAll`. |
 | `seed.ts` | `seedFor(today)`: 28 eventos de ejemplo relativos a semanas enteras respecto a `today`. `DEMO_DATE` y `SEED_EVENTS` solo los usan selfcheck y tests. |
 | `selfcheck.ts` | Asserts de dominio, se ejecutan en DEV al arrancar y en `npm test`. |
 
 - **UI:** `App.tsx` tiene todo el estado y la navegación; `src/components/` son presentacionales con callbacks.
-- **Persistencia:** localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (`{ trackers, proposals }`), validados al leer (eventos y custom). Si hay datos ilegibles o inválidos, el valor bruto se copia a `<clave>.backup.<stamp>` antes de sobrescribir y se avisa en la home; clave ilegible → arranca vacía (no semilla). `life-rpg-meta-v1` (`{ lastExportAt }`) guarda la última exportación. Antes de borrar o importar se hace copia interna atómica de eventos+custom en `<clave>.backup.last` (rota a `.backup.prev`); si falla, se aborta con aviso. `exportData` pide `navigator.storage.persist()`. Si el backup falla, la clave se bloquea (`save*` no escribe) hasta importar una copia.
+- **Persistencia:** localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (`{ trackers, proposals }`), validados al leer (eventos y custom). Si hay datos ilegibles o inválidos, el valor bruto se copia a `<clave>.backup.<stamp>` antes de sobrescribir y se avisa en la home; clave ilegible → arranca vacía (no semilla). `life-rpg-meta-v1` (`{ lastExportAt }`) guarda la última exportación. Antes de borrar o importar se hace copia interna atómica de eventos+custom en `<clave>.backup.last` (rota a `.backup.prev`); si falla, se aborta con aviso. La app restaura solo `.backup.last` (`.backup.prev` y `.backup.<stamp>` solo por DevTools; los sellados no se purgan). `exportData` pide `navigator.storage.persist()`. Si el backup falla, la clave se bloquea (`save*` no escribe) hasta importar una copia.
 - **IA:** `vite.config.ts` monta un proxy `/api/claude` → `api.anthropic.com` solo en `dev`/`preview`, con `ANTHROPIC_API_KEY` de `app/.env.local` (nunca entra al bundle). En un build estático no existe y siempre se usa la heurística.
 
 ## 5. Herencia de la demo (lo que falta para producción)
@@ -60,13 +60,13 @@ Cosas que funcionan pero son atajos de hackathon. Ninguna está decidida; cada u
 | Datos iniciales | Resuelto en ciclo 2: arranque vacío; «Cargar ejemplo» carga `seedFor(hoy)`; «Borrar todo» vacía. | Si `getItem` lanza, se devuelve `[]` (sin pérdida). |
 | Party | Amigos, parties y votos son ficticios y deterministas (`PARTIES`, `stance`). | Requiere backend, cuentas e invitaciones para ser real. |
 | Usuarios | Un único usuario local, sin cuenta. | Sin auth ni sincronización entre dispositivos. |
-| Persistencia | Solo localStorage del navegador, con exportar/importar manual. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador (persist es solo petición); recordatorio fijo de 14 días, sin copias automáticas, sin UI para restaurar backups internos (manual en DevTools) ni migraciones de esquema. |
+| Persistencia | Solo localStorage del navegador, con exportar/importar manual. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador (persist es solo petición); recordatorio fijo de 14 días, sin copias automáticas, UI para restaurar solo `.backup.last` (el resto, manual en DevTools; backups con sello sin purgar) ni migraciones de esquema. |
 | IA | Proxy de Vite solo en local; sin reintentos, caché ni límite de uso. | Necesita un endpoint de servidor para funcionar desplegada. |
 | Progresión | Umbrales lineales y XP/unidad fijos; sin límite de registros por día; solo la corrección se limita al total del día. | Balance de juego sin validar con usuarios. |
 | Calidad | `npm test` (Vitest) solo cubre selfcheck y funciones puras de storage; sin tests de componentes ni e2e. CI ya existe (ciclo 2). | Añadir cobertura de UI si el proyecto crece. |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Revisar cuando se quiten los atajos anteriores. |
 
-Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `storage.ts` (restaurar backup interno manual; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas)).
+Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas)).
 
 ## 6. Cómo trabajar
 
