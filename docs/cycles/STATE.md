@@ -8,9 +8,10 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 2 — cerrado (7982124).
 - Ciclo 3 — cerrado.
 - Ciclo 4 — cerrado.
-- Ciclo 5 (P4.4) — fusionado; paso 8 (análisis).
-- Ciclo 6 (P4.3 + P4.5) — paso 4 (spec).
-- Ciclo 7 — paso 1 (proponer).
+- Ciclo 5 — cerrado (bc660e8).
+- Ciclo 6 (P4.3 + P4.5) — paso 5 (implementación).
+- Ciclo 7 (P7.4 → P7.3 + P7.1): aprobado.
+- Ciclo 8 (P7.2b): aprobado. P7.2a no aprobada todavía.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -19,6 +20,7 @@ Ver `docs/WORKFLOW.md`.
 - Dependencias de desarrollo libres; las de runtime necesitan okay.
 - Claves de localStorage `*-demo-v1`: no se renombran.
 - P4.2: campo opcional `undoes?` en `ActivityEvent` aprobado.
+- P7.1 rachas: semanal por actividad, sin XP, la semana en curso no la rompe, objetivo actual también hacia atrás; `pop` en tarjeta + mejor racha en «Hoy».
 - Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
 
 ## Propuestas
@@ -39,3 +41,8 @@ Ver `docs/WORKFLOW.md`.
 | P4.3 | Editar/archivar actividades propias | aprobada | 6+ |
 | P4.4 | Restaurar `.backup.last` desde la app (rehecha por el evaluador) | aprobada | 5 |
 | P4.5 | Tests de componentes (RTL + jsdom) | aprobada | 6+ |
+| P7.1 | Rachas semanales (regla aprobada tal cual) | aprobada | 7 |
+| P7.2a | Límite semanal opcional en VILLAIN | pendiente (no aprobada) | — |
+| P7.2b | Objetivos editables en las 6 fijas | aprobada | 8 |
+| P7.3 | Bloque «Hoy» en la home | aprobada | 7 |
+| P7.4 | Cerrar menores del ciclo 4 (deshacer) | aprobada | 7 |
