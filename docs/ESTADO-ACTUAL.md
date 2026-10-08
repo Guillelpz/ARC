@@ -16,7 +16,7 @@ App web (móvil primero) que convierte actividades de la vida real en un persona
 
 | Pantalla (`screen`) | Qué hace |
 |---|---|
-| Inicio (`home`) | Nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, botón «Restablecer demo». |
+| Inicio (`home`) | Nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, botón «Restablecer demo», «Exportar copia» / «Importar copia» (JSON, con confirmación) y aviso si al cargar se perdieron o descartaron datos. |
 | HERO / VILLAIN (`hero`, `villain`) | Tarjetas de actividad: registro con incremento fijo, corrección (evento negativo), semana actual vs. mismo tramo de la anterior, objetivo semanal, XP y nivel por actividad, en qué parties cuenta. |
 | Nuevo (`new`) | Crear actividad propia: texto libre → clasificación (Claude Haiku o heurística local) → el usuario confirma rama, tipo, unidad y XP/unidad. Detecta actividades parecidas ya existentes. Permite proponerla a parties. |
 | Party (`party`) | Dos parties fijas (*Los del Gym*, *La Oficina*), criterios aceptados/rechazados, ranking semanal (HERO, VILLAIN, profundidad) y nivel del usuario calculado solo con los criterios de esa party. |
@@ -27,7 +27,7 @@ Feedback: toast de level-up / level-down, XP flotante, aviso de adelantamientos 
 
 React 19 + TypeScript 6 + Vite 8 + Tailwind CSS v4 (sin config, tokens en `@theme` de `src/index.css`) + lucide-react. Lint con oxlint. Versiones exactas en `app/package.json`.
 
-Sin router, sin gestor de estado, sin backend, sin tests automatizados (solo `selfcheck.ts`).
+Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `selfcheck.ts` más tests de las funciones puras de `storage.ts`.
 
 ## 4. Arquitectura
 
@@ -42,12 +42,12 @@ Sin router, sin gestor de estado, sin backend, sin tests automatizados (solo `se
 | `rpg.ts` | `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps/Downs()`. |
 | `party.ts` | `PARTIES` hardcodeadas; votación simulada por `stance` (mayoría estricta); estado por party con su propio `deriveGame`. |
 | `classify.ts` | `classifyAI()` (Claude Haiku vía proxy) con fallback a `classify()` (palabras clave). `findSimilar()` (prefijo + Levenshtein). |
-| `storage.ts` | Única capa de persistencia (localStorage). |
+| `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents`/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar. |
 | `seed.ts` | `DEMO_DATE = '2026-10-07'` y 28 eventos semilla. |
-| `selfcheck.ts` | Asserts de dominio, se ejecutan en DEV al arrancar. |
+| `selfcheck.ts` | Asserts de dominio, se ejecutan en DEV al arrancar y en `npm test`. |
 
 - **UI:** `App.tsx` tiene todo el estado y la navegación; `src/components/` son presentacionales con callbacks.
-- **Persistencia:** localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (`{ trackers, proposals }`), validados al leer; si están corruptos → seed / vacío.
+- **Persistencia:** localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (`{ trackers, proposals }`), validados al leer (eventos y custom). Si hay datos ilegibles o inválidos, el valor bruto se copia a `<clave>.backup.<stamp>` antes de sobrescribir y se avisa en la home; clave ilegible → arranca vacía (no semilla). Si el backup falla, la clave se bloquea (`save*` no escribe) hasta importar una copia.
 - **IA:** `vite.config.ts` monta un proxy `/api/claude` → `api.anthropic.com` solo en `dev`/`preview`, con `ANTHROPIC_API_KEY` de `app/.env.local` (nunca entra al bundle). En un build estático no existe y siempre se usa la heurística.
 
 ## 5. Herencia de la demo (lo que falta para producción)
@@ -60,14 +60,13 @@ Cosas que funcionan pero son atajos de hackathon. Ninguna está decidida; cada u
 | Datos iniciales | Usuario nuevo arranca con 28 eventos semilla. «Restablecer demo» vuelve a ellos. | Decidir onboarding vacío vs. ejemplo. |
 | Party | Amigos, parties y votos son ficticios y deterministas (`PARTIES`, `stance`). | Requiere backend, cuentas e invitaciones para ser real. |
 | Usuarios | Un único usuario local, sin cuenta. | Sin auth ni sincronización entre dispositivos. |
-| Persistencia | Solo localStorage del navegador. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador; sin migraciones de esquema. |
+| Persistencia | Solo localStorage del navegador, con exportar/importar manual. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador; sin copias automáticas, sin UI para restaurar backups internos (manual en DevTools) ni migraciones de esquema. |
 | IA | Proxy de Vite solo en local; sin reintentos, caché ni límite de uso. | Necesita un endpoint de servidor para funcionar desplegada. |
 | Progresión | Umbrales lineales y XP/unidad fijos; sin límite de registros por día. | Balance de juego sin validar con usuarios. |
-| Calidad | Sin tests automatizados ni CI; `selfcheck.ts` solo corre en DEV en la consola. | Añadir runner de tests si el proyecto crece. |
-| Repositorio | El proyecto no está bajo git. | Inicializar control de versiones antes de seguir. |
+| Calidad | `npm test` (Vitest) solo cubre selfcheck y funciones puras de storage; sin tests de componentes, e2e ni CI. | Añadir CI y cobertura de UI si el proyecto crece. |
 | Copy | Textos con «demo»: «Restablecer demo», «Fecha demo», «Party de ejemplo». | Revisar cuando se quiten los atajos anteriores. |
 
-Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev).
+Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `storage.ts` (restaurar backup interno manual).
 
 ## 6. Cómo trabajar
 
@@ -76,6 +75,7 @@ Desde `app/`:
 - `npm run dev` — servidor de desarrollo; en la consola del navegador aparece `[selfcheck] done` (los fallos salen como `console.assert`).
 - `npm run build` — `tsc -b && vite build` (también es el type-check).
 - `npm run lint` — oxlint.
+- `npm test` — Vitest (`vitest run`): selfcheck + tests de `storage.ts`.
 - IA opcional: crear `app/.env.local` con `ANTHROPIC_API_KEY=...`.
 
 Regla: `selfcheck.ts` es el oráculo del dominio; si falla, se arregla el motor, no los asserts (salvo cambio de reglas decidido explícitamente).
