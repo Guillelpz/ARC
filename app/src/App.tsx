@@ -3,7 +3,7 @@ import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
 import { clampAmount, localDate } from './core/stats'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, loadAll, loadLastExport, parseBackup, requestPersist, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -33,6 +33,7 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
   const [overtake, setOvertake] = useState<Overtake | null>(null)
+  const [canRestore, setCanRestore] = useState(hasLastBackup)
   const [lastExport, setLastExport] = useState(loadLastExport)
 
   const [, refresh] = useReducer((n: number) => n + 1, 0)
@@ -125,6 +126,7 @@ export default function App() {
     }
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
+    setCanRestore(hasLastBackup())
     setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
@@ -145,16 +147,28 @@ export default function App() {
     const n = b.events.length, m = b.custom.trackers.length
     if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
+    setCanRestore(hasLastBackup())
     unlockStorage()
     setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
+  }
+
+  function restore() {
+    const r = readLast()
+    if (r === 'none') { setCanRestore(false); return setNotice('No hay ninguna copia interna que recuperar.') }
+    if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
+    const ev = r.events ?? events, cu = r.custom ?? custom
+    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
+    if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
+    setEvents(ev); setCustom(cu); setToast(null); setGain(null); setOvertake(null)
+    setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)
   }
 
   return (
     <>
       {screen === 'home' && (
         <HomeView game={game} partyStates={partyStates} onNavigate={go}
-          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined}
+          onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} onDismissNotice={() => setNotice(null)} />
       )}

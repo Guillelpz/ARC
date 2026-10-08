@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { ChevronRight, CircleAlert, Download, Moon, Plus, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { Branch, GameState, PartyState } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
@@ -14,6 +14,7 @@ type Props = {
   onOpenParty: (id: string) => void
   onReset: () => void
   onLoadExample?: () => void
+  onRestore?: () => void
   onExport: () => void
   onImport: (text: string) => void
   onImportError: () => void
@@ -29,7 +30,7 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onLoadExample, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
+export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b).length, weekXp: weeklyXp(game, b) }
@@ -145,6 +146,12 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
                 className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
                 <Upload className="size-4" aria-hidden /> Importar copia
               </button>
+              {onRestore && (
+                <button type="button" onClick={onRestore}
+                  className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
+                  <RotateCcw className="size-4" aria-hidden /> Recuperar copia anterior
+                </button>
+              )}
               <input ref={fileRef} type="file" accept=".json,application/json" hidden
                 onChange={e => {
                   const input = e.currentTarget, file = input.files?.[0]
