@@ -10,7 +10,8 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 4 — cerrado.
 - Ciclo 5 — cerrado (bc660e8).
 - Ciclo 6 — cerrado (df87f37).
-- Ciclo 7 (P7.4 → P7.3 + P7.1) — paso 4 (spec).
+- Ciclo 7 (P7.4 → P7.3 + P7.1) — paso 5 (implementación).
+- Ciclo 9 — paso 1 (proponer).
 - Ciclo 8 (P7.2b): aprobado. P7.2a no aprobada todavía.
 
 ## Decisiones del usuario (2026-10-08)
