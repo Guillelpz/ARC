@@ -1,0 +1,232 @@
+@import "tailwindcss";
+
+@theme {
+  /* Base neutral: Inicio, Nuevo, Party, navegación, toasts de PLAYER */
+  --color-app-bg: #E8E9E5;
+  --color-app-surface: #F7F7F4;
+  --color-app-border: #C8CDC9;
+  --color-app-text: #20272D;
+  --color-app-muted: #4F5A60;
+  --color-app-track: #D5D9D5;
+
+  /* HERO: modo claro local */
+  --color-hero: #285B70;
+  --color-hero-bg: #F5F4EF;
+  --color-hero-surface: #FFFFFF;
+  --color-hero-border: #D6D9D5;
+  --color-hero-text: #18242B;
+  --color-hero-muted: #53616A;
+  --color-hero-on-accent: #FFFFFF;
+  --color-hero-track: #E3E7E5;
+
+  /* VILLAIN: modo oscuro local */
+  --color-villain: #B2A0CF;
+  --color-villain-bg: #16141C;
+  --color-villain-surface: #211E2A;
+  --color-villain-border: #4A435A;
+  --color-villain-text: #F2EFF7;
+  --color-villain-muted: #B9B1C8;
+  --color-villain-on-accent: #16141C;
+  --color-villain-track: #393242;
+
+  /* Recompensas: podio y celebraciones */
+  --color-gold: #E0B13A;
+  --color-silver: #AEB6BD;
+  --color-bronze: #C4834A;
+}
+
+body {
+  @apply bg-app-bg text-app-text antialiased;
+}
+
+.float-xp {
+  position: absolute;
+  pointer-events: none;
+  animation: float-xp 900ms ease-out forwards;
+}
+
+@keyframes float-xp {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(-32px); opacity: 0; }
+}
+
+.pop {
+  animation: pop 200ms ease-out;
+}
+
+@keyframes pop {
+  from { transform: scale(0.9); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Entrada de bloques: sube y aparece; escalonar con animation-delay */
+.rise { animation: rise 320ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes rise { from { transform: translateY(10px); opacity: 0 } }
+
+/* Barras: el relleno ocupa el 100 % y se desplaza con transform (sin reflow); la pista recorta con overflow-hidden */
+.bar-fill { transition: transform 500ms cubic-bezier(.2, .8, .2, 1); animation: grow 700ms cubic-bezier(.2, .8, .2, 1) backwards; }
+@keyframes grow { from { transform: translateX(-100%) } }
+
+/* Cifra que acaba de cambiar */
+.bump { display: inline-block; animation: bump 350ms cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes bump { 40% { transform: scale(1.18) } }
+
+/* Banners: salen hacia arriba justo antes de desmontarse (App: 3200 ms); salida más corta que la entrada */
+.banner-out { animation: banner-out 200ms ease-in 3000ms forwards; }
+@keyframes banner-out { to { transform: translateY(-120%); opacity: 0 } }
+
+/* View Transitions (src/viewTransition.ts). La navegación queda fija; lo nombrado se desliza a su sitio. */
+.vt-nav { view-transition-name: nav; }
+.vt-tab { view-transition-name: nav-tab; }
+.vt-banner { view-transition-name: banner; }
+::view-transition-group(*) { animation-duration: 300ms; animation-timing-function: cubic-bezier(.2, .8, .2, 1); }
+::view-transition-group(nav) { animation: none; }
+/* la vieja queda opaca debajo y la nueva entra encima: sin fogonazo de app-bg entre HERO claro y VILLAIN oscuro */
+::view-transition-old(root) { animation: none; }
+::view-transition-new(root) { animation: 200ms ease-out both vt-fade; }
+/* solo al cambiar de pantalla la nueva entra subiendo */
+[data-vt="screen"]::view-transition-new(root) { animation: 300ms cubic-bezier(.2, .8, .2, 1) both vt-in; }
+@keyframes vt-fade { from { opacity: 0 } }
+@keyframes vt-in { from { opacity: 0; transform: translateY(8px) } }
+
+/* LEVEL UP: fondo con destello, rayos giratorios, chispas y tarjeta con rebote */
+.levelup-backdrop {
+  background: radial-gradient(circle, color-mix(in srgb, var(--glow) 45%, transparent) 0, rgb(0 0 0 / 0.55) 70%);
+  animation: fade-in-out 2400ms ease-out forwards;
+  overflow: hidden;
+}
+.levelup-rays {
+  background: repeating-conic-gradient(color-mix(in srgb, var(--glow) 35%, transparent) 0 8deg, transparent 8deg 22deg);
+  mask-image: radial-gradient(circle, #000 0, transparent 45%);
+  animation: spin 6s linear infinite;
+}
+.levelup-card {
+  white-space: pre-line;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--glow) 30%, transparent), 0 0 60px var(--glow);
+  animation: level-pop 600ms cubic-bezier(.2, 1.6, .4, 1) both;
+}
+.spark {
+  top: 50%; left: 50%;
+  background: var(--glow);
+  box-shadow: 0 0 10px var(--glow);
+  animation: spark 1100ms ease-out 150ms both;
+}
+
+@keyframes fade-in-out { 0% { opacity: 0 } 10%, 80% { opacity: 1 } 100% { opacity: 0 } }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes level-pop { from { transform: scale(.3) rotate(-6deg); opacity: 0 } to { transform: none; opacity: 1 } }
+@keyframes spark {
+  from { transform: rotate(var(--a)) translateY(0) scale(1.4); opacity: 1 }
+  to { transform: rotate(var(--a)) translateY(-42vmin) scale(.2); opacity: 0 }
+}
+
+/* LEVEL DOWN: caída con impacto, temblor, grieta y fragmentos con gravedad */
+.leveldown-backdrop {
+  background: radial-gradient(circle, color-mix(in srgb, var(--glow) 25%, transparent) 0, rgb(0 0 0 / 0.75) 60%);
+  backdrop-filter: grayscale(1);
+  animation: fade-in-out 2400ms ease-out forwards, shake 380ms linear 480ms;
+  overflow: hidden;
+}
+.leveldown-card {
+  white-space: pre-line;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--glow) 30%, transparent), 0 24px 60px rgb(0 0 0 / .6);
+  animation: level-drop 520ms cubic-bezier(.55, 0, 1, .45) both, sag 900ms ease-out 900ms forwards;
+}
+.crack polyline {
+  fill: none;
+  stroke: var(--glow);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: crack 350ms ease-out 500ms forwards;
+}
+.shard {
+  top: 50%; left: 50%;
+  background: var(--glow);
+  clip-path: polygon(50% 0, 100% 70%, 20% 100%);
+  animation: shard-fall 1300ms cubic-bezier(.4, 0, 1, 1) both;
+}
+
+@keyframes level-drop { from { transform: translateY(-110vh) } to { transform: none } }
+@keyframes sag { to { transform: translateY(10px) rotate(4deg) } }
+@keyframes shake {
+  0%, 100% { transform: none }
+  20% { transform: translate(-10px, 6px) }
+  40% { transform: translate(8px, -4px) }
+  60% { transform: translate(-6px, 3px) }
+  80% { transform: translate(4px, -2px) }
+}
+@keyframes crack { to { stroke-dashoffset: 0 } }
+@keyframes shard-fall {
+  from { transform: translate(0, 0) rotate(0); opacity: 1 }
+  to { transform: translate(var(--x), 60vh) rotate(var(--r)); opacity: 0 }
+}
+
+/* Adelantamiento: entra desde arriba con brillo que cruza */
+.slide-down { animation: slide-down 450ms cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes slide-down { from { transform: translateY(-140%) } to { transform: none } }
+
+.shine { position: relative; overflow: hidden; }
+.shine::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgb(255 255 255 / .35) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: shine 2.4s ease-in-out 400ms; /* una pasada: nada de bucles perpetuos */
+  pointer-events: none;
+}
+@keyframes shine { 60%, 100% { transform: translateX(100%) } }
+
+/* Te superan en HERO: el banner entra, un rival cruza como un rayo y te empuja hacia atrás */
+.passed-hero { animation: slide-down 450ms cubic-bezier(.2, 1.4, .4, 1) both, knock-back 420ms ease-out 650ms; }
+.zoom-by { animation: zoom-by 650ms cubic-bezier(.5, 0, .2, 1) 300ms both; }
+.speed-lines { background: repeating-linear-gradient(transparent 0 3px, var(--color-hero) 3px 5px); mask-image: linear-gradient(90deg, transparent, #000); }
+@keyframes zoom-by { from { transform: translateX(-120%) } to { transform: translateX(110vw) } }
+@keyframes knock-back {
+  0%, 100% { transform: none }
+  30% { transform: translateX(-14px) skewX(8deg) }
+  60% { transform: translateX(5px) }
+}
+
+/* Te superan en VILLAIN: interferencia, cortes de imagen y texto desdoblado */
+.passed-villain { animation: glitch-in 600ms steps(1) both, flicker 1.6s steps(1) 600ms 2; }
+.passed-villain .passed-title { position: relative; }
+.passed-villain .passed-title::before, .passed-villain .passed-title::after {
+  content: attr(data-text);
+  position: absolute; inset: 0;
+  animation: glitch-split 900ms steps(2) 2;
+}
+.passed-villain .passed-title::before { color: var(--color-villain-text); clip-path: inset(0 0 55% 0); }
+.passed-villain .passed-title::after { color: var(--color-villain-muted); clip-path: inset(55% 0 0 0); animation-direction: reverse; }
+@keyframes glitch-in {
+  0% { opacity: 0; clip-path: inset(40% 0 45% 0); transform: translateX(-20px) }
+  20% { opacity: 1; clip-path: inset(0 0 70% 0); transform: translateX(14px) }
+  40% { clip-path: inset(60% 0 0 0); transform: translateX(-8px) }
+  60% { clip-path: inset(20% 0 30% 0); transform: translateX(4px) }
+  80%, 100% { clip-path: inset(0); transform: none }
+}
+@keyframes flicker { 0%, 100% { opacity: 1 } 7% { opacity: .35 } 9% { opacity: 1 } 52% { opacity: .6 } 54% { opacity: 1 } }
+@keyframes glitch-split { 0%, 100% { transform: none } 33% { transform: translateX(-3px) } 66% { transform: translateX(3px) } }
+
+/* Te superan en profundidad: el banner baja a golpes, escalón a escalón, y la flecha se hunde */
+.passed-depth { animation: stair-down 900ms steps(3, jump-end) both, settle 300ms ease-out 900ms; }
+.passed-depth .passed-icon { animation: sink 700ms ease-in-out 900ms 3; }
+@keyframes stair-down { from { transform: translateY(-140%) } to { transform: none } }
+@keyframes settle { 50% { transform: translateY(4px) } }
+@keyframes sink { 50% { transform: translateY(5px) } }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise, .bar-fill, .bump, .banner-out,
+  .float-xp, .pop, .levelup-rays, .levelup-card, .spark, .slide-down, .shine::after,
+  .leveldown-card, .crack polyline, .shard, .passed-hero, .zoom-by, .passed-villain,
+  .passed-villain .passed-title::before, .passed-villain .passed-title::after, .passed-depth, .passed-depth .passed-icon { animation: none; }
+  .zoom-by { display: none; }
+  .leveldown-backdrop { animation: fade-in-out 2400ms ease-out forwards; }
+  .crack polyline { stroke-dashoffset: 0; }
+  .spark, .shard { display: none; }
+}
+/* regla aparte: un navegador sin View Transitions descartaría toda la lista de selectores */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none; }
+}
