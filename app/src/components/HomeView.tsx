@@ -1,6 +1,6 @@
 import { useRef } from 'react'
-import { ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
-import type { Branch, GameState, PartyState } from '../core/types'
+import { ArchiveRestore, ChevronRight, CircleAlert, Download, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import type { Branch, GameState, PartyState, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -10,6 +10,8 @@ const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 type Props = {
   game: GameState
   partyStates: PartyState[]
+  archived: Tracker[]
+  onUnarchive: (t: Tracker) => void
   onNavigate: (s: Screen) => void
   onOpenParty: (id: string) => void
   onReset: () => void
@@ -30,10 +32,10 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
+export function HomeView({ game, partyStates, archived, onUnarchive, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
-    return { count: game.trackers.filter(t => t.tracker.branch === b).length, weekXp: weeklyXp(game, b) }
+    return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
   }
 
   return (
@@ -115,6 +117,26 @@ export function HomeView({ game, partyStates, onNavigate, onOpenParty, onReset, 
               ))}
             </ul>
           </section>
+
+          {archived.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <h2 className="text-lg font-semibold">Archivadas</h2>
+              <ul className="divide-y divide-app-border overflow-hidden rounded-xl border border-app-border bg-app-surface shadow-sm">
+                {archived.map(t => (
+                  <li key={t.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-semibold">{t.name}</span>
+                      <span className="inline-flex items-center rounded-md border border-app-border px-2 py-0.5 text-xs font-medium text-app-muted">{t.branch === 'hero' ? 'HERO' : 'VILLAIN'}</span>
+                    </span>
+                    <button type="button" onClick={() => onUnarchive(t)} aria-label={`Reactivar ${t.name}`}
+                      className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
+                      <ArchiveRestore className="size-4" aria-hidden /> Reactivar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <button type="button" onClick={() => onNavigate('new')}
             className={`${btn} w-full border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-surface`}>
