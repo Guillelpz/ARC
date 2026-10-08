@@ -2,14 +2,6 @@ import type { ActivityEvent, CustomData, Proposal, Tracker } from './types'
 import { SEED_EVENTS } from './seed'
 
 const KEY = 'life-rpg-demo-v1'
-
-export function loadEvents(): ActivityEvent[] {
-  try { const v = JSON.parse(localStorage.getItem(KEY) ?? 'null'); if (Array.isArray(v)) return v } catch { /* corrupto: seed */ }
-  return SEED_EVENTS
-}
-
-export const saveEvents = (e: ActivityEvent[]) => { try { localStorage.setItem(KEY, JSON.stringify(e)) } catch { /* cuota / modo privado */ } }
-
 const CUSTOM_KEY = 'life-rpg-custom-v1'
 export const EMPTY_CUSTOM: CustomData = { trackers: [], proposals: [] }
 
@@ -44,5 +36,38 @@ export function readCustom(v: unknown): Parsed<CustomData> {
 
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM
 
-export const loadCustom = (): CustomData => { try { return parseCustom(localStorage.getItem(CUSTOM_KEY)) } catch { return EMPTY_CUSTOM } }
-export const saveCustom = (c: CustomData) => { try { localStorage.setItem(CUSTOM_KEY, JSON.stringify(c)) } catch { /* cuota */ } }
+
+type Store = Pick<Storage, 'getItem' | 'setItem'>
+export type LoadProblem = { key: string; dropped: number | null; backupKey: string | null } // dropped null = ilegible; backupKey null = no se pudo copiar → clave bloqueada
+export type Loaded = { events: ActivityEvent[]; custom: CustomData; problems: LoadProblem[] }
+
+const locked = new Set<string>() // claves que no se pueden escribir en esta sesión
+export const unlockStorage = () => locked.clear()
+
+// ponytail: restaurar un backup interno es manual (DevTools → Local Storage). Añadir UI cuando un usuario real lo necesite.
+export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
+  const problems: LoadProblem[] = []
+  function load<T>(key: string, read: (v: unknown) => Parsed<T>, ifMissing: T, ifUnreadable: T): T {
+    let raw: string | null
+    try { raw = store.getItem(key) } catch { return ifMissing }
+    if (raw === null) return ifMissing
+    const r = read(json(raw))
+    if (r && r.dropped === 0) return r.data
+    let backupKey: string | null = `${key}.backup.${now.toISOString().replace(/[-:]/g, '').slice(0, 15)}`
+    try { store.setItem(backupKey, raw) } catch { locked.add(key); backupKey = null }
+    problems.push({ key, dropped: r ? r.dropped : null, backupKey })
+    return r ? r.data : ifUnreadable
+  }
+  const events = load(KEY, readEvents, SEED_EVENTS, [])
+  const custom = load(CUSTOM_KEY, readCustom, EMPTY_CUSTOM, EMPTY_CUSTOM)
+  return { events, custom, problems }
+}
+
+export const saveEvents = (e: ActivityEvent[], store: Store = localStorage) => {
+  if (locked.has(KEY)) return
+  try { store.setItem(KEY, JSON.stringify(e)) } catch { /* cuota / modo privado */ }
+}
+export const saveCustom = (c: CustomData, store: Store = localStorage) => {
+  if (locked.has(CUSTOM_KEY)) return
+  try { store.setItem(CUSTOM_KEY, JSON.stringify(c)) } catch { /* cuota */ }
+}
