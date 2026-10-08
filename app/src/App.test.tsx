@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
 
-const EV = 'life-rpg-demo-v1'
+const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
 beforeEach(() => {
   localStorage.clear(); unlockStorage()
@@ -110,4 +110,43 @@ test('U7 borrar todo y U8 recuperar', () => {
   fireEvent.click(btn('Recuperar copia anterior'))
   expect(stored()).toHaveLength(28)
   expect(screen.getByText('Copia recuperada: 28 registros y 0 misiones nuevas.')).toBeTruthy()
+})
+
+const base = { id: 'custom-med', name: 'Meditar', branch: 'hero', type: 'count', unit: 'unidades', increment: 1, buttonLabel: '+1', xpPerUnit: 20, custom: true }
+const preload = () => {
+  localStorage.setItem(CU, JSON.stringify({ trackers: [base], proposals: [] }))
+  localStorage.setItem(EV, JSON.stringify([{ id: 'm1', trackerId: 'custom-med', amount: 1, occurredAt: '2026-10-06T09:00:00' }]))
+}
+const heroXp = () => screen.getByText(/^Lv\. \d+ · \d+ XP$/).textContent
+
+test('U9 editar', () => {
+  preload(); render(<App />); go('HERO')
+  const xp = heroXp()
+  fireEvent.click(btn('Editar Meditar'))
+  const save = () => btn('Guardar') as HTMLButtonElement
+  fireEvent.change(card('Meditar').getByLabelText(/^Nombre/), { target: { value: 'Gym' } })
+  expect(save().disabled).toBe(true)
+  fireEvent.change(card('Meditar').getByLabelText(/^Nombre/), { target: { value: 'Meditar mucho' } })
+  fireEvent.change(card('Meditar').getByLabelText(/^Incremento/), { target: { value: '3' } })
+  fireEvent.change(card('Meditar').getByLabelText(/^Objetivo semanal .unidades/), { target: { value: '5' } })
+  fireEvent.click(save())
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0]).toMatchObject({ name: 'Meditar mucho', increment: 3, buttonLabel: '+3 unidades', weeklyGoal: 5, xpPerUnit: 20 })
+  expect(card('Meditar mucho').getByRole('button', { name: '+3 unidades' })).toBeTruthy()
+  expect(card('Meditar mucho').getByText(/\/ 5 unidades esta semana/)).toBeTruthy()
+  expect(heroXp()).toBe(xp)
+})
+
+test('U10 archivar y reactivar', () => {
+  preload(); render(<App />); go('HERO')
+  const xp = heroXp()
+  fireEvent.click(btn('Editar Meditar'))
+  fireEvent.click(btn('Archivar'))
+  expect(screen.queryByRole('group', { name: 'Meditar' })).toBeNull()
+  expect(heroXp()).toBe(xp)
+  go('Inicio')
+  expect(screen.getByText('Archivadas')).toBeTruthy()
+  fireEvent.click(btn('Reactivar Meditar'))
+  go('HERO')
+  expect(screen.getByRole('group', { name: 'Meditar' })).toBeTruthy()
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0].archived).toBe(false)
 })
