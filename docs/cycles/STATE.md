@@ -6,8 +6,9 @@ Ver `docs/WORKFLOW.md`.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
-- Ciclo 3 (P3.3 + P3.2) — paso 5 (implementación).
-- Ciclo 4 — paso 1 (proponer).
+- Ciclo 3 (P3.3 + P3.2) — fusionado; paso 8 (análisis).
+- Ciclo 4 (P4.1 + P4.2) — paso 4 (spec).
+- Ciclo 5: P4.4 aprobada. Después P4.3 y P4.5 (aprobadas).
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -15,6 +16,7 @@ Ver `docs/WORKFLOW.md`.
 - Se puede proponer backend, cuentas y PARTY real; no se implementan sin okay.
 - Dependencias de desarrollo libres; las de runtime necesitan okay.
 - Claves de localStorage `*-demo-v1`: no se renombran.
+- P4.2: campo opcional `undoes?` en `ActivityEvent` aprobado.
 - Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
 
 ## Propuestas
@@ -30,3 +32,8 @@ Ver `docs/WORKFLOW.md`.
 | P3.3 | Bloque «Tus datos» en la home (después de P1.1/P1.2) | aprobada | 3 |
 | P3.4 | Despliegue + endpoint de IA | pospuesta (decisión del usuario: hosting, key, KV) | — |
 | P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta | — |
+| P4.1 | Registrar en otro día (con cambios de evaluation.md) | aprobada | 4 |
+| P4.2 | Historial + deshacer concreto (`undoes?`) | aprobada | 4 |
+| P4.3 | Editar/archivar actividades propias | aprobada | 6+ |
+| P4.4 | Restaurar `.backup.last` desde la app (rehecha por el evaluador) | aprobada | 5 |
+| P4.5 | Tests de componentes (RTL + jsdom) | aprobada | 6+ |
