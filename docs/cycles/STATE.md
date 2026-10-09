@@ -7,7 +7,9 @@ Ver `docs/WORKFLOW.md`.
 - Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
 - Ciclo 14 — cerrado. Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
-- Ciclo 19 — cerrado. Desde aquí, cada push a main que toque app/ despliega a producción.
+- Ciclo 19 — cerrado; primer despliegue automático OK (2026-10-09). Desde aquí, cada push a main que toque app/ despliega a producción.
+- Ciclo 20 (P20.2 → P20.1) — paso 4 (spec). El usuario hace en paralelo los pasos de GitHub de P20.1.
+- Ciclo 21 (sync opción A: «Importar y fusionar» + P15.2 Web Share): aprobado.
 
 ## Nota
 
@@ -26,6 +28,7 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 - P13.2 (2026-10-09): hosting sin decidir → se deja el despliegue preparado (build + workflow) sin activar; sin IA en producción.
 - P16.3 (2026-10-09): la IA solo funciona en `npm run dev` (`__AI_PROXY__ = command === 'serve' && !!key`); preview usa la heurística.
 - Push de `main` a origin tras cada ciclo cerrado (aprobado 2026-10-09); nunca force-push ni otras ramas.
+- Sincronización (2026-10-10): opción A, sin servidor — «Importar y fusionar» (unión por id + backup) + compartir copia (P15.2). Worker/servidor descartado por ahora (RGPD art. 9).
 - Despliegue (2026-10-09): GitHub Pages (repo público). El usuario crea el repo vacío en la web y pasa la URL; el orquestador añade el remoto y hace push. Commits nuevos con el email noreply de GitHub (el usuario lo facilita); reescribir el historial solo con su okay.
 
 ## Propuestas
@@ -66,7 +69,7 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 | P13.4 | Endpoint de IA en servidor | no aprobada | — |
 | P13.5 | e2e en Chromium real en la CI (Playwright) | aprobada | 14 |
 | P15.1 | Deshacer desde «Hoy» (con cambios) | aprobada | 15 |
-| P15.2 | Exportar con Web Share en móvil instalado | no aprobada por ahora | — |
+| P15.2 | Exportar con Web Share en móvil instalado | aprobada (dentro de la opción A) | 21 |
 | P15.3 | Lint `--deny-warnings` (reducida: silenciar los 3 warnings aceptados con su ponytail) | aprobada | 15 |
 | P16.1 | Tendencia 8 semanas por actividad (barras CSS accesibles) | aprobada | 16 |
 | P16.2 | HERO vs VILLAIN semana a semana en la home | aprobada | 17 |
@@ -76,3 +79,6 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 | P19.1 | Despliegue automático a Pages en push a main (paths app/**, e2e como gate, salvo sw_kill) | aprobada | 19 |
 | P19.2 | No perder registros con dos pestañas (evento `storage`) | aprobada | 19 |
 | P19.3 | Vista previa del enlace (meta + Open Graph) | aprobada | 19 |
+| P20.1 | Proteger producción: humo post-deploy (JS publicado = dist), rollback con git revert; pasos de GitHub los hace el usuario | aprobada | 20 |
+| P20.2 | No pisar datos de otra pestaña tras aviso de datos dañados | aprobada | 20 |
+| P20.3 | Sincronización | opción A aprobada (ciclo 21); Worker descartado por ahora | 21 |
