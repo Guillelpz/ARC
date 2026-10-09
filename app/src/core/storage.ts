@@ -102,13 +102,14 @@ export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
   return { events, custom, problems }
 }
 
-export const saveEvents = (e: ActivityEvent[], store: Store = localStorage) => {
-  if (locked.has(KEY)) return
-  try { store.setItem(KEY, JSON.stringify(e)) } catch { /* cuota / modo privado */ }
+// true = escrito; false = setItem lanzó (cuota, modo privado…); null = clave bloqueada, no se intenta (lo avisa noticeFor)
+export const saveEvents = (e: ActivityEvent[], store: Store = localStorage): boolean | null => {
+  if (locked.has(KEY)) return null
+  try { store.setItem(KEY, JSON.stringify(e)); return true } catch { return false }
 }
-export const saveCustom = (c: CustomData, store: Store = localStorage) => {
-  if (locked.has(CUSTOM_KEY)) return
-  try { store.setItem(CUSTOM_KEY, JSON.stringify(c)) } catch { /* cuota */ }
+export const saveCustom = (c: CustomData, store: Store = localStorage): boolean | null => {
+  if (locked.has(CUSTOM_KEY)) return null
+  try { store.setItem(CUSTOM_KEY, JSON.stringify(c)); return true } catch { return false }
 }
 
 export type Backup = { app: 'rpg-life-tracker'; version: 1; exportedAt: string; events: ActivityEvent[]; custom: CustomData }

@@ -52,8 +52,8 @@ export default function App() {
   const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0
   const copy = backupDue(lastExport, now, hasData)
 
-  useEffect(() => saveEvents(events), [events])
-  useEffect(() => saveCustom(custom), [custom])
+  useEffect(() => { saveEvents(events) }, [events])
+  useEffect(() => { saveCustom(custom) }, [custom])
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2400)

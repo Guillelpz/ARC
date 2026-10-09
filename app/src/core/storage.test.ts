@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -98,8 +98,14 @@ describe('loadAll', () => {
   test('sin poder copiar: bloquea', () => {
     const s = fakeStore({ [EV]: '{roto' }, true)
     expect(loadAll(s, D).problems[0].backupKey).toBeNull()
-    saveEvents([good], s)
+    expect(saveEvents([good], s)).toBeNull() // W2
     expect(s.m.get(EV)).toBe('{roto')
+  })
+  test('W1 resultado de guardar', () => {
+    expect(saveEvents([good], fakeStore())).toBe(true)
+    expect(saveCustom(EMPTY_CUSTOM, fakeStore())).toBe(true)
+    expect(saveEvents([good], fakeStore({}, true))).toBe(false)
+    expect(saveCustom(EMPTY_CUSTOM, fakeStore({}, true))).toBe(false)
   })
 })
 
