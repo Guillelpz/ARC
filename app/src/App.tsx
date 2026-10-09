@@ -176,7 +176,7 @@ export default function App() {
   function reset() {
     if (stale) return setNotice(STALE_BLOCK_TEXT)
     if (copy.due && hasData && window.confirm('No tienes una copia reciente de tus datos. ¿Exportar una antes de borrar? Aceptar exporta y no borra nada; Cancelar sigue con el borrado.')) {
-      exportData(); setNotice('Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.'); return
+      void exportData().then(ok => setNotice(ok ? 'Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.' : 'No se ha exportado la copia y no se ha borrado nada.')); return
     }
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
@@ -184,15 +184,23 @@ export default function App() {
     setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
-  function exportData() {
-    const stamp = new Date().toISOString()
-    const url = URL.createObjectURL(new Blob([exportBackup(events, custom, stamp)], { type: 'application/json' }))
+  async function exportData(): Promise<boolean> {
+    const stamp = new Date().toISOString(), name = `rpg-life-tracker-${stamp.slice(0, 10)}.json`
+    const text = exportBackup(events, custom, stamp)
+    const done = () => { saveLastExport(stamp); setLastExport(stamp); requestPersist(); return true } // requestPersist en el primer gesto (no al arrancar: Firefox muestra un diálogo)
+    const file = new File([text], name, { type: 'application/json' })
+    // ponytail: Chrome Android no comparte application/json (canShare = false) → descarga. Solo en la app instalada en táctil:
+    // en escritorio (incluida la PWA instalada) la hoja de compartir no tiene «Guardar archivo».
+    if (window.matchMedia?.('(display-mode: standalone)').matches && window.matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return done() }
+      catch (e) { if (e instanceof DOMException && e.name === 'AbortError') { setNotice('No se ha exportado la copia.'); return false } } // NotAllowedError (sin gesto, p. ej. tras confirm) u otro → descarga
+    }
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
     const a = document.createElement('a')
-    a.href = url; a.download = `rpg-life-tracker-${stamp.slice(0, 10)}.json`; a.click()
+    a.href = url; a.download = name; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
-    // ponytail: cuenta como copia al lanzar la descarga; el navegador no confirma que se guardó.
-    saveLastExport(stamp); setLastExport(stamp)
-    requestPersist() // en el primer gesto del usuario (no al arrancar: Firefox muestra un diálogo de permiso)
+    // ponytail: la descarga cuenta como copia al lanzarse; el navegador no confirma que se guardó.
+    return done()
   }
 
   function importData(text: string) {

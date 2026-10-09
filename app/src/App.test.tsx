@@ -144,6 +144,48 @@ test('U-F4 fusionar y recuperar', async () => {
   await vi.waitFor(() => expect(stored()).toEqual([x1]))
 })
 
+const shareEnv = (canShare: boolean, share: () => Promise<void>) => {
+  window.matchMedia = vi.fn(() => ({ matches: true })) as never
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => canShare })
+  Object.defineProperty(navigator, 'share', { configurable: true, value: vi.fn(share) })
+}
+const lastExport = () => JSON.parse(localStorage.getItem('life-rpg-meta-v1') ?? '{}').lastExportAt
+afterEach(() => { delete (navigator as never as Record<string, unknown>).canShare; delete (navigator as never as Record<string, unknown>).share; delete (window as never as Record<string, unknown>).matchMedia })
+
+test('U-S1 compartir', async () => {
+  shareEnv(true, () => Promise.resolve())
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  await vi.waitFor(() => expect(lastExport()).toBeTruthy())
+  expect(URL.createObjectURL).not.toHaveBeenCalled()
+})
+
+test('U-S2 compartir cancelado', async () => {
+  shareEnv(true, () => Promise.reject(new DOMException('x', 'AbortError')))
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  expect(await screen.findByText('No se ha exportado la copia.')).toBeTruthy()
+  expect(lastExport()).toBeUndefined()
+  expect(URL.createObjectURL).not.toHaveBeenCalled()
+})
+
+test('U-S3 compartir sin permiso cae a descarga', async () => {
+  shareEnv(true, () => Promise.reject(new DOMException('x', 'NotAllowedError')))
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  await vi.waitFor(() => expect(lastExport()).toBeTruthy())
+  expect(URL.createObjectURL).toHaveBeenCalled()
+})
+
+test('U-S4 sin canShare descarga', async () => {
+  shareEnv(false, () => Promise.resolve())
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  await vi.waitFor(() => expect(lastExport()).toBeTruthy())
+  expect(URL.createObjectURL).toHaveBeenCalled()
+  expect(navigator.share).not.toHaveBeenCalled()
+})
+
 test('U7 borrar todo y U8 recuperar', () => {
   render(<App />)
   fireEvent.click(btn('Cargar ejemplo'))
