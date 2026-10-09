@@ -1,6 +1,6 @@
 # Estado actual — RPG Life Tracker
 
-> Fecha de corte: 2026-10-09 (tras ciclo 11). El proyecto nació como demo de hackathon (Build Day) y pasa a desarrollo real.
+> Fecha de corte: 2026-10-09 (tras ciclo 12). El proyecto nació como demo de hackathon (Build Day) y pasa a desarrollo real.
 > Este documento describe **lo que hay hoy en el código** y lo que lo separa de un producto en producción. Es la referencia principal; los PRD y specs anteriores quedan como histórico (ver §7).
 
 ## 1. Qué es
@@ -16,7 +16,7 @@ App web (móvil primero) que convierte actividades de la vida real en un persona
 
 | Pantalla (`screen`) | Qué hace |
 |---|---|
-| Inicio (`home`) | Bloque «Hoy» (XP neta de hoy por rama, registrado hoy, «Te faltan» con días restantes y mejor racha; cada fila lleva a su rama), nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, estado vacío de bienvenida para usuario nuevo, bloque «Tus datos» (estado de la última copia y aviso si pasan 14 días con datos), «Cargar ejemplo» / «Borrar todo» (con confirmación; «Borrar todo» ofrece exportar antes), «Exportar copia» / «Importar copia» (JSON, con confirmación), «Recuperar copia anterior» (intercambia el estado actual con `.backup.last`; repetirlo deshace) y aviso si al cargar se perdieron o descartaron datos. |
+| Inicio (`home`) | Bloque «Hoy» (XP neta de hoy por rama, registrado hoy, «Te faltan» con días restantes y mejor racha; cada fila lleva a su rama y tiene un «+» que registra el incremento de hoy, moviendo el foco a «Hoy» si con eso se cumple el objetivo), nivel PLAYER, ramas HERO/VILLAIN, composición %, resumen de parties, estado vacío de bienvenida para usuario nuevo, bloque «Tus datos» (estado de la última copia y aviso si pasan 14 días con datos), «Cargar ejemplo» / «Borrar todo» (con confirmación; «Borrar todo» ofrece exportar antes), «Exportar copia» / «Importar copia» (JSON, con confirmación), «Recuperar copia anterior» (intercambia el estado actual con `.backup.last`; repetirlo deshace) y aviso si al cargar se perdieron o descartaron datos. |
 | HERO / VILLAIN (`hero`, `villain`) | Tarjetas de actividad: registro con incremento fijo, selector de día («Hoy», «Ayer» o fecha pasada) para registrar y corregir, corrección (evento negativo, limitada al total de ese día), «Últimos registros» (10 más recientes) con «Deshacer», semana actual vs. mismo tramo de la anterior, objetivo semanal con chip de racha semanal (semanas seguidas cumpliendo el objetivo vigente en cada semana; cambiar el objetivo no reescribe el pasado; no da XP), XP y nivel por actividad, en qué parties cuenta. |
 | Actividades propias | (Las 4 fijas HERO editan solo su objetivo semanal; campo vacío = valor por defecto.) En su tarjeta (HERO/VILLAIN) se pueden editar nombre, incremento y objetivo semanal (solo HERO) y archivar; no se cambia rama, tipo, unidad ni XP/unidad. Las archivadas se ocultan de las tarjetas, pero su XP, histórico y parties siguen contando; se reactivan desde Inicio o con «Reactivar» en Nuevo si el usuario escribe su nombre. |
 | Nuevo (`new`) | Crear actividad propia: texto libre → clasificación (Claude Haiku o heurística local) → el usuario confirma rama, tipo, unidad y XP/unidad. Detecta actividades parecidas ya existentes, incluidas las archivadas (ofrece «Reactivar»). Permite proponerla a parties. |
