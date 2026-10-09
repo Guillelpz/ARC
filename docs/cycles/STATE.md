@@ -5,9 +5,9 @@ Ver `docs/WORKFLOW.md`.
 ## En curso
 
 - Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
-- Ciclo 14 (P13.3 PWA + P13.5 e2e) — paso 4 (spec). Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
+- Ciclo 14 (P13.3 PWA + P13.5 e2e) — paso 5 (implementación). Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
-- Siguiente: ciclo 14.
+- Ciclo 19 — paso 1 (proponer).
 
 ## Nota
 
