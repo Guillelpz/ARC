@@ -9,7 +9,8 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
 - Ciclo 19 — cerrado; primer despliegue automático OK (2026-10-09). Desde aquí, cada push a main que toque app/ despliega a producción.
 - Ciclo 20 — cerrado. El usuario hace en paralelo los pasos de GitHub de P20.1.
-- Ciclo 21 (sync opción A: «Importar y fusionar» + P15.2 Web Share) — paso 4 (spec).
+- Ciclo 21 (sync opción A: «Importar y fusionar» + P15.2 Web Share) — paso 5 (implementación).
+- Ciclo 22 — paso 1 (proponer).
 
 ## Nota
 
