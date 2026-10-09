@@ -17,7 +17,8 @@ Orden: 13 → 14. El primero no cerrado de la lista es el siguiente a especifica
 - Ciclo 9 — cerrado (4760257).
 - Ciclo 10 — cerrado (7d6d19e).
 - Ciclo 11 — cerrado (26b7c76).
-- Ciclo 13 (P13.1 + P13.2) — paso 4 (spec).
+- Ciclo 13 (P13.1 + P13.2) — paso 5 (implementación).
+- Ciclo 15 — paso 1 (proponer).
 - Ciclo 14 (P13.3 + P13.5): aprobado, después de comprobar el primer despliegue en el móvil.
 - Ciclo 12 — cerrado. P11.2 no aprobada.
 
