@@ -168,6 +168,13 @@ test('U12 racha', () => {
   expect(screen.getByText('Mejor racha: Gym · 3 semanas')).toBeTruthy()
 })
 
+test('U-W1 tendencia semanal', () => {
+  streakEvents(); render(<App />); go('HERO')
+  expect(card('Gym').getByText('Últimas 8 semanas')).toBeTruthy()
+  expect(card('Gym').getByText(/^Semana del 28 sep.*: 4 de 4 sesiones, cumplida$/)).toBeTruthy()
+  expect(card('Gym').getByText(/^Semana del 5 oct.* \(en curso\): 2 de 4 sesiones$/)).toBeTruthy()
+})
+
 test('U10 archivar y reactivar', () => {
   preload(); render(<App />); go('HERO')
   const xp = heroXp()

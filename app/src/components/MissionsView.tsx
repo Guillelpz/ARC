@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import type { ActivityEvent, Branch, GameState, PartyState, Tracker } from '../core/types'
 import { countsIn, vote } from '../core/party'
-import { addDays, byRecent, dayLabel, dayTotal, history } from '../core/stats'
+import { addDays, byRecent, dayLabel, dayTotal, history, weekly } from '../core/stats'
 import { isDuplicateName, normalizeText } from '../core/classify'
 import { ProgressBar } from './ProgressBar'
 import { SaveFailBanner } from './SaveFailBanner'
@@ -83,7 +83,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((s, i) => (
             <div key={s.tracker.id} className="rise" style={{ animationDelay: `${i * 60}ms` }}>
-            <TrackerCard stats={s} gain={gain} today={today} history={history(events, s.tracker.id)} onUndo={e => onUndo(s.tracker, e)} dayTotal={dayTotal(events, s.tracker.id, day)} dayNote={day === today ? undefined : dayLabel(day, today).toLowerCase()} onAdd={n => onAdd(s.tracker, n, day)}
+            <TrackerCard stats={s} gain={gain} today={today} history={history(events, s.tracker.id)} weeks={weekly(events, s.tracker, today)} onUndo={e => onUndo(s.tracker, e)} dayTotal={dayTotal(events, s.tracker.id, day)} dayNote={day === today ? undefined : dayLabel(day, today).toLowerCase()} onAdd={n => onAdd(s.tracker, n, day)}
               countsIn={countsIn(s.tracker.id, partyStates)}
               proposable={s.tracker.custom ? proposable(s.tracker) : undefined}
               proposals={s.tracker.custom ? proposals(s.tracker) : undefined}
