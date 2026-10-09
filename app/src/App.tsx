@@ -14,6 +14,8 @@ import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
+import { UpdateBanner } from './components/UpdateBanner'
+import { registerSW } from './pwa'
 import { liveText } from './components/liveText'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
@@ -29,6 +31,8 @@ const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
 
 export default function App() {
   const [loaded] = useState(loadAll)
+  const [update, setUpdate] = useState(false)
+  useEffect(() => registerSW(() => setUpdate(true)), [])
   const [events, setEvents] = useState<ActivityEvent[]>(loaded.events)
   const [custom, setCustom] = useState<CustomData>(loaded.custom)
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
@@ -217,6 +221,7 @@ export default function App() {
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
       <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={go} />
+      {update && <UpdateBanner tone={screen === 'hero' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
     </>
   )
 }

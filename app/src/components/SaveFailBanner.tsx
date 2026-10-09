@@ -1,16 +1,11 @@
 import { CircleAlert, Download } from 'lucide-react'
+import { bannerTones } from './bannerTones'
 
 export const SAVE_FAIL_TEXT = 'No se ha podido guardar en este navegador. Lo que registres ahora se perderá al recargar: exporta una copia.'
 
-const tones = {
-  app: { box: 'border-app-border bg-app-surface text-app-text', btn: 'border-app-border text-app-text outline-app-text hover:bg-app-bg' },
-  hero: { box: 'border-hero-border bg-hero-surface text-hero-text', btn: 'border-hero-border text-hero-text outline-hero' },
-  villain: { box: 'border-villain-border bg-villain-surface text-villain-text', btn: 'border-villain-border text-villain-text outline-villain' },
-} as const
-
 // Sin role: lo anuncia la región status global de App.
-export function SaveFailBanner({ tone, onExport, className = '' }: { tone: keyof typeof tones; onExport: () => void; className?: string }) {
-  const c = tones[tone]
+export function SaveFailBanner({ tone, onExport, className = '' }: { tone: keyof typeof bannerTones; onExport: () => void; className?: string }) {
+  const c = bannerTones[tone]
   return (
     <div className={`flex items-start gap-3 rounded-xl border p-4 shadow-sm ${c.box} ${className}`}>
       <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
