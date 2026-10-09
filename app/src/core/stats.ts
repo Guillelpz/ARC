@@ -1,4 +1,4 @@
-import type { ActivityEvent, HistoryRow, TodaySummary, Tracker, TrackerStats, WeekRow } from './types'
+import type { ActivityEvent, HistoryRow, TodaySummary, Tracker, TrackerStats, WeekRow, BranchWeek } from './types'
 
 export const addDays = (d: string, n: number): string => {
   const t = new Date(d + 'T00:00:00Z')
@@ -132,3 +132,16 @@ export function weekly(events: ActivityEvent[], t: Tracker, today: string, n = 8
     return { monday, total: tot, goal, met: goal !== null && tot >= goal, current }
   })
 }
+
+// XP neta por rama y semana; archivadas incluidas (misma regla que deriveGame). Eventos de trackers desconocidos: ignorados.
+// ponytail: weekly() por tracker filtra todos los eventos cada vez (O(trackers·eventos)); indexar por trackerId si se nota.
+export function branchWeekly(events: ActivityEvent[], trackers: Tracker[], today: string, n = 8): BranchWeek[] {
+  const cur = mondayOf(today)
+  const out: BranchWeek[] = Array.from({ length: n }, (_, i) => ({ monday: addDays(cur, -7 * (n - 1 - i)), hero: 0, villain: 0, current: i === n - 1 }))
+  for (const t of trackers) weekly(events, t, today, n).forEach((w, i) => { out[i][t.branch] += w.total * t.xpPerUnit })
+  return out
+}
+
+// «28 sept»; mismo formato que tenía TrackerCard.weekText
+export const shortDate = (d: string) =>
+  new Date(d + 'T00:00:00Z').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
