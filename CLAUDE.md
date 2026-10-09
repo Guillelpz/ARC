@@ -9,7 +9,7 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
 - `npm run dev` — Vite dev server. En DEV, `main.tsx` ejecuta `runSelfCheck()` (`src/core/selfcheck.ts`): los fallos salen como `console.assert` en la consola del navegador y termina con `[selfcheck] done`.
 - `npm run build` — `tsc -b && vite build` (es también el type-check).
 - `npm run lint` — oxlint (`.oxlintrc.json`).
-- `npm test` — Vitest: ejecuta `selfcheck.ts` (falla si algún `console.assert` es falso) los tests de `core/` y los de UI (`src/App.test.tsx`, Testing Library + happy-dom).
+- `npm test` — Vitest: ejecuta `selfcheck.ts` (falla si algún `console.assert` es falso) los tests de `core/` y los de UI (`src/App.test.tsx`, Testing Library + happy-dom) y el chequeo axe (`src/a11y.test.tsx`).
 - `selfcheck.ts` es el oráculo de dominio (TECH_SPEC §5/§10 y §4.6 de V2): si falla, se arregla el motor, nunca los asserts. Para cambios de código, pasar `build`, `lint` y `test`; si cambia `core/`, revisar los asserts afectados.
 
 ## Documentos
