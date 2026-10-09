@@ -19,9 +19,9 @@ Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el sig
 - Ciclo 11 — cerrado (26b7c76).
 - Ciclo 13 — cerrado (b31ba3d).
 - Ciclo 15 — cerrado (2a20baa).
-- Ciclo 16 (P16.3 → P16.1) — paso 5 (implementación).
-- Ciclo 18 — paso 1 (proponer).
-- Ciclo 17 (P16.2): aprobado. Se adelanta al 14 por estar este bloqueado.
+- Ciclo 16 (P16.3 → P16.1) — fusionado; paso 8 (análisis).
+- Ciclo 18: el proponedor recomienda no abrir más ciclos locales; el usuario activa el despliegue (P18.1). Después, ciclo 14.
+- Ciclo 17 (P16.2 + P18.2) — paso 4 (spec). Se adelanta al 14 por estar este bloqueado.
 - Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
 - Ciclo 12 — cerrado. P11.2 no aprobada.
 
@@ -37,7 +37,7 @@ Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el sig
 - P11.1 (2026-10-09): `goalLog?` en life-rpg-custom-v1; racha con el objetivo vigente cada semana; antes del primer apunte, el objetivo vigente justo antes de ese cambio (aclarado 2026-10-09: bajar el objetivo nunca alarga la racha pasada); sin apuntes, objetivo de hoy; varios cambios en una semana → el primero; de «sin objetivo» a objetivo → la racha empieza en la semana del cambio.
 - P13.2 (2026-10-09): hosting sin decidir → se deja el despliegue preparado (build + workflow) sin activar; sin IA en producción.
 - P16.3 (2026-10-09): la IA solo funciona en `npm run dev` (`__AI_PROXY__ = command === 'serve' && !!key`); preview usa la heurística.
-- Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
+- Despliegue (2026-10-09): GitHub Pages (repo público). El usuario crea el repo vacío en la web y pasa la URL; el orquestador añade el remoto y hace push. Commits nuevos con el email noreply de GitHub (el usuario lo facilita); reescribir el historial solo con su okay.
 
 ## Propuestas
 
@@ -82,3 +82,5 @@ Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el sig
 | P16.1 | Tendencia 8 semanas por actividad (barras CSS accesibles) | aprobada | 16 |
 | P16.2 | HERO vs VILLAIN semana a semana en la home | aprobada | 17 |
 | P16.3 | Menores del ciclo 13 (IA solo en dev) | aprobada | 16 |
+| P18.1 | Activar despliegue en GitHub Pages | aprobada (espera repo del usuario) | — |
+| P18.2 | Plural en aria-label de «Deshacer» | aprobada (dentro del ciclo 17) | 17 |
