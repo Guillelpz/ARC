@@ -4,7 +4,7 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 10 → 11. El primero no cerrado de la lista es el siguiente a especificar.
+Orden: 10 → 11 → 12. El primero no cerrado de la lista es el siguiente a especificar.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
@@ -15,8 +15,9 @@ Orden: 10 → 11. El primero no cerrado de la lista es el siguiente a especifica
 - Ciclo 7 — cerrado (ef60fdc).
 - Ciclo 8 — cerrado (3906d6f). P7.2a no aprobada todavía.
 - Ciclo 9 — cerrado (4760257).
-- Ciclo 10 (P9.1 + P9.4) — paso 5 (implementar). Spec: `docs/TECH_SPEC-deuda-y-a11y.md`.
-- Ciclo 11 — paso 3 (okay del usuario). Propuestas y evaluación en `docs/cycles/cycle-11/`; falta el okay a la regla de P11.1.
+- Ciclo 10 (P9.1 + P9.4) — fusionado; paso 8 (análisis).
+- Ciclo 11 (P11.1 con P11.5 + P11.3) — paso 4 (spec).
+- Ciclo 12 (P11.4): aprobado. P11.2 no aprobada.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -27,6 +28,7 @@ Orden: 10 → 11. El primero no cerrado de la lista es el siguiente a especifica
 - P4.2: campo opcional `undoes?` en `ActivityEvent` aprobado.
 - P7.1 rachas: semanal por actividad, sin XP, la semana en curso no la rompe, objetivo actual también hacia atrás; `pop` en tarjeta + mejor racha en «Hoy».
 - P9.3: prorrateo lineal de la XP semanal de los amigos simulados por día transcurrido; asserts de ranking actuales se mueven al domingo 2026-10-11 + asserts nuevos de miércoles y lunes.
+- P11.1 (2026-10-09): `goalLog?` en life-rpg-custom-v1; racha con el objetivo vigente cada semana; antes del primer apunte, objetivo actual; varios cambios en una semana → el primero; de «sin objetivo» a objetivo → la racha empieza en la semana del cambio.
 - Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
 
 ## Propuestas
@@ -56,8 +58,8 @@ Orden: 10 → 11. El primero no cerrado de la lista es el siguiente a especifica
 | P9.2 | Proponer a una party una actividad existente | aprobada | 9 |
 | P9.3 | Ranking prorrateado (regla aprobada) | aprobada | 9 |
 | P9.4 | Avisos accesibles + axe | aprobada | 10 |
-| P11.1 | Objetivo vigente por semana (`goalLog`), absorbe P11.5 | evaluada, espera okay de regla | 11 |
-| P11.2 | Límite semanal VILLAIN (`weeklyLimit`, sustituye a P7.2a) | evaluada: posponer | 12 |
-| P11.3 | No perder registros en silencio si falla el guardado | evaluada, espera okay | 11 |
-| P11.4 | Registrar desde «Te faltan» en la home | evaluada, espera okay | 11 o 12 |
-| P11.5 | Menores de objetivos → dentro de P11.1 | evaluada | 11 |
+| P11.1 | Objetivo vigente por semana (`goalLog`), absorbe P11.5 | aprobada | 11 |
+| P11.2 | Límite semanal VILLAIN (`weeklyLimit`, sustituye a P7.2a) | no aprobada | — |
+| P11.3 | No perder registros en silencio si falla el guardado | aprobada | 11 |
+| P11.4 | Registrar desde «Te faltan» en la home | aprobada | 12 |
+| P11.5 | Menores de objetivos → dentro de P11.1 | aprobada | 11 |

@@ -1,0 +1,39 @@
+# Propuestas — ciclo 11
+
+Contexto: ciclos 1-8 cerrados. Doy por hechos el ciclo 9 (P9.2 y P9.3, party y ranking) y el ciclo 10 (P9.1 y P9.4). Siguen pospuestas P3.4 (despliegue + IA) y P3.5 (cuentas), así que ninguna propuesta necesita backend. P7.2a está pendiente, no rechazada, y vuelve en P11.2 rehecha sobre lo que ya existe (ciclos 7 y 8). Los dos efectos señalados en los análisis de los ciclos 7 y 8 tienen propuesta propia: la racha retroactiva (P11.1) y la asimetría entre HERO y VILLAIN (P11.2).
+
+## P11.1 — La racha respeta el objetivo que había cada semana (`producto`)
+- Problema: `streak` usa el `weeklyGoal` actual para todas las semanas pasadas (`ponytail:` en `stats.ts:51`). Desde el ciclo 8 esto afecta también a las 4 fijas HERO (`goals` en `life-rpg-custom-v1`). Si el usuario baja el objetivo, la racha crece hacia atrás sin que haya hecho nada para ganarla; si lo sube, pierde semanas que sí cumplió. Lo señalan los análisis de los ciclos 7 («Para el siguiente ciclo») y 8 («Riesgos»).
+- Propuesta: al cambiar el objetivo de una actividad, fija o propia, se guarda el objetivo anterior junto con la semana hasta la que estuvo en vigor, en un registro opcional dentro de `custom` (p. ej. `goalLog?: { trackerId, goal, until }[]`, `until` = lunes de la semana en curso). `streak` usa, para cada semana pasada, el objetivo que estaba en vigor esa semana. La semana en curso usa siempre el objetivo actual. `readCustom` valida el registro (si falta, se comporta como hoy) y el registro se conserva en el backup, en exportar/importar y en «Borrar todo». Varios cambios de objetivo dentro de la misma semana dejan una sola entrada. Asserts nuevos en `selfcheck.ts` para bajar el objetivo, subirlo y no tener registro. Se retira el `ponytail:` de `stats.ts:51`. NO: reconstruir el pasado de los datos que ya existen (antes del ciclo no hay registro, así que esas semanas siguen con el objetivo actual, y se documenta), mostrar el histórico de objetivos en la UI ni dar XP por racha.
+- Alternativa mínima, por si el usuario prefiere no tocar el esquema: dejar la regla como está y avisar en el formulario de edición de que «la racha se recalcula con el nuevo objetivo» (coste XS, riesgo nulo).
+- Valor: medio (la racha deja de premiar o castigar algo que el usuario no hizo; con P11.2 el mismo problema pasaría a los límites de VILLAIN) / Coste: M / Riesgo: medio (cambio de esquema compatible en `custom` y cambio de una regla que el usuario aprobó en P7.1).
+- Requiere: cambio de reglas de juego (la decisión de P7.1 «objetivo actual también hacia atrás» pasa a «objetivo vigente en cada semana») y cambio de esquema compatible en `life-rpg-custom-v1`. Ninguna dependencia.
+- Depende de: —
+
+## P11.2 — Límite semanal opcional en VILLAIN (`producto`)
+- Problema: es P7.2a, que sigue pendiente. VILLAIN no tiene ninguna meta: más vicio solo suma más XP (assert «villain sin objetivo» en `selfcheck.ts`). Desde el ciclo 8 los HERO, fijos y propios, tienen objetivo editable y racha, y VILLAIN no tiene nada (análisis del ciclo 8, «Riesgos»). Además, «Te faltan» lleva siempre a `'hero'` (deuda del ciclo 7).
+- Propuesta: límite semanal opcional en las actividades VILLAIN (Beer y Burgers como override en `goals`, las propias en su edición). Reutiliza la UI y la validación de P7.2b. La tarjeta muestra «3 / 5 esta semana», con la barra en estado de aviso al superar el límite. Racha «semanas bajo control»: semanas cerradas sin superar el límite. A diferencia de la racha HERO, la semana en curso la rompe en cuanto se supera el límite. En «Hoy», una línea «Te pasaste en: …» que lleva a la rama correcta (`t.branch`). Sin límite, todo sigue como hoy: el assert «villain sin objetivo» se mantiene para ese caso y se añaden asserts para el caso con límite. NO: penalizar XP, cambiar `xpPerUnit` o los umbrales, límites diarios ni límites en la party.
+- Valor: medio-alto (da a VILLAIN un sentido de control además de acumular, y cierra la asimetría) / Coste: M / Riesgo: medio (regla de juego nueva; hay que decidir cómo se lee la XP VILLAIN cuando existe un límite).
+- Requiere: cambio de reglas de juego (VILLAIN con meta opcional). Ninguna dependencia. El esquema reutiliza `goals`, que ya existe.
+- Depende de: — (si entra P11.1, conviene hacerla después para que el límite no herede la racha retroactiva).
+
+## P11.3 — No perder registros en silencio cuando falla el guardado (`calidad`)
+- Problema: `saveEvents` y `saveCustom` tragan cualquier excepción de `setItem` (`storage.ts:94` y `:98`, `/* cuota */`), y una clave bloqueada (`storage.ts:93`) tampoco avisa. Si localStorage se llena o no deja escribir, la app sigue mostrando los registros como guardados y se pierden al recargar. Además, los backups sellados `.backup.<stamp>` no se purgan nunca (`ponytail:` en `storage.ts:73`) y van ocupando cuota.
+- Propuesta: `saveEvents` y `saveCustom` devuelven si han podido escribir. `App.tsx` muestra un aviso persistente en la home y en la rama activa («No se pudo guardar: exporta una copia ahora»), con el botón de exportar que ya existe. El aviso se anuncia por la región `role="status"` de P9.4. Purga de sellados: se conservan los N más recientes por clave (p. ej. 3), y solo se purga después de escribir un sellado nuevo. Tests en `storage.test.ts` con un `store` que lanza `QuotaExceededError` y un test de UI con el aviso. NO: copias automáticas, IndexedDB ni migrar de almacenamiento, reintentos, ni tocar `.backup.last`/`.prev`.
+- Valor: alto (hoy es la única forma de perder datos sin enterarse) / Coste: S / Riesgo: bajo (la purga borra datos, pero solo copias antiguas y redundantes de un mismo incidente; queda cubierta por tests).
+- Requiere: nada.
+- Depende de: — (usa la región de avisos de P9.4, del ciclo 10).
+
+## P11.4 — Registrar desde «Te faltan» en la home (`producto`)
+- Problema: el bloque «Hoy» dice qué falta, pero para registrar hay que ir a la rama, buscar la tarjeta y volver. El análisis del ciclo 7 lo deja abierto («Hoy no permite registrar desde la home; decidir si merece la pena»). Es la acción más frecuente de la app y la pantalla de entrada no la permite.
+- Propuesta: cada fila de «Te faltan» lleva un botón «+<incremento>» que llama al `add` que ya existe, con fecha de hoy. Muestra el feedback que ya hay (XP flotante y toast) y la fila se actualiza o desaparece al cumplir el objetivo. Botón con nombre accesible («Registrar 1 sesión de Gym»). Test de UI. NO: selector de día ni corrección desde la home (siguen en la tarjeta), registrar actividades sin objetivo desde la home, ni reordenar la home.
+- Valor: medio (menos pasos para el uso diario) / Coste: S / Riesgo: bajo (solo UI; reutiliza `add`).
+- Requiere: nada.
+- Depende de: — (si entra P11.2, la línea «Te pasaste en» no lleva botón).
+
+## P11.5 — Cerrar los menores de los ciclos 7 y 8 (`deuda`)
+- Problema: (1) `App.tsx:126` llama a `proposeTo` con `allTrackers(c.trackers)`, sin `goals` (análisis del ciclo 8). Hoy no tiene efecto, pero la lista de trackers no coincide con la de `App.tsx:71`. (2) `setGoal` persiste `goals: {}` al volver al valor por defecto (`ponytail:` en `trackers.ts`/`App.tsx`). (3) `todaySummary.missing` depende de que `stats.week` venga de `deriveGame` con el mismo `today`, y eso no está comprobado ni comentado (análisis del ciclo 7).
+- Propuesta: (1) usar en `propose` la lista `trackers` ya calculada (o pasarle `goals`). (2) `setGoal` elimina `goals` cuando queda vacío, y se retira el `ponytail:`. (3) Un assert en `selfcheck.ts` que fije la relación entre `todaySummary` y `deriveGame` con el mismo `today`. NO: refactorizar `App.tsx` ni tocar las reglas.
+- Valor: bajo-medio (evita divergencias cuando P11.1 y P11.2 toquen objetivos) / Coste: XS / Riesgo: bajo.
+- Requiere: nada.
+- Depende de: — (comprobar antes que el ciclo 9, que toca `propose` con P9.2, no haya cerrado ya el punto 1).
