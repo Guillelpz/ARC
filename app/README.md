@@ -9,4 +9,4 @@ npm run build   # type-check + build de producción
 npm run lint    # oxlint
 ```
 
-Clasificación con IA (opcional, solo `dev`/`preview`): crear `.env.local` con `ANTHROPIC_API_KEY=...`. Sin key, la app usa la heurística local.
+Clasificación con IA (opcional, solo `npm run dev`): crear `.env.local` con `ANTHROPIC_API_KEY=...`. Sin key, la app usa la heurística local.

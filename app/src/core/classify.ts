@@ -61,7 +61,7 @@ const aiSchema = (ids: string[]) => ({
 })
 const oneOf = <T extends string>(v: unknown, xs: readonly T[]): v is T => xs.includes(v as T)
 
-declare const __AI_PROXY__: boolean // vite.config `define`: true si había ANTHROPIC_API_KEY al arrancar o al hacer el build
+declare const __AI_PROXY__: boolean // vite.config `define`: true solo en `npm run dev` con ANTHROPIC_API_KEY; en cualquier build, false
 
 // ponytail: una llamada a Claude vía el proxy de Vite, sin reintentos ni caché; cualquier fallo → heurística
 export async function classifyAI(text: string, trackers: Tracker[]): Promise<Classification> {
