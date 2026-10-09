@@ -254,6 +254,7 @@ export function HomeView({ game, summary, weeks, partyStates, archived, onUnarch
                   : `Última copia: hace ${copy.days} ${copy.days === 1 ? 'día' : 'días'}.`}
               </p>
             )}
+            <p className="text-xs leading-5 text-app-muted">En iPhone y iPad, la app añadida a la pantalla de inicio guarda sus datos aparte de Safari: exporta una copia aquí e impórtala en la app.</p>
             <div className="flex flex-wrap gap-3">
               <button type="button" onClick={onExport}
                 className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
