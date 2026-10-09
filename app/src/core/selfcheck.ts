@@ -214,6 +214,14 @@ export function runSelfCheck() {
   const arch = { ...med, archived: true }, ha = [ev(med.id, 1, DEMO_DATE)]
   const hsa = todaySummary(ha, deriveGame(ha, DEMO_DATE, allTrackers([arch])).trackers, DEMO_DATE)
   ok(!hsa.done.length && hsa.xp.hero === 0, 'H4 archivada fuera de hoy')
+  const ua = [ev('gym', 1, DEMO_DATE, 'u1'), ev('gym', 1, DEMO_DATE, 'u2')]
+  const ud = (es: ActivityEvent[]) => todaySummary(es, deriveGame(es, DEMO_DATE).trackers, DEMO_DATE).done.find(d => d.tracker.id === 'gym')
+  ok(ud(ua)?.undo?.id === 'u2'
+    && ud([...ua, { ...ev('gym', -1, DEMO_DATE, 'u3'), undoes: 'u2' }])?.undo?.id === 'u1'
+    && ud([ev('gym', 2, DEMO_DATE, 'u4'), ev('gym', -1, DEMO_DATE, 'u5')])?.undo === undefined
+    && ud([ev('gym', 1, '2026-10-06', 'u6'), ev('gym', 1, DEMO_DATE, 'u7')])?.undo?.id === 'u7', 'H7 hoy: último registro que se puede deshacer')
+  const many = [ev('gym', 1, DEMO_DATE, 'm0'), ...Array.from({ length: 10 }, (_, i) => [ev('gym', 1, DEMO_DATE, `p${i}`), { ...ev('gym', -1, DEMO_DATE, `n${i}`), undoes: `p${i}` }]).flat()]
+  ok(ud(many)?.undo?.id === 'm0', 'H8 hoy: deshacer no se corta en 10')
 
   // G1–G4 — objetivos editables de las fijas
   const ga = allTrackers([], { gym: 2 })

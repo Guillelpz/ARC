@@ -55,7 +55,9 @@ export default function App() {
 
   const [unsaved, setUnsaved] = useState({ events: false, custom: false }) // false en cada clave con su siguiente guardado correcto
   // ponytail: setState dentro del efecto de guardado (aviso de lint aceptado); guardar en cada handler evitaría el render extra, a costa de tocar todos los setEvents/setCustom
+  // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
+  // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
   const saveFailed = unsaved.events || unsaved.custom
   useEffect(() => {
@@ -90,11 +92,11 @@ export default function App() {
 
   // amount < 0 = corrección (evento negativo); no deja el día por debajo de 0
   // undo = registro positivo que se anula entero
-  function add(t: Tracker, amount: number, day = today, undo?: ActivityEvent) {
+  function add(t: Tracker, amount: number, day = today, undo?: ActivityEvent): number {
     if (day > today) day = today
-    if (undo && undoneIds(events).has(undo.id)) return
+    if (undo && undoneIds(events).has(undo.id)) return 0
     amount = clampAmount(events, t.id, day, amount)
-    if (!amount || (undo && amount !== -undo.amount)) return
+    if (!amount || (undo && amount !== -undo.amount)) return 0
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,
       occurredAt: undo ? undo.occurredAt : nowStamp(day), ...(undo && { undoes: undo.id }) }
     const next = [...events, ev]
@@ -116,6 +118,7 @@ export default function App() {
       }).find(o => o.names.length)
       if (lost) { setOvertake(lost); break }
     }
+    return amount
   }
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
@@ -194,7 +197,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)}
+        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />

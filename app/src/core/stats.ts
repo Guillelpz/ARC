@@ -98,7 +98,11 @@ export function todaySummary(events: ActivityEvent[], stats: TrackerStats[], tod
   for (const { tracker: t } of live) {
     const net = todays.reduce((n, e) => (e.trackerId === t.id ? n + e.amount : n), 0)
     xp[t.branch] += net * t.xpPerUnit
-    if (net > 0) done.push({ tracker: t, amount: net })
+    if (net > 0) {
+      // history sin límite: con más de 10 registros hoy, el último que se puede deshacer no se corta
+      const undo = history(events, t.id, Infinity).find(r => r.canUndo && r.event.occurredAt.slice(0, 10) === today)?.event
+      done.push({ tracker: t, amount: net, ...(undo && { undo }) })
+    }
   }
   const missing = live.flatMap(s => s.tracker.weeklyGoal && s.week < s.tracker.weeklyGoal
     ? [{ tracker: s.tracker, left: s.tracker.weeklyGoal - s.week }] : [])
