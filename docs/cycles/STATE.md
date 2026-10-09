@@ -5,9 +5,9 @@ Ver `docs/WORKFLOW.md`.
 ## En curso
 
 - Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
-- Ciclo 14 (P13.3 PWA + P13.5 e2e): aprobado; **bloqueado** hasta que el despliegue en GitHub Pages funcione y el usuario lo pruebe en el móvil.
+- Ciclo 14 (P13.3 PWA + P13.5 e2e) — paso 4 (spec). Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
-- Siguiente: activar Pages (usuario) → ciclo 14.
+- Siguiente: ciclo 14.
 
 ## Nota
 
@@ -71,5 +71,5 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 | P16.1 | Tendencia 8 semanas por actividad (barras CSS accesibles) | aprobada | 16 |
 | P16.2 | HERO vs VILLAIN semana a semana en la home | aprobada | 17 |
 | P16.3 | Menores del ciclo 13 (IA solo en dev) | aprobada | 16 |
-| P18.1 | Activar despliegue en GitHub Pages | repo creado y main subido (2026-10-09); falta que el usuario active Pages y lance el workflow | — |
+| P18.1 | Activar despliegue en GitHub Pages | hecha (2026-10-09; despliegue manual con «Run workflow») | — |
 | P18.2 | Plural en aria-label de «Deshacer» | aprobada (dentro del ciclo 17) | 17 |
