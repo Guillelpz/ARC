@@ -4,7 +4,7 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 15 → 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente a especificar.
+Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente a especificar.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
@@ -18,7 +18,7 @@ Orden: 15 → 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es
 - Ciclo 10 — cerrado (7d6d19e).
 - Ciclo 11 — cerrado (26b7c76).
 - Ciclo 13 — cerrado (b31ba3d).
-- Ciclo 15 (P15.3 reducida → P15.1) — fusionado; paso 8 (análisis).
+- Ciclo 15 — cerrado (2a20baa).
 - Ciclo 16 (P16.3 → P16.1) — paso 4 (spec).
 - Ciclo 17 (P16.2): aprobado. Se adelanta al 14 por estar este bloqueado.
 - Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
