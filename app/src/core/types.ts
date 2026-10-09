@@ -51,7 +51,7 @@ export type TrackerStats = {
 
 export type TodaySummary = {
   xp: Record<Branch, number>                       // neto de hoy por rama
-  done: { tracker: Tracker; amount: number }[]     // neto de hoy > 0, en el orden de game.trackers
+  done: { tracker: Tracker; amount: number; undo?: ActivityEvent }[] // neto de hoy > 0, en el orden de game.trackers; undo: último registro de hoy que se puede deshacer entero
   missing: { tracker: Tracker; left: number }[]    // con weeklyGoal y week < goal; left = goal − week
   daysLeft: number                                 // 1..7, cuenta hoy
   best: { tracker: Tracker; weeks: number } | null // mayor streak > 0; empate: el primero
