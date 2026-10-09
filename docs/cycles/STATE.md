@@ -5,9 +5,9 @@ Ver `docs/WORKFLOW.md`.
 ## En curso
 
 - Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
-- Ciclo 14 (P13.3 PWA + P13.5 e2e) — paso 5 (implementación). Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
+- Ciclo 14 (P13.3 PWA + P13.5 e2e) — fusionado; paso 8 (análisis). Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
-- Ciclo 19 — paso 1 (proponer).
+- Ciclo 19 (P19.2 → P19.1 → P19.3) — paso 4 (spec).
 
 ## Nota
 
@@ -73,3 +73,6 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 | P16.3 | Menores del ciclo 13 (IA solo en dev) | aprobada | 16 |
 | P18.1 | Activar despliegue en GitHub Pages | hecha (2026-10-09; despliegue manual con «Run workflow») | — |
 | P18.2 | Plural en aria-label de «Deshacer» | aprobada (dentro del ciclo 17) | 17 |
+| P19.1 | Despliegue automático a Pages en push a main (paths app/**, e2e como gate, salvo sw_kill) | aprobada | 19 |
+| P19.2 | No perder registros con dos pestañas (evento `storage`) | aprobada | 19 |
+| P19.3 | Vista previa del enlace (meta + Open Graph) | aprobada | 19 |
