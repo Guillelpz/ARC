@@ -17,7 +17,7 @@ Orden: 15 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente 
 - Ciclo 9 — cerrado (4760257).
 - Ciclo 10 — cerrado (7d6d19e).
 - Ciclo 11 — cerrado (26b7c76).
-- Ciclo 13 (P13.1 + P13.2) — fusionado; paso 8 (análisis).
+- Ciclo 13 — cerrado (b31ba3d).
 - Ciclo 15 (P15.3 reducida → P15.1) — paso 4 (spec). Se adelanta al 14 por estar este bloqueado.
 - Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
 - Ciclo 12 — cerrado. P11.2 no aprobada.
