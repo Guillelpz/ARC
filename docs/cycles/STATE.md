@@ -7,7 +7,7 @@ Ver `docs/WORKFLOW.md`.
 - Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
 - Ciclo 14 — cerrado. Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
-- Ciclo 19 (P19.2 → P19.1 → P19.3) — fusionado; paso 8 (análisis).
+- Ciclo 19 — cerrado. Desde aquí, cada push a main que toque app/ despliega a producción.
 
 ## Nota
 
