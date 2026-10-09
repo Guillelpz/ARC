@@ -4,7 +4,7 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 11 → 12. El primero no cerrado de la lista es el siguiente a especificar.
+Orden: 11 → 12 → 13 → 14. El primero no cerrado de la lista es el siguiente a especificar.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
@@ -16,9 +16,10 @@ Orden: 11 → 12. El primero no cerrado de la lista es el siguiente a especifica
 - Ciclo 8 — cerrado (3906d6f). P7.2a no aprobada todavía.
 - Ciclo 9 — cerrado (4760257).
 - Ciclo 10 — cerrado (7d6d19e).
-- Ciclo 11 (P11.1 con P11.5 + P11.3) — paso 5 (implementación).
-- Ciclo 13 — paso 1 (proponer).
-- Ciclo 12 (P11.4): aprobado. P11.2 no aprobada.
+- Ciclo 11 (P11.1 con P11.5 + P11.3) — fusionado; paso 8 (análisis).
+- Ciclo 13 (P13.1 + P13.2): aprobado.
+- Ciclo 14 (P13.3 + P13.5): aprobado, después de comprobar el primer despliegue en el móvil.
+- Ciclo 12 (P11.4) — paso 4 (spec). P11.2 no aprobada.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -30,6 +31,7 @@ Orden: 11 → 12. El primero no cerrado de la lista es el siguiente a especifica
 - P7.1 rachas: semanal por actividad, sin XP, la semana en curso no la rompe, objetivo actual también hacia atrás; `pop` en tarjeta + mejor racha en «Hoy».
 - P9.3: prorrateo lineal de la XP semanal de los amigos simulados por día transcurrido; asserts de ranking actuales se mueven al domingo 2026-10-11 + asserts nuevos de miércoles y lunes.
 - P11.1 (2026-10-09): `goalLog?` en life-rpg-custom-v1; racha con el objetivo vigente cada semana; antes del primer apunte, el objetivo vigente justo antes de ese cambio (aclarado 2026-10-09: bajar el objetivo nunca alarga la racha pasada); sin apuntes, objetivo de hoy; varios cambios en una semana → el primero; de «sin objetivo» a objetivo → la racha empieza en la semana del cambio.
+- P13.2 (2026-10-09): hosting sin decidir → se deja el despliegue preparado (build + workflow) sin activar; sin IA en producción.
 - Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
 
 ## Propuestas
@@ -64,3 +66,8 @@ Orden: 11 → 12. El primero no cerrado de la lista es el siguiente a especifica
 | P11.3 | No perder registros en silencio si falla el guardado | aprobada | 11 |
 | P11.4 | Registrar desde «Te faltan» en la home | aprobada | 12 |
 | P11.5 | Menores de objetivos → dentro de P11.1 | aprobada | 11 |
+| P13.1 | Guardar sin borrar claves desconocidas de `custom` | aprobada | 13 |
+| P13.2 | Sitio estático sin IA (despliegue preparado, sin activar; hosting por decidir) | aprobada | 13 |
+| P13.3 | PWA instalable/offline (sw.js generado en build, kill switch) | aprobada | 14 |
+| P13.4 | Endpoint de IA en servidor | no aprobada | — |
+| P13.5 | e2e en Chromium real en la CI (Playwright) | aprobada | 14 |
