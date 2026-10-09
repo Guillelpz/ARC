@@ -19,7 +19,7 @@ Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el sig
 - Ciclo 11 — cerrado (26b7c76).
 - Ciclo 13 — cerrado (b31ba3d).
 - Ciclo 15 — cerrado (2a20baa).
-- Ciclo 16 (P16.3 → P16.1) — fusionado; paso 8 (análisis).
+- Ciclo 16 — cerrado (418aaf5).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales; el usuario activa el despliegue (P18.1). Después, ciclo 14.
 - Ciclo 17 (P16.2 + P18.2) — paso 4 (spec). Se adelanta al 14 por estar este bloqueado.
 - Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
