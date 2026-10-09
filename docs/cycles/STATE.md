@@ -4,26 +4,10 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente a especificar.
-
-- Ciclo 1 — cerrado (a712108).
-- Ciclo 2 — cerrado (7982124).
-- Ciclo 3 — cerrado.
-- Ciclo 4 — cerrado.
-- Ciclo 5 — cerrado (bc660e8).
-- Ciclo 6 — cerrado (df87f37).
-- Ciclo 7 — cerrado (ef60fdc).
-- Ciclo 8 — cerrado (3906d6f). P7.2a no aprobada todavía.
-- Ciclo 9 — cerrado (4760257).
-- Ciclo 10 — cerrado (7d6d19e).
-- Ciclo 11 — cerrado (26b7c76).
-- Ciclo 13 — cerrado (b31ba3d).
-- Ciclo 15 — cerrado (2a20baa).
-- Ciclo 16 — cerrado (418aaf5).
-- Ciclo 18: el proponedor recomienda no abrir más ciclos locales; el usuario activa el despliegue (P18.1). Después, ciclo 14.
-- Ciclo 17 — cerrado. Se adelanta al 14 por estar este bloqueado.
-- Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
-- Ciclo 12 — cerrado. P11.2 no aprobada.
+- Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
+- Ciclo 14 (P13.3 PWA + P13.5 e2e): aprobado; **bloqueado** hasta que el despliegue en GitHub Pages funcione y el usuario lo pruebe en el móvil.
+- Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
+- Siguiente: activar Pages (usuario) → ciclo 14.
 
 ## Nota
 
@@ -41,6 +25,7 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 - P11.1 (2026-10-09): `goalLog?` en life-rpg-custom-v1; racha con el objetivo vigente cada semana; antes del primer apunte, el objetivo vigente justo antes de ese cambio (aclarado 2026-10-09: bajar el objetivo nunca alarga la racha pasada); sin apuntes, objetivo de hoy; varios cambios en una semana → el primero; de «sin objetivo» a objetivo → la racha empieza en la semana del cambio.
 - P13.2 (2026-10-09): hosting sin decidir → se deja el despliegue preparado (build + workflow) sin activar; sin IA en producción.
 - P16.3 (2026-10-09): la IA solo funciona en `npm run dev` (`__AI_PROXY__ = command === 'serve' && !!key`); preview usa la heurística.
+- Push de `main` a origin tras cada ciclo cerrado (aprobado 2026-10-09); nunca force-push ni otras ramas.
 - Despliegue (2026-10-09): GitHub Pages (repo público). El usuario crea el repo vacío en la web y pasa la URL; el orquestador añade el remoto y hace push. Commits nuevos con el email noreply de GitHub (el usuario lo facilita); reescribir el historial solo con su okay.
 
 ## Propuestas
