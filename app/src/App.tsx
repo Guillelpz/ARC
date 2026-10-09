@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
+import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
@@ -207,6 +208,24 @@ export default function App() {
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
   }
 
+  function mergeData(text: string) {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
+    const b = parseBackup(text)
+    if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
+    const r = mergeBackup({ events, custom }, b)
+    if (!r.changed) return setNotice(`Esa copia no trae nada nuevo: ya tienes todos sus registros.${r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios; se mantiene lo de este dispositivo.` : ''}`)
+    const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas.`
+      + (r.renamed > 0 ? ` ${r.renamed} registros coinciden en identificador con uno tuyo pero son distintos (p. ej. del ejemplo): se añaden aparte.` : '')
+      + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo o archivado): se mantiene lo de este dispositivo.` : '')
+      + (b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : '') + (b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : '')
+      + ' No se borra nada. Lo que hayas borrado aquí y siga en la copia volverá a aparecer. Si no te convence, «Recuperar copia anterior» lo deshace.'
+    if (!window.confirm(msg)) return
+    if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha fusionado nada. Exporta una copia y vuelve a intentarlo.')
+    setCanRestore(hasLastBackup()); unlockStorage()
+    setEvents(r.events); setCustom(r.custom); setToast(null); setGain(null); setOvertake(null)
+    setNotice(`Copia fusionada: ${r.added} registros y ${r.trackersAdded} misiones nuevas.`)
+  }
+
   function restore() {
     if (stale) return setNotice(STALE_BLOCK_TEXT)
     const r = readLast()
@@ -224,7 +243,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeView game={game} summary={summary} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
-          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
+          onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
