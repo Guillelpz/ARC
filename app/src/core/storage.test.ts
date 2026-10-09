@@ -311,3 +311,27 @@ describe('readCustom: goalLog', () => {
     expect(r !== 'none' && r !== 'unreadable' && r.custom?.goalLog).toEqual([e])
   })
 })
+
+describe('readCustom: claves desconocidas', () => {
+  test('C13 se conservan', () => {
+    const raw = { trackers: [], proposals: [], futuro: { a: 1 }, n: 3 }
+    const r = readCustom(raw)
+    expect(r!.data).toEqual(raw); expect(r!.dropped).toBe(0); expect(r!.fixed).toBe(0)
+    const g = readCustom({ goals: 'x', otro: 1 })!.data
+    expect(g).not.toHaveProperty('goals'); expect(g).toHaveProperty('otro', 1)
+  })
+  test('C14 viaje completo', () => {
+    const s = fakeStore({ [CU]: JSON.stringify({ trackers: [], proposals: [], futuro: [1] }) })
+    const { custom, problems } = loadAll(s)
+    expect(problems).toEqual([]); expect(s.writes()).toBe(0)
+    saveCustom({ ...custom }, s)
+    expect(JSON.parse(s.m.get(CU)!).futuro).toEqual([1])
+    expect(parseBackup(exportBackup([], custom, 'x'))?.custom).toHaveProperty('futuro')
+  })
+  test('C15 __proto__', () => {
+    const r = readCustom(JSON.parse('{"__proto__":{"x":1}}'))!.data
+    expect(Object.getPrototypeOf(r)).toBe(Object.prototype)
+    expect((r as any).x).toBeUndefined() // eslint-disable-line
+    expect(r).toEqual(EMPTY_CUSTOM)
+  })
+})
