@@ -91,7 +91,7 @@ test('U6 importar', async () => {
   vi.mocked(window.confirm).mockReturnValueOnce(true)
   importFile(container, copia)
   expect(await screen.findByText('Copia importada: 1 registros y 0 misiones nuevas.')).toBeTruthy()
-  expect(stored()).toEqual(ev)
+  await vi.waitFor(() => expect(stored()).toEqual(ev))
 })
 
 test('U7 borrar todo y U8 recuperar', () => {

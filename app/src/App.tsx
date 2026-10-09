@@ -13,7 +13,8 @@ import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
-import { LevelUpToast, OvertakeBanner, PassedBanner, liveText, type Overtake, type Toast } from './components/LevelUpToast'
+import { liveText } from './components/liveText'
+import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`

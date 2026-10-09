@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import axe from 'axe-core'
 import App from './App'
 import { unlockStorage } from './core/storage'
-import { liveText } from './components/LevelUpToast'
+import { liveText } from './components/liveText'
 
 beforeEach(() => {
   localStorage.clear(); unlockStorage()
