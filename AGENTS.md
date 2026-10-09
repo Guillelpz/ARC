@@ -21,5 +21,5 @@ Si el usuario pide uno de estos roles y están instalados, delegar al agente cor
 
 - Definir un resultado concreto y archivos asignados antes de delegar. No permitir que dos agentes editen los mismos archivos simultáneamente; realizar en secuencia tareas dependientes.
 - El agente principal integra resultados, comprueba los cambios y entrega una respuesta final en español. Crear los archivos de configuración no equivale a ejecutar los agentes.
-- Para cambios de código, ejecutar `npm run build`, `npm run lint` y `npm test` (Vitest: selfcheck + tests de `core/` + tests de UI en `src/App.test.tsx` con happy-dom + chequeo axe en `src/a11y.test.tsx`) desde `app/`. El proyecto también tiene comprobaciones de dominio en `app/src/core/selfcheck.ts`; revisar las relevantes cuando cambie el núcleo.
+- Para cambios de código, ejecutar `npm run build`, `npm run lint` (oxlint `--deny-warnings`: cualquier warning rompe la CI) y `npm test` (Vitest: selfcheck + tests de `core/` + tests de UI en `src/App.test.tsx` con happy-dom + chequeo axe en `src/a11y.test.tsx`) desde `app/`. El proyecto también tiene comprobaciones de dominio en `app/src/core/selfcheck.ts`; revisar las relevantes cuando cambie el núcleo.
 - Para cambios exclusivos de documentación/configuración, validar formato y rutas. No afirmar que se ha probado visualmente la UI sin haberla abierto.
