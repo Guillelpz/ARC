@@ -15,6 +15,7 @@ type Props = {
   archived: Tracker[]
   onUnarchive: (t: Tracker) => void
   onNavigate: (s: Screen) => void
+  onAdd: (t: Tracker) => void
   onOpenParty: (id: string) => void
   onReset: () => void
   onLoadExample?: () => void
@@ -35,25 +36,32 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string }[]; onGo: (s: Screen) => void }) {
+function TodayList({ rows, onGo, onAdd }: { rows: { t: Tracker; text: string; left?: number }[]; onGo: (s: Screen) => void; onAdd?: (t: Tracker, left: number) => void }) {
   return (
     <ul className="divide-y divide-app-border rounded-lg border border-app-border">
-      {rows.map(({ t, text }) => (
-        <li key={t.id}>
+      {rows.map(({ t, text, left }) => (
+        <li key={t.id} className="flex items-stretch">
           <button type="button" onClick={() => onGo(t.branch)}
-            className="flex min-h-11 w-full items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
+            className="flex min-h-11 flex-1 items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
             <span className="flex-1 text-sm font-semibold">{t.name}</span>
             <span className="text-sm text-app-muted tabular-nums">{text}</span>
             <ChevronRight className="size-4 shrink-0 text-app-muted" aria-hidden />
           </button>
+          {onAdd && (
+            <button type="button" onClick={() => onAdd(t, left!)} aria-label={`${t.buttonLabel} en ${t.name}`}
+              className="m-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-app-border px-3 text-sm font-semibold tabular-nums text-app-text hover:bg-app-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
+              {t.buttonLabel}
+            </button>
+          )}
         </li>
       ))}
     </ul>
   )
 }
 
-export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onAdd, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const hoyRef = useRef<HTMLHeadingElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
   }
@@ -111,7 +119,7 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
           </section>
         )}
         <section aria-labelledby="hoy" className="rise flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5 lg:col-span-2">
-          <h2 id="hoy" className="text-lg font-semibold">Hoy</h2>
+          <h2 id="hoy" ref={hoyRef} tabIndex={-1} className="text-lg font-semibold">Hoy</h2>
           {summary.done.length === 0
             ? <p className="text-sm text-app-muted">Aún nada hoy.</p>
             : <p className="text-sm font-semibold tabular-nums text-app-text">
@@ -133,7 +141,8 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
           {summary.missing.length > 0 && (
             <>
               <h3 className="text-sm font-semibold">Te faltan · {summary.daysLeft === 1 ? 'queda 1 día' : `quedan ${summary.daysLeft} días`}</h3>
-              <TodayList rows={summary.missing.map(m => ({ t: m.tracker, text: `${Math.round(m.left)} ${m.tracker.unit}` }))} onGo={() => onNavigate('hero')} />
+              <TodayList rows={summary.missing.map(m => ({ t: m.tracker, text: `${Math.round(m.left)} ${m.tracker.unit}`, left: m.left }))} onGo={onNavigate}
+                onAdd={(t, left) => { onAdd(t); if (left <= t.increment) hoyRef.current?.focus() }} />
             </>
           )}
         </section>

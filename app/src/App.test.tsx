@@ -318,3 +318,28 @@ test('U18 región status del level-up', () => {
   expect(document.querySelector('.levelup-backdrop')!.getAttribute('aria-hidden')).toBe('true')
   expect(document.querySelector('.levelup-backdrop[aria-live]')).toBeNull()
 })
+
+test('U21 registrar desde la home', async () => {
+  render(<App />)
+  fireEvent.click(btn('+1 sesión en Gym'))
+  await vi.waitFor(() => expect(stored()).toHaveLength(1))
+  expect(stored()[0]).toMatchObject({ trackerId: 'gym', amount: 1 })
+  expect(stored()[0].occurredAt.startsWith('2026-10-07')).toBe(true)
+  expect(screen.getByText('+30 HERO')).toBeTruthy()
+  expect(btn(/^Gym 3 sesiones/)).toBeTruthy()
+  expect(btn(/^Gym \+1 sesiones/)).toBeTruthy()
+  fireEvent.click(btn('+1 sesión en Gym'))
+  expect(screen.getByRole('status').textContent).toMatch(/Gym Lv\. 2/)
+  fireEvent.click(btn(/^Gym 2 sesiones/))
+  expect(screen.getByRole('heading', { name: 'Misiones HERO' })).toBeTruthy()
+})
+
+test('U22 cumplir el objetivo desde la home', async () => {
+  localStorage.setItem(EV, JSON.stringify(['2026-10-05', '2026-10-06', '2026-10-06'].map((d, i) => ({ id: `g${i}`, trackerId: 'gym', amount: 1, occurredAt: `${d}T10:00:00` }))))
+  render(<App />)
+  fireEvent.click(btn('+1 sesión en Gym'))
+  expect(screen.queryByRole('button', { name: /^Gym 1 sesiones/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: '+1 sesión en Gym' })).toBeNull()
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Hoy' }))
+  await vi.waitFor(() => expect(stored()).toHaveLength(4))
+})
