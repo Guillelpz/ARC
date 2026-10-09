@@ -1,6 +1,6 @@
 import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
-import { allTrackers, setGoal, TRACKERS } from './trackers'
+import { allTrackers, logGoal, setGoal, TRACKERS } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, undoneIds } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
@@ -197,7 +197,7 @@ export function runSelfCheck() {
   const s3 = [...wk('2026-09-14', 4), ...wk('2026-09-21', 3), ...wk('2026-09-28', 4)]
   ok(st(s3) === 1, 'S3 racha rota')
   ok(st([...s3, ev('gym', 1, '2026-09-26', 'wk-fix')]) === 3, 'S4 un día pasado recompone')
-  ok(st(s3, { ...G, weeklyGoal: 3 }) === 3, 'S5 objetivo actual retroactivo')
+  ok(st(s3, { ...G, weeklyGoal: 3 }) === 3, 'S5 sin registro: objetivo actual retroactivo')
   const s6 = wk('2026-09-28', 4)
   ok(st(s6) === 1 && get(deriveGame(s6, DEMO_DATE), 'gym').streak === 1, 'S6 corte en el primer evento')
 
@@ -224,6 +224,20 @@ export function runSelfCheck() {
   ok(streak(s3, gt[0], DEMO_DATE) === 3, 'G4 racha retroactiva con override')
   ok(Math.abs(get(gg, 'gym').goalPct! - 100 / 3) < 1e-9, 'G4 goalPct')
   ok(todaySummary(hv, gg.trackers, DEMO_DATE).missing.find(x => x.tracker.id === 'gym')?.left === 2, 'G4 te faltan')
+
+  // GL1–GL6 — racha con el objetivo vigente en cada semana
+  ok(st(s3, { ...G, weeklyGoal: 3, pastGoals: [{ goal: 4, until: '2026-10-05' }] }) === 1, 'GL1 bajar objetivo no crece la racha')
+  ok(st(s3, { ...G, weeklyGoal: 5, pastGoals: [{ goal: 3, until: '2026-10-05' }] }) === 3, 'GL2 subir objetivo conserva la racha')
+  ok(st(s3, { ...G, weeklyGoal: 3, pastGoals: [{ goal: null, until: '2026-09-28' }] }) === 1, 'GL3 null→objetivo corta')
+  const l1 = logGoal(undefined, 'gym', 4, 3, DEMO_DATE), l2 = logGoal(l1, 'gym', 3, 5, '2026-10-12')
+  ok(JSON.stringify(l1) === '[{"trackerId":"gym","goal":4,"until":"2026-10-05"}]' && logGoal(l1, 'gym', 3, 2, '2026-10-09') === l1 && logGoal(l1, 'gym', 3, 3, DEMO_DATE) === l1
+    && l2.length === 2 && JSON.stringify(l2[1]) === '{"trackerId":"gym","goal":3,"until":"2026-10-12"}', 'GL4 logGoal: el primero de la semana manda')
+  const ga6 = allTrackers([], { gym: 3 }, [{ trackerId: 'gym', goal: 2, until: '2026-10-05' }, { trackerId: 'gym', goal: 4, until: '2026-09-28' }])
+  ok(ga6[0].pastGoals?.map(p => p.until).join() === '2026-09-28,2026-10-05' && ga6[1] === TRACKERS[1] && TRACKERS[0].pastGoals === undefined && streak(s3, ga6[0], DEMO_DATE) === 1, 'GL5 allTrackers: orden e inmutabilidad')
+  ok(get(deriveGame(s3, DEMO_DATE, allTrackers([], { gym: 3 }, [{ trackerId: 'gym', goal: 4, until: '2026-10-05' }])), 'gym').streak === 1, 'GL6 el registro llega al motor')
+  const hg = deriveGame(hv, DEMO_DATE), hm = todaySummary(hv, hg.trackers, DEMO_DATE).missing
+  const hn = '2026-10-12', hmn = todaySummary(hv, deriveGame(hv, hn).trackers, hn).missing
+  ok(hm.every(m => m.left === m.tracker.weeklyGoal! - get(hg, m.tracker.id).week) && hmn.find(m => m.tracker.id === 'gym')?.left === 4, 'H6 missing con el mismo today')
 
   // K1–K5 — ranking prorrateado: amigos a ritmo lineal (lun 1/7 … dom 7/7)
   const MON = '2026-10-12'
