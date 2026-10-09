@@ -118,8 +118,7 @@ export default function App() {
   const saveTracker = (t: Tracker) => t.custom
     ? setCustom(c => ({ ...c, trackers: c.trackers.map(x => (x.id === t.id ? t : x)) }))
     : setCustom(c => ({ ...c, goals: setGoal(c.goals, t.id, t.weeklyGoal ?? null) }))
-  // ponytail: UnknownView solo ve las activas; se puede crear una misión con el nombre de una archivada
-  const active = useMemo(() => trackers.filter(t => !t.archived), [trackers])
+  const unarchive = (t: Tracker) => saveTracker({ ...t, archived: false })
   const archived = useMemo(() => custom.trackers.filter(t => t.archived), [custom.trackers])
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
 
@@ -177,7 +176,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={t => saveTracker({ ...t, archived: false })} onNavigate={go}
+        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} onDismissNotice={() => setNotice(null)} />
@@ -186,7 +185,7 @@ export default function App() {
         <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} />
       )}
       {screen === 'new' && (
-        <UnknownView trackers={active} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />
+        <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
       )}
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />

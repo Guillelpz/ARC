@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, CircleAlert, Sparkles, X } from 'lucide-react'
+import { ArchiveRestore, Check, CircleAlert, Sparkles, X } from 'lucide-react'
 import type { Branch, Classification, Party, Tracker, TrackerDraft, VoteResult } from '../core/types'
 import { TYPE_DEFAULTS, buttonLabel, classifyAI, createTracker, findSimilar, isValidName, isValidUnit, normalizeText, trackerName } from '../core/classify'
 import { vote } from '../core/party'
@@ -12,6 +12,7 @@ type Props = {
   onAdd: (t: Tracker, amount: number) => void
   onPropose: (trackerId: string, partyIds: string[]) => void
   onGoToMissions: (b: Branch) => void
+  onUnarchive: (t: Tracker) => void
 }
 
 type Step = 'write' | 'proposal' | 'parties' | 'result'
@@ -49,7 +50,7 @@ const TYPES: { value: Tracker['type']; label: string }[] = [
   { value: 'custom', label: 'Otro' },
 ]
 
-export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onGoToMissions }: Props) {
+export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onGoToMissions, onUnarchive }: Props) {
   const [step, setStep] = useState<Step>('write')
   const [text, setText] = useState('')
   const [ai, setAi] = useState<Classification | null>(null)
@@ -60,6 +61,7 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
   const [skipped, setSkipped] = useState(false)
   const [loading, setLoading] = useState(false)
 
+  const active = trackers.filter(t => !t.archived) // trackers = todas, incluidas archivadas
   const valid = isValidName(text)
   const dup = trackers.find(t => normalizeText(t.name) === normalizeText(text)) // = isDuplicateName, pero necesitamos el nombre
   const canAnalyze = valid && !dup
@@ -68,7 +70,7 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
   async function analyze() {
     if (!canAnalyze || loading) return
     setLoading(true)
-    const c = await classifyAI(text, trackers)
+    const c = await classifyAI(text, active)
     setLoading(false)
     setAi(c)
     setDraft({ name: trackerName(text), branch: c.branch, type: c.type, xpPerUnit: c.xpPerUnit })
@@ -128,11 +130,16 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
               <p id="new-activity-help" className="text-xs leading-5 text-app-muted">
                 {similar ? (
                   <span className="inline-flex items-center gap-1 text-app-text">
-                    <CircleAlert className="size-4" aria-hidden="true" /> {dup ? 'Ya tienes' : 'Se parece a'} «{similar.name}»
+                    <CircleAlert className="size-4" aria-hidden="true" /> {dup ? 'Ya tienes' : 'Se parece a'} «{similar.name}»{similar.archived ? ' (archivada)' : ''}
                   </span>
                 ) : '2–40 caracteres'}
               </p>
-              {similar && (
+              {similar?.archived ? (
+                <button type="button" className={SECONDARY}
+                  onClick={() => { onUnarchive(similar); onGoToMissions(similar.branch) }}>
+                  <ArchiveRestore className="size-4" aria-hidden="true" /> Reactivar {similar.name}
+                </button>
+              ) : similar && (
                 <button type="button" className={BRANCH_BTN[similar.branch]}
                   onClick={() => { onAdd(similar, similar.increment); onGoToMissions(similar.branch) }}>
                   Sumar a {similar.name} · {similar.buttonLabel}
@@ -151,7 +158,7 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
             const unitOk = !isCustom || isValidUnit(draft.unit ?? '')
             const unit = isCustom ? (draft.unit ?? '').trim() || 'unidades' : TYPE_DEFAULTS[draft.type].unit
             const low = ai.confidence === 'baja'
-            const match = trackers.find(t => t.id === ai.matchId)
+            const match = active.find(t => t.id === ai.matchId)
             return (
               <section aria-labelledby="ai-title" className={`rise flex flex-col gap-3 rounded-xl border p-4 shadow-sm transition duration-150 sm:p-5 ${c.box} ${low ? 'border-dashed' : ''}`}>
                 <h2 id="ai-title" className="text-lg font-semibold">La IA propone: {LABEL[ai.branch]}</h2>

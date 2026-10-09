@@ -248,3 +248,16 @@ test('U16 archivar guarda cambios válidos', () => {
   fireEvent.click(btn('Archivar'))
   expect(JSON.parse(localStorage.getItem(CU)!).trackers[0]).toMatchObject({ name: 'Meditar zen', archived: true })
 })
+
+test('U17 duplicado de archivada en Nuevo', () => {
+  localStorage.setItem(CU, JSON.stringify({ trackers: [{ ...base, archived: true }], proposals: [] }))
+  render(<App />); go('Nuevo')
+  fireEvent.change(screen.getByLabelText('¿Qué has hecho?'), { target: { value: 'meditar' } })
+  expect(screen.getByText(/Ya tienes «Meditar» \(archivada\)/)).toBeTruthy()
+  expect((screen.getByRole('button', { name: /Analizar con IA/ }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('button', { name: /^Sumar a/ })).toBeNull()
+  fireEvent.click(btn('Reactivar Meditar'))
+  expect(screen.getByRole('heading', { name: 'Misiones HERO' })).toBeTruthy()
+  expect(screen.getByRole('group', { name: 'Meditar' })).toBeTruthy()
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0].archived).toBe(false)
+})
