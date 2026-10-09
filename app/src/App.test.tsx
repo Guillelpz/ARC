@@ -27,8 +27,7 @@ test('U1 registrar hoy', () => {
   expect(ev).toHaveLength(1)
   expect(ev[0]).toMatchObject({ trackerId: 'gym', amount: 1 })
   expect(ev[0].occurredAt.startsWith('2026-10-07')).toBe(true)
-  expect(card('Gym').getByText('1')).toBeTruthy()
-  expect(card('Gym').getByText(/\/ 4 sesiones esta semana/)).toBeTruthy()
+  expect(card('Gym').getByText(/\/ 4 sesiones esta semana/).textContent).toMatch(/^1 \/ 4 sesiones esta semana/)
 })
 
 test('U2 día pasado', () => {
@@ -92,7 +91,7 @@ test('U6 importar', async () => {
   vi.mocked(window.confirm).mockReturnValueOnce(true)
   importFile(container, copia)
   expect(await screen.findByText('Copia importada: 1 registros y 0 misiones nuevas.')).toBeTruthy()
-  expect(stored()).toEqual(ev)
+  await vi.waitFor(() => expect(stored()).toEqual(ev))
 })
 
 test('U7 borrar todo y U8 recuperar', () => {
@@ -233,4 +232,41 @@ test('U14 proponer actividad existente', () => {
   fireEvent.click(btn('Proponer Pizza a una party'))
   expect(card('Pizza').getByLabelText('Los del Gym')).toBeTruthy()
   expect(card('Pizza').queryByLabelText('La Oficina')).toBeNull()
+})
+
+test('U16 archivar guarda cambios válidos', () => {
+  preload(); render(<App />); go('HERO')
+  fireEvent.click(btn('Editar Meditar'))
+  fireEvent.change(card('Meditar').getByLabelText(/^Nombre/), { target: { value: 'Meditar zen' } })
+  fireEvent.click(btn('Archivar'))
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0]).toMatchObject({ name: 'Meditar zen', archived: true })
+  go('Inicio')
+  fireEvent.click(btn('Reactivar Meditar zen'))
+  go('HERO')
+  fireEvent.click(btn('Editar Meditar zen'))
+  fireEvent.change(card('Meditar zen').getByLabelText(/^Nombre/), { target: { value: '' } })
+  fireEvent.click(btn('Archivar'))
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0]).toMatchObject({ name: 'Meditar zen', archived: true })
+})
+
+test('U17 duplicado de archivada en Nuevo', () => {
+  localStorage.setItem(CU, JSON.stringify({ trackers: [{ ...base, archived: true }], proposals: [] }))
+  render(<App />); go('Nuevo')
+  fireEvent.change(screen.getByLabelText('¿Qué has hecho?'), { target: { value: 'meditar' } })
+  expect(screen.getByText(/Ya tienes «Meditar» \(archivada\)/)).toBeTruthy()
+  expect((screen.getByRole('button', { name: /Analizar con IA/ }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('button', { name: /^Sumar a/ })).toBeNull()
+  fireEvent.click(btn('Reactivar Meditar'))
+  expect(screen.getByRole('heading', { name: 'Misiones HERO' })).toBeTruthy()
+  expect(screen.getByRole('group', { name: 'Meditar' })).toBeTruthy()
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0].archived).toBe(false)
+})
+
+test('U18 región status del level-up', () => {
+  render(<App />); go('HERO')
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  expect(screen.getByRole('status').textContent).toMatch(/^LEVEL UP\. .*Gym Lv\. 2/)
+  expect(document.querySelector('.levelup-backdrop')!.getAttribute('aria-hidden')).toBe('true')
+  expect(document.querySelector('.levelup-backdrop[aria-live]')).toBeNull()
 })

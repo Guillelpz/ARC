@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react'
-import { ChevronsDown, Crown, Ghost, Sparkles, TrendingDown, TrendingUp, Zap } from 'lucide-react'
+import { Crown, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
 import type { RankMetric } from '../core/types'
+import { PASSED, RANK_NAME } from './liveText'
 
 export type Toast = { title: string; detail: string; key: string; tone: 'hero' | 'villain' | 'neutral'; down?: boolean }
 export type Overtake = { key: string; party: string; names: string[]; position: number; lost?: RankMetric }
@@ -23,7 +24,7 @@ export function LevelUpToast({ toast }: { toast: Toast }) {
   const c = THEME[toast.tone]
   if (toast.down) return <LevelDownToast toast={toast} />
   return (
-    <div key={toast.key} aria-live="polite" className="levelup-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
+    <div key={toast.key} aria-hidden className="levelup-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
       style={{ '--glow': c.glow } as CSSProperties}>
       <div className="levelup-rays absolute size-[140vmax]" aria-hidden />
       {SPARKS.map(a => (
@@ -42,7 +43,7 @@ export function LevelUpToast({ toast }: { toast: Toast }) {
 function LevelDownToast({ toast }: { toast: Toast }) {
   const c = THEME[toast.tone]
   return (
-    <div key={toast.key} aria-live="polite" className="leveldown-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
+    <div key={toast.key} aria-hidden className="leveldown-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
       style={{ '--glow': c.glow } as CSSProperties}>
       {SHARDS.map((s, i) => (
         <span key={i} className="shard absolute size-3" aria-hidden
@@ -66,7 +67,7 @@ export function OvertakeBanner({ o }: { o: Overtake }) {
   const lead = o.position === 1
   const Icon = lead ? Crown : TrendingUp
   return (
-    <div key={o.key} aria-live="polite" className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+    <div key={o.key} aria-hidden className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
       <div className="slide-down shine flex items-center gap-3 rounded-xl border-2 border-gold bg-app-text px-5 py-3 text-app-surface shadow-xl">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gold text-app-text"><Icon className="size-5" aria-hidden /></span>
         <span className="flex flex-col">
@@ -78,18 +79,10 @@ export function OvertakeBanner({ o }: { o: Overtake }) {
   )
 }
 
-// Te superan: HERO = un rival pasa como un rayo y te empuja; VILLAIN = glitch; profundidad = bajas escalones
-const PASSED: Record<RankMetric, { card: string; badge: string; label: string; muted: string; title: string; Icon: typeof Zap }> = {
-  hero: { card: 'passed-hero border-hero bg-hero-surface text-hero-text', badge: 'bg-hero text-hero-on-accent', label: 'text-hero', muted: 'text-hero-muted', title: 'Te adelantan', Icon: Zap },
-  villain: { card: 'passed-villain border-villain bg-villain-bg text-villain-text', badge: 'bg-villain text-villain-on-accent', label: 'text-villain', muted: 'text-villain-muted', title: 'Te superan en el lado oscuro', Icon: Ghost },
-  depth: { card: 'passed-depth border-app-text bg-app-surface text-app-text', badge: 'bg-app-text text-app-surface', label: 'text-app-muted', muted: 'text-app-muted', title: 'Pierdes profundidad', Icon: ChevronsDown },
-}
-const RANK_NAME: Record<RankMetric, string> = { hero: 'HERO', villain: 'VILLAIN', depth: 'profundidad' }
-
 export function PassedBanner({ o, lost }: { o: Overtake; lost: RankMetric }) {
   const t = PASSED[lost]
   return (
-    <div key={o.key} aria-live="polite" className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+    <div key={o.key} aria-hidden className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
       <div className={`relative flex items-center gap-3 overflow-hidden rounded-xl border-2 px-5 py-3 shadow-xl ${t.card}`}>
         {lost === 'hero' && (
           <span className="zoom-by absolute inset-y-0 left-0 flex items-center gap-1" aria-hidden>

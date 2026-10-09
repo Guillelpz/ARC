@@ -52,9 +52,10 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
   const canSave = fixed ? goalOk : !nameErr && incOk && goalOk
   const field = `min-h-11 w-full rounded-lg border bg-transparent px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`
   const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setProposing(false); setEditing(true) }
+  const nextT = () => editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal) })
   const save = () => {
     if (fixed) { onSave?.({ ...t, weeklyGoal: eGoal.trim() === '' ? undefined : Number(eGoal) }); setEditing(false); return }
-    const next = editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal) })
+    const next = nextT()
     onSave?.(next); setQty(String(next.increment)); setEditing(false)
   }
 
@@ -134,8 +135,8 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
               className={`inline-flex min-h-11 flex-1 items-center justify-center rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 ${c.button}`}>Guardar</button>
           </div>
           {!fixed && <div className="flex flex-col gap-2 border-t pt-3">
-            <p className={`text-xs leading-5 ${c.muted}`}>Archivar la oculta de esta lista. Sus registros siguen contando y puedes reactivarla desde Inicio.</p>
-            <button type="button" onClick={() => onSave?.({ ...t, archived: true })}
+            <p className={`text-xs leading-5 ${c.muted}`}>Archivar guarda los cambios válidos y la oculta de esta lista. Sus registros siguen contando y puedes reactivarla desde Inicio.</p>
+            <button type="button" onClick={() => onSave?.({ ...(canSave ? nextT() : t), archived: true })}
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
               <Archive className="size-4" aria-hidden /> Archivar
             </button>

@@ -4,12 +4,12 @@ import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
   test('roundtrip de la semilla', () => {
-    expect(readEvents(JSON.parse(JSON.stringify(SEED_EVENTS)))).toEqual({ data: SEED_EVENTS, dropped: 0 })
+    expect(readEvents(JSON.parse(JSON.stringify(SEED_EVENTS)))).toEqual({ data: SEED_EVENTS, dropped: 0, fixed: 0 })
   })
   test('descarta inválidos', () => {
     const ok = { id: 'a', trackerId: 't', amount: 1, occurredAt: '2026-10-07T10:00:00' }
     const r = readEvents([ok, null, { ...ok, id: undefined }, { ...ok, amount: '3' }, { ...ok, amount: null }, { ...ok, occurredAt: '2026-10-07' }])
-    expect(r).toEqual({ data: [ok], dropped: 5 })
+    expect(r).toEqual({ data: [ok], dropped: 5, fixed: 0 })
   })
   test('trackerId desconocido se conserva', () => {
     expect(readEvents([{ id: 'a', trackerId: 'borrado', amount: 1, occurredAt: '2026-10-07T10:00:00' }])?.dropped).toBe(0)
@@ -22,10 +22,10 @@ describe('readEvents', () => {
 describe('undoes', () => {
   const g = { id: 'a', trackerId: 't', amount: -1, occurredAt: '2026-10-07T10:00:00' }
   test('S1: válido se conserva', () => {
-    expect(readEvents([{ ...g, undoes: 'a' }])).toEqual({ data: [{ ...g, undoes: 'a' }], dropped: 0 })
+    expect(readEvents([{ ...g, undoes: 'a' }])).toEqual({ data: [{ ...g, undoes: 'a' }], dropped: 0, fixed: 0 })
   })
   test('S2: inválido se repara', () => {
-    expect(readEvents([{ ...g, undoes: 3 }, { ...g, id: 'b', undoes: '' }])).toEqual({ data: [g, { ...g, id: 'b' }], dropped: 2 })
+    expect(readEvents([{ ...g, undoes: 3 }, { ...g, id: 'b', undoes: '' }])).toEqual({ data: [g, { ...g, id: 'b' }], dropped: 0, fixed: 2 })
   })
   test('S3: sobrevive a export/import', () => {
     const e = { ...g, undoes: 'x' }
@@ -34,7 +34,7 @@ describe('undoes', () => {
 })
 
 describe('readCustom', () => {
-  test('vacío', () => { expect(readCustom({})).toEqual({ data: EMPTY_CUSTOM, dropped: 0 }) })
+  test('vacío', () => { expect(readCustom({})).toEqual({ data: EMPTY_CUSTOM, dropped: 0, fixed: 0 }) })
   test('trackers no array', () => { expect(readCustom({ trackers: 'x' })).toBeNull() })
   test('tracker sin name', () => {
     expect(readCustom({ trackers: [{ id: 'a', branch: 'hero', increment: 1, xpPerUnit: 1 }] })?.dropped).toBe(1)
@@ -75,6 +75,14 @@ describe('loadAll', () => {
     expect(r.problems[0].dropped).toBeNull()
     expect(s.m.get(BK(EV))).toBe('{roto')
   })
+  test('solo reparados', () => {
+    const raw = JSON.stringify([{ ...good, undoes: 3 }])
+    const s = fakeStore({ [EV]: raw })
+    const r = loadAll(s, D)
+    expect(r.events).toEqual([good])
+    expect(r.problems[0]).toMatchObject({ dropped: 0, fixed: 1 })
+    expect(s.m.get(BK(EV))).toBe(raw)
+  })
   test('eventos con inválidos', () => {
     const raw = JSON.stringify([good, null])
     const s = fakeStore({ [EV]: raw })
@@ -103,7 +111,7 @@ describe('exportBackup / parseBackup', () => {
   const exp = (o: object = {}) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: EMPTY_CUSTOM, ...o })
   test('roundtrip', () => {
     const r = parseBackup(exportBackup(SEED_EVENTS, custom as never, '2026-10-08T00:00:00Z'))
-    expect(r).toEqual({ events: SEED_EVENTS, custom, dropped: 0 })
+    expect(r).toEqual({ events: SEED_EVENTS, custom, dropped: 0, fixed: 0 })
   })
   test('rechaza ajenos', () => {
     expect(parseBackup(exp({ app: 'otro' }))).toBeNull()
@@ -182,7 +190,7 @@ describe('restaurar copia', () => {
   beforeEach(unlockStorage)
   test('R1 readLast', () => {
     expect(readLast(fakeStore())).toBe('none')
-    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, dropped: 0 })
+    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, dropped: 0, fixed: 0 })
     expect(readLast(fakeStore({ [L(EV)]: '{roto' }))).toBe('unreadable')
     expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good, null]) }))).toMatchObject({ dropped: 1 })
   })
@@ -232,18 +240,18 @@ describe('restaurar copia', () => {
 
 describe('readCustom: campos de P4.3', () => {
   const base = { id: 'c', name: 'X', branch: 'hero', type: 'count', unit: 'unidades', increment: 1, buttonLabel: '+1', xpPerUnit: 20, custom: true }
-  test('C1 formato antiguo', () => { expect(readCustom({ trackers: [base] })).toEqual({ data: { trackers: [base], proposals: [] }, dropped: 0 }) })
+  test('C1 formato antiguo', () => { expect(readCustom({ trackers: [base] })).toEqual({ data: { trackers: [base], proposals: [] }, dropped: 0, fixed: 0 }) })
   test('C2 weeklyGoal inválido', () => {
     const r = readCustom({ trackers: ['x', null, 0, -1].map(w => ({ ...base, weeklyGoal: w })) })
-    expect(r?.data.trackers).toEqual([base, base, base, base]); expect(r?.dropped).toBe(4)
+    expect(r?.data.trackers).toEqual([base, base, base, base]); expect(r?.dropped).toBe(0); expect(r?.fixed).toBe(4)
   })
   test('C3 villain con objetivo y archived no booleano', () => {
     const r = readCustom({ trackers: [{ ...base, branch: 'villain', weeklyGoal: 3 }, { ...base, archived: 'yes' }] })
-    expect(r?.data.trackers).toEqual([{ ...base, branch: 'villain' }, base]); expect(r?.dropped).toBe(2)
+    expect(r?.data.trackers).toEqual([{ ...base, branch: 'villain' }, base]); expect(r?.dropped).toBe(0); expect(r?.fixed).toBe(2)
   })
   test('C4 campos válidos', () => {
     const ts = [{ ...base, weeklyGoal: 5, archived: true }, { ...base, archived: false }]
-    expect(readCustom({ trackers: ts })).toEqual({ data: { trackers: ts, proposals: [] }, dropped: 0 })
+    expect(readCustom({ trackers: ts })).toEqual({ data: { trackers: ts, proposals: [] }, dropped: 0, fixed: 0 })
   })
   test('C5 export/import', () => {
     const t = { ...base, weeklyGoal: 5, archived: true }
@@ -254,11 +262,11 @@ describe('readCustom: campos de P4.3', () => {
 describe('readCustom: goals', () => {
   test('C6 sin goals', () => {
     const r = readCustom({ trackers: [], proposals: [] })
-    expect(r).toEqual({ data: { trackers: [], proposals: [] }, dropped: 0 })
+    expect(r).toEqual({ data: { trackers: [], proposals: [] }, dropped: 0, fixed: 0 })
     expect(r!.data).not.toHaveProperty('goals')
   })
   test('C7 válidos', () => {
-    expect(readCustom({ goals: { gym: 2, reading: 60 } })).toEqual({ data: { trackers: [], proposals: [], goals: { gym: 2, reading: 60 } }, dropped: 0 })
+    expect(readCustom({ goals: { gym: 2, reading: 60 } })).toEqual({ data: { trackers: [], proposals: [], goals: { gym: 2, reading: 60 } }, dropped: 0, fixed: 0 })
   })
   test('C8 inválidos', () => {
     const t = { id: 'c', name: 'C', branch: 'hero', increment: 1, xpPerUnit: 1 }

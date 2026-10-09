@@ -13,19 +13,19 @@ const isEvent = (e: unknown): e is ActivityEvent => isObj(e) && typeof e.id === 
   typeof e.trackerId === 'string' && typeof e.amount === 'number' && Number.isFinite(e.amount) &&
   typeof e.occurredAt === 'string' && STAMP.test(e.occurredAt)
 
-export type Parsed<T> = { data: T; dropped: number } | null // null = ilegible
+export type Parsed<T> = { data: T; dropped: number; fixed: number } | null // null = ilegible
 
 export function readEvents(v: unknown): Parsed<ActivityEvent[]> {
   if (!Array.isArray(v)) return null
-  let dropped = 0
+  let dropped = 0, fixedC = 0
   const data: ActivityEvent[] = []
   for (const e of v) {
     if (!isEvent(e)) { dropped++; continue }
     if (e.undoes !== undefined && (typeof e.undoes !== 'string' || e.undoes === '')) {
-      const fixed = { ...e }; delete fixed.undoes; data.push(fixed); dropped++ // reparado: se conserva sin el campo
+      const fixed = { ...e }; delete fixed.undoes; data.push(fixed); fixedC++ // reparado: se conserva sin el campo
     } else data.push(e)
   }
-  return { data, dropped }
+  return { data, dropped, fixed: fixedC }
 }
 
 export function readCustom(v: unknown): Parsed<CustomData> {
@@ -58,13 +58,13 @@ export function readCustom(v: unknown): Parsed<CustomData> {
   }
   const data: CustomData = { trackers, proposals }
   if (Object.keys(goals).length > 0) data.goals = goals
-  return { data, dropped: rawT.length - trackers.length + fixedN + rawP.length - proposals.length + gDropped }
+  return { data, dropped: rawT.length - trackers.length + rawP.length - proposals.length + gDropped, fixed: fixedN }
 }
 
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>
-export type LoadProblem = { key: string; dropped: number | null; backupKey: string | null } // dropped null = ilegible; backupKey null = no se pudo copiar → clave bloqueada
+export type LoadProblem = { key: string; dropped: number | null; fixed: number; backupKey: string | null } // dropped null = ilegible (fixed 0); backupKey null = no se pudo copiar → clave bloqueada
 export type Loaded = { events: ActivityEvent[]; custom: CustomData; problems: LoadProblem[] }
 
 const locked = new Set<string>() // claves que no se pueden escribir en esta sesión
@@ -78,10 +78,10 @@ export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
     try { raw = store.getItem(key) } catch { return ifMissing }
     if (raw === null) return ifMissing
     const r = read(json(raw))
-    if (r && r.dropped === 0) return r.data
+    if (r && r.dropped === 0 && r.fixed === 0) return r.data
     let backupKey: string | null = `${key}.backup.${now.toISOString().replace(/[-:]/g, '').slice(0, 15)}`
     try { store.setItem(backupKey, raw) } catch { locked.add(key); backupKey = null }
-    problems.push({ key, dropped: r ? r.dropped : null, backupKey })
+    problems.push({ key, dropped: r ? r.dropped : null, fixed: r ? r.fixed : 0, backupKey })
     return r ? r.data : ifUnreadable
   }
   const events = load(KEY, readEvents, [], [])
@@ -103,11 +103,11 @@ export type Backup = { app: 'rpg-life-tracker'; version: 1; exportedAt: string; 
 export const exportBackup = (events: ActivityEvent[], custom: CustomData, exportedAt: string): string =>
   JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt, events, custom } satisfies Backup, null, 2)
 
-export function parseBackup(raw: string): { events: ActivityEvent[]; custom: CustomData; dropped: number } | null {
+export function parseBackup(raw: string): { events: ActivityEvent[]; custom: CustomData; dropped: number; fixed: number } | null {
   const v = json(raw)
   if (!isObj(v) || v.app !== 'rpg-life-tracker' || v.version !== 1) return null
   const e = readEvents(v.events), c = readCustom(v.custom)
-  return e && c ? { events: e.data, custom: c.data, dropped: e.dropped + c.dropped } : null
+  return e && c ? { events: e.data, custom: c.data, dropped: e.dropped + c.dropped, fixed: e.fixed + c.fixed } : null
 }
 
 export type Meta = { lastExportAt: string } // ISO 8601 (Date.toISOString())
@@ -172,18 +172,18 @@ export function backupCurrent(store: WStore = localStorage): boolean {
 }
 
 // null en una rama = esa clave no tiene .backup.last
-export type LastBackup = { events: ActivityEvent[] | null; custom: CustomData | null; dropped: number }
+export type LastBackup = { events: ActivityEvent[] | null; custom: CustomData | null; dropped: number; fixed: number }
 
 export function hasLastBackup(store: Pick<Storage, 'getItem'> = localStorage): boolean {
   try { return [KEY, CUSTOM_KEY].some(k => store.getItem(`${k}.backup.last`) !== null) } catch { return false }
 }
 
 export function readLast(store: Pick<Storage, 'getItem'> = localStorage): LastBackup | 'none' | 'unreadable' {
-  const out: LastBackup = { events: null, custom: null, dropped: 0 }
+  const out: LastBackup = { events: null, custom: null, dropped: 0, fixed: 0 }
   try {
     const ev = store.getItem(`${KEY}.backup.last`), cu = store.getItem(`${CUSTOM_KEY}.backup.last`)
-    if (ev !== null) { const r = readEvents(json(ev)); if (!r) return 'unreadable'; out.events = r.data; out.dropped += r.dropped }
-    if (cu !== null) { const r = readCustom(json(cu)); if (!r) return 'unreadable'; out.custom = r.data; out.dropped += r.dropped }
+    if (ev !== null) { const r = readEvents(json(ev)); if (!r) return 'unreadable'; out.events = r.data; out.dropped += r.dropped; out.fixed += r.fixed }
+    if (cu !== null) { const r = readCustom(json(cu)); if (!r) return 'unreadable'; out.custom = r.data; out.dropped += r.dropped; out.fixed += r.fixed }
   } catch { return 'unreadable' }
   return out.events === null && out.custom === null ? 'none' : out
 }

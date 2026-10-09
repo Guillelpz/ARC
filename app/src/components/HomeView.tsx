@@ -219,7 +219,7 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
                   <RotateCcw className="size-4" aria-hidden /> Recuperar copia anterior
                 </button>
               )}
-              <input ref={fileRef} type="file" accept=".json,application/json" hidden
+              <input ref={fileRef} type="file" accept=".json,application/json" hidden aria-label="Importar copia"
                 onChange={e => {
                   const input = e.currentTarget, file = input.files?.[0]
                   if (file) file.text().then(onImport, onImportError)

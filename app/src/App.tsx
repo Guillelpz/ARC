@@ -13,6 +13,7 @@ import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
+import { liveText } from './components/liveText'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
@@ -21,6 +22,8 @@ const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.t
 const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
   : problems.some(p => p.backupKey === null)
     ? 'Parte de tus datos guardados no se pudo leer ni copiar. Tus cambios no se guardarán en este navegador hasta que importes una copia.'
+    : problems.every(p => p.dropped === 0)
+    ? 'Hemos corregido algunos datos guardados con campos no válidos; no se ha perdido ningún registro. El original está copiado aparte en este navegador.'
     : 'Parte de tus datos guardados no se pudo leer. El original está copiado aparte en este navegador. Exporta una copia para conservar lo que ves.'
 
 export default function App() {
@@ -116,8 +119,7 @@ export default function App() {
   const saveTracker = (t: Tracker) => t.custom
     ? setCustom(c => ({ ...c, trackers: c.trackers.map(x => (x.id === t.id ? t : x)) }))
     : setCustom(c => ({ ...c, goals: setGoal(c.goals, t.id, t.weeklyGoal ?? null) }))
-  // ponytail: UnknownView solo ve las activas; se puede crear una misión con el nombre de una archivada
-  const active = useMemo(() => trackers.filter(t => !t.archived), [trackers])
+  const unarchive = (t: Tracker) => saveTracker({ ...t, archived: false })
   const archived = useMemo(() => custom.trackers.filter(t => t.archived), [custom.trackers])
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
 
@@ -153,7 +155,7 @@ export default function App() {
     const b = parseBackup(text)
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
     const n = b.events.length, m = b.custom.trackers.length
-    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
+    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
     unlockStorage()
@@ -166,7 +168,7 @@ export default function App() {
     if (r === 'none') { setCanRestore(false); return setNotice('No hay ninguna copia interna que recuperar.') }
     if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
     const ev = r.events ?? events, cu = r.custom ?? custom
-    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
+    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
     if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
     setEvents(ev); setCustom(cu); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)
@@ -175,7 +177,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={t => saveTracker({ ...t, archived: false })} onNavigate={go}
+        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} onDismissNotice={() => setNotice(null)} />
@@ -184,13 +186,15 @@ export default function App() {
         <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} />
       )}
       {screen === 'new' && (
-        <UnknownView trackers={active} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} />
+        <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
       )}
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
+      {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
+      <p role="status" className="sr-only">{liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={go} />
     </>
   )
