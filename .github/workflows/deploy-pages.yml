@@ -14,6 +14,8 @@ permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: pages, cancel-in-progress: true }
 jobs:
   deploy:
+    # cosmético: un workflow_dispatch desde otra rama ejecuta el YAML de esa rama. La protección real es el entorno github-pages limitado a main (DEPLOY.md)
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: { name: github-pages, url: '${{ steps.deployment.outputs.page_url }}' }
     defaults: { run: { working-directory: app } }
@@ -22,7 +24,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json }
       - run: npm ci
-      # lint, test y e2e = puerta antes de publicar; con sw_kill se saltan (en una emergencia nada debe bloquear el kill switch)
+      # lint, test y e2e = puerta antes de publicar; con sw_kill se saltan (en una emergencia nada debe bloquear el kill switch). El humo final se ejecuta siempre
       - if: ${{ !inputs.sw_kill }}
         run: npm run lint
       - if: ${{ !inputs.sw_kill }}
@@ -39,3 +41,15 @@ jobs:
         with: { path: app/dist }
       - id: deployment
         uses: actions/deploy-pages@v4
+      # humo: también con sw_kill. Va después del deploy, así que no bloquea nada; si falla, el job sale en rojo
+      - name: Humo (la URL publicada sirve este build)
+        run: |
+          url='${{ steps.deployment.outputs.page_url }}'
+          want=$(grep -o 'assets/index-[^"]*\.js' dist/index.html | head -1)
+          [ -n "$want" ] || { echo "::error::dist/index.html no referencia assets/index-*.js"; exit 1; }
+          for i in 1 2 3 4 5; do
+            got=$(curl -fsS "${url}?smoke=${GITHUB_RUN_ID}-$i" | grep -o 'assets/index-[^"]*\.js' | head -1) || true
+            if [ "$got" = "$want" ] && curl -fsS "${url}sw.js?smoke=${GITHUB_RUN_ID}-$i" | cmp -s - dist/sw.js; then echo "Humo OK: $want"; exit 0; fi
+            echo "Intento $i/5: publicado '$got', esperado '$want' (o sw.js distinto)"; sleep 10
+          done
+          echo "::error::Humo: la URL publicada no sirve este build. Ver docs/DEPLOY.md «Volver atrás»"; exit 1
