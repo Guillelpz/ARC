@@ -1,6 +1,6 @@
 import { useRef } from 'react'
 import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
-import type { Branch, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
+import type { ActivityEvent, Branch, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -15,7 +15,8 @@ type Props = {
   archived: Tracker[]
   onUnarchive: (t: Tracker) => void
   onNavigate: (s: Screen) => void
-  onAdd: (t: Tracker) => void
+  onAdd: (t: Tracker) => number
+  onUndo: (t: Tracker, e: ActivityEvent) => number
   onOpenParty: (id: string) => void
   onReset: () => void
   onLoadExample?: () => void
@@ -36,10 +37,10 @@ const access = {
   villain: { Icon: Moon, label: 'VILLAIN', tagline: 'El camino de la sombra', cls: 'bg-villain-bg text-villain-text hover:bg-villain-surface outline-villain', accent: 'text-villain', muted: 'text-villain-muted' },
 } as const
 
-function TodayList({ rows, onGo, onAdd }: { rows: { t: Tracker; text: string; left?: number }[]; onGo: (s: Screen) => void; onAdd?: (t: Tracker, left: number) => void }) {
+function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: { label: string; aria: string; run: () => void } }[]; onGo: (s: Screen) => void }) {
   return (
     <ul className="divide-y divide-app-border rounded-lg border border-app-border">
-      {rows.map(({ t, text, left }) => (
+      {rows.map(({ t, text, action }) => (
         <li key={t.id} className="flex items-stretch">
           <button type="button" onClick={() => onGo(t.branch)}
             className="flex min-h-11 flex-1 items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
@@ -47,10 +48,10 @@ function TodayList({ rows, onGo, onAdd }: { rows: { t: Tracker; text: string; le
             <span className="text-sm text-app-muted tabular-nums">{text}</span>
             <ChevronRight className="size-4 shrink-0 text-app-muted" aria-hidden />
           </button>
-          {onAdd && (
-            <button type="button" onClick={() => onAdd(t, left!)} aria-label={`${t.buttonLabel} en ${t.name}`}
+          {action && (
+            <button type="button" onClick={action.run} aria-label={action.aria}
               className="m-1 inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg border border-app-border px-3 text-sm font-semibold tabular-nums text-app-text hover:bg-app-bg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text">
-              {t.buttonLabel}
+              {action.label}
             </button>
           )}
         </li>
@@ -59,7 +60,7 @@ function TodayList({ rows, onGo, onAdd }: { rows: { t: Tracker; text: string; le
   )
 }
 
-export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onAdd, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const hoyRef = useRef<HTMLHeadingElement>(null)
   const branchSummary = (b: Branch) => {
@@ -129,7 +130,12 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
           {summary.done.length > 0 && (
             <>
               <h3 className="text-sm font-semibold">Registrado hoy</h3>
-              <TodayList rows={summary.done.map(d => ({ t: d.tracker, text: `+${Math.round(d.amount)} ${d.tracker.unit}` }))} onGo={onNavigate} />
+              <TodayList rows={summary.done.map(d => {
+                const u = d.undo
+                return { t: d.tracker, text: `+${Math.round(d.amount)} ${d.tracker.unit}`, ...(u && { action: {
+                  label: 'Deshacer', aria: `Deshacer +${u.amount} ${d.tracker.unit} en ${d.tracker.name}`,
+                  run: () => { if (d.amount + onUndo(d.tracker, u) <= 0) hoyRef.current?.focus() } } }) }
+              })} onGo={onNavigate} />
             </>
           )}
           {summary.best && (
@@ -141,8 +147,9 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
           {summary.missing.length > 0 && (
             <>
               <h3 className="text-sm font-semibold">Te faltan · {summary.daysLeft === 1 ? 'queda 1 día' : `quedan ${summary.daysLeft} días`}</h3>
-              <TodayList rows={summary.missing.map(m => ({ t: m.tracker, text: `${Math.round(m.left)} ${m.tracker.unit}`, left: m.left }))} onGo={onNavigate}
-                onAdd={(t, left) => { onAdd(t); if (left <= t.increment) hoyRef.current?.focus() }} />
+              <TodayList rows={summary.missing.map(m => ({ t: m.tracker, text: `${Math.round(m.left)} ${m.tracker.unit}`, action: {
+                label: m.tracker.buttonLabel, aria: `${m.tracker.buttonLabel} en ${m.tracker.name}`,
+                run: () => { if (onAdd(m.tracker) >= m.left) hoyRef.current?.focus() } } }))} onGo={onNavigate} />
             </>
           )}
         </section>

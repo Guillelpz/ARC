@@ -343,3 +343,27 @@ test('U22 cumplir el objetivo desde la home', async () => {
   expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Hoy' }))
   await vi.waitFor(() => expect(stored()).toHaveLength(4))
 })
+
+test('U23 deshacer desde la home', async () => {
+  const plus = () => fireEvent.click(screen.getByRole('button', { name: '+1 sesión en Gym' }))
+  const undoBtn = () => screen.getByRole('button', { name: 'Deshacer +1 sesiones en Gym' })
+  render(<App />)
+  plus(); fireEvent.click(undoBtn())
+  await vi.waitFor(() => expect(stored()).toHaveLength(2))
+  expect(stored()[1]).toMatchObject({ amount: -1, undoes: stored()[0].id })
+  expect(screen.getByText('Aún nada hoy.')).toBeTruthy()
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Hoy' }))
+  cleanup(); localStorage.clear()
+  render(<App />)
+  plus(); plus(); fireEvent.click(undoBtn())
+  await vi.waitFor(() => expect(stored()).toHaveLength(3))
+  expect(screen.getByRole('button', { name: /^Gym \+1 sesiones/ })).toBeTruthy()
+  expect(undoBtn()).toBeTruthy()
+  cleanup(); localStorage.clear()
+  localStorage.setItem(EV, JSON.stringify([
+    { id: 'a', trackerId: 'gym', amount: 2, occurredAt: '2026-10-07T09:00:00' },
+    { id: 'b', trackerId: 'gym', amount: -1, occurredAt: '2026-10-07T10:00:00' }]))
+  render(<App />)
+  expect(screen.getByRole('button', { name: /^Gym \+1 sesiones/ })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /^Deshacer/ })).toBeNull()
+})
