@@ -29,6 +29,8 @@ export function readEvents(v: unknown): Parsed<ActivityEvent[]> {
   return { data, dropped, fixed: fixedC }
 }
 
+const KNOWN = new Set(['trackers', 'proposals', 'goals', 'goalLog', '__proto__'])
+
 export function readCustom(v: unknown): Parsed<CustomData> {
   if (!isObj(v)) return null
   if ((v.trackers !== undefined && !Array.isArray(v.trackers)) || (v.proposals !== undefined && !Array.isArray(v.proposals))) return null
@@ -68,7 +70,10 @@ export function readCustom(v: unknown): Parsed<CustomData> {
       else gDropped++
     }
   }
-  const data: CustomData = { trackers, proposals }
+  // ponytail: las claves desconocidas se copian sin validar. Una versión anterior conserva p. ej. `goalLog`, pero no lo actualiza
+  // si cambia un objetivo. Cuando haga falta una migración real: número de versión de esquema.
+  const data = { trackers, proposals } as CustomData
+  for (const [k, x] of Object.entries(v)) if (!KNOWN.has(k)) (data as Record<string, unknown>)[k] = x
   if (Object.keys(goals).length > 0) data.goals = goals
   if (goalLog.length > 0) data.goalLog = goalLog
   return { data, dropped: rawT.length - trackers.length + rawP.length - proposals.length + gDropped, fixed: fixedN }
