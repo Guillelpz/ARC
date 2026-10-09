@@ -16,11 +16,11 @@ Fuentes: `docs/cycles/cycle-20/proposals.md` y `docs/cycles/cycle-20/evaluation.
 | Qué claves se bloquean | Las **dos** claves de datos, aunque solo una tenga problemas | Con problemas, `onStorage` sale antes de leer nada, así que la clave «limpia» de la otra pestaña tampoco se ha cargado y escribirla también la pisaría |
 | Firma | `lockStorage(keys = [KEY, CUSTOM_KEY])` | Las constantes de clave no salen de `storage.ts` |
 | Aviso | Estado `stale` en App y un banner fijo y no descartable (reutiliza `UpdateBanner` con `text`, sin `onClose`), visible en todas las pantallas | El `notice` actual solo se ve en Inicio y se puede cerrar. Con la clave bloqueada, `save*` devuelve `null` y no aparece `SaveFailBanner`: sin este banner, lo que se registre se perdería sin aviso |
-| Desbloqueo | Igual que hoy: un evento `storage` limpio llama a `unlockStorage()` y además `setStale(false)`. Importar (`unlockStorage`) y recuperar (`restoreLast`) también ponen `stale` a `false` | Ya existen; solo se apaga el banner en los mismos sitios |
+| Desbloqueo | Igual que hoy: un evento `storage` limpio llama a `unlockStorage()` y además `setStale(false)`. Con `stale` activo, «Borrar todo», «Importar copia» y «Recuperar copia anterior» no hacen nada y muestran «Recarga la página antes de cambiar tus datos.». Las únicas salidas son recargar o un `storage` limpio | Importar o recuperar con la clave bloqueada o con la otra pestaña desactualizada podría pisar sus datos |
 | `if` de rama en el job | Se añade, con un comentario que lo marca como cosmético | Un `workflow_dispatch` lanzado desde otra rama ejecuta el YAML de esa rama. La protección real es el entorno `github-pages` limitado a `main` (paso 1 del usuario) |
 | Humo y caché | `?smoke=<run_id>-<intento>` en cada `curl` | Una URL nueva evita la copia en caché del CDN de Pages |
 | Humo con `sw_kill` | **Se ejecuta.** Va después de `deploy-pages`, así que no bloquea el kill switch. Si falla, el job sale en rojo, pero lo publicado ya está publicado | Confirma que el `sw.js` del kill switch está en línea |
-| Qué compara el humo | El primer `assets/index-[^"]*\.js` de `dist/index.html` frente al del `index.html` publicado, y `sw.js` publicado byte a byte (`cmp`) frente a `dist/sw.js` | Detecta la versión anterior servida y, a la vez, que `sw.js` responde 200 |
+| Qué compara el humo | El primer `assets/index-[^"]*\.js` de `dist/index.html` frente al del `index.html` publicado, y `sw.js` publicado byte a byte (solo su primera línea (BUILD_ID, ASSETS y KILL) frente a la de `dist/sw.js` | Detecta la versión anterior servida y, a la vez, que `sw.js` responde 200 |
 
 ## 3. Decisiones que requieren aprobación
 
@@ -32,7 +32,7 @@ Ninguna. No hay dependencias, backend ni cambios de reglas de juego. Los pasos d
 |---|---|
 | `app/src/core/storage.ts` | + `lockStorage(keys?)` |
 | `app/src/components/UpdateBanner.tsx` | `text?` y `onClose?` opcionales; se exporta `STALE_TAB_TEXT` |
-| `app/src/App.tsx` | Estado `stale`; `onStorage` bloquea y activa `stale`; `importData` y `restore` lo apagan; render del banner |
+| `app/src/App.tsx` | Estado `stale`; `onStorage` bloquea y activa `stale`; `reset`, `importData` y `restore` se bloquean mientras está activo; render del banner |
 | `app/src/App.test.tsx` | Se ajusta `U-pestañas` y se añade el test `U-pestañas-bloqueo` |
 | `.github/workflows/deploy-pages.yml` | `if` de rama en el job y paso de humo al final |
 | `docs/DEPLOY.md` | Secciones «Volver atrás» y «Proteger producción (pasos en GitHub)»; nota del humo en «PWA y kill switch» |
@@ -62,7 +62,7 @@ unlockStorage(); setStale(false)
 ```
 
 - `const [stale, setStale] = useState(false)`.
-- En `importData`, después de `unlockStorage()`, se llama a `setStale(false)`. En `restore`, después de que `restoreLast(r)` termine bien, también `setStale(false)`.
+- `reset`, `importData` y `restore` empiezan con `if (stale) return setNotice(STALE_BLOCK_TEXT)`. No apagan `stale`.
 - Ese evento ya no llama a `setNotice(noticeFor(...))`: el banner lo sustituye. `noticeFor` sigue en uso al arrancar.
 - Los comentarios `ponytail:` de las líneas 67–68 (carrera de milisegundos) se quedan tal cual.
 
@@ -122,7 +122,7 @@ En App, en el lugar del render actual:
         [ -n "$want" ] || { echo "::error::dist/index.html no referencia assets/index-*.js"; exit 1; }
         for i in 1 2 3 4 5; do
           got=$(curl -fsS "${url}?smoke=${GITHUB_RUN_ID}-$i" | grep -o 'assets/index-[^"]*\.js' | head -1) || true
-          if [ "$got" = "$want" ] && curl -fsS "${url}sw.js?smoke=${GITHUB_RUN_ID}-$i" | cmp -s - dist/sw.js; then echo "Humo OK: $want"; exit 0; fi
+          if [ "$got" = "$want" ] && [ "$(curl -fsS "${url}sw.js?smoke=${GITHUB_RUN_ID}-$i" | head -1)" = "$(head -1 dist/sw.js)" ]; then echo "Humo OK: $want"; exit 0; fi
           echo "Intento $i/5: publicado '$got', esperado '$want' (o sw.js distinto)"; sleep 10
         done
         echo "::error::Humo: la URL publicada no sirve este build. Ver docs/DEPLOY.md «Volver atrás»"; exit 1
@@ -155,7 +155,7 @@ En App, en el lugar del render actual:
 |---|---|---|
 | El banner `stale` se queda fijo si la otra pestaña nunca escribe algo limpio | «Recargar» siempre lo resuelve (`loadAll` repara y no bloquea) | — |
 | El CDN sirve `index.html` antiguo más de 50 s | Cache-buster por intento | Subir a 10 intentos |
-| `cmp` de `sw.js` falla por compresión o transformación del CDN | `curl` sin `--compressed` pide el fichero sin comprimir | Si da falsos rojos, quedarse con `curl -fsS -o /dev/null` (200) para `sw.js` |
+| La comparación de `sw.js` falla por transformación del CDN (ya solo se compara la primera línea) | `curl` sin `--compressed` pide el fichero sin comprimir | Si da falsos rojos, quedarse con `curl -fsS -o /dev/null` (200) para `sw.js` |
 | `cancel-in-progress` cancela el humo si entra otro push | Se acepta: el job queda cancelado, no verde | — |
 
 ## 11. Verificación

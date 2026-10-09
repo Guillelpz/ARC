@@ -428,6 +428,11 @@ test('U-pestañas-bloqueo no pisa datos de otra pestaña', async () => {
   for (const bad of [EV, CU]) {
     localStorage.setItem(bad, '{roto'); fire(bad)
     await vi.waitFor(() => expect(banner()).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Inicio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar todo' }))
+    await vi.waitFor(() => expect(screen.getByText('Recarga la página antes de cambiar tus datos.')).toBeTruthy())
+    expect(window.confirm).not.toHaveBeenCalled()
+    go('HERO')
     plus()
     expect(gym()).toMatch(/^2 \//)
     await vi.waitFor(() => expect(localStorage.getItem(bad)).toBe('{roto'))

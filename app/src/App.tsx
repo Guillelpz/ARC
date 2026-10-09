@@ -22,6 +22,7 @@ import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast }
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
 
+const STALE_BLOCK_TEXT = 'Recarga la página antes de cambiar tus datos.'
 const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
   : problems.some(p => p.backupKey === null)
     ? 'Parte de tus datos guardados no se pudo leer ni copiar. Tus cambios no se guardarán en este navegador hasta que importes una copia.'
@@ -172,6 +173,7 @@ export default function App() {
   const loadExample = () => setEvents(seedFor(today))
 
   function reset() {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
     if (copy.due && hasData && window.confirm('No tienes una copia reciente de tus datos. ¿Exportar una antes de borrar? Aceptar exporta y no borra nada; Cancelar sigue con el borrado.')) {
       exportData(); setNotice('Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.'); return
     }
@@ -193,25 +195,26 @@ export default function App() {
   }
 
   function importData(text: string) {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
     const b = parseBackup(text)
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
     const n = b.events.length, m = b.custom.trackers.length
     if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
-    unlockStorage(); setStale(false)
+    unlockStorage()
     setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
   }
 
   function restore() {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
     const r = readLast()
     if (r === 'none') { setCanRestore(false); return setNotice('No hay ninguna copia interna que recuperar.') }
     if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
     const ev = r.events ?? events, cu = r.custom ?? custom
     if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
     if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
-    setStale(false)
     setEvents(ev); setCustom(cu); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)
   }

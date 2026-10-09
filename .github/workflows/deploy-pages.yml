@@ -41,7 +41,7 @@ jobs:
         with: { path: app/dist }
       - id: deployment
         uses: actions/deploy-pages@v4
-      # humo: también con sw_kill. Va después del deploy, así que no bloquea nada; si falla, el job sale en rojo
+      # humo: compara la primera línea de sw.js (BUILD_ID, ASSETS, KILL), no el fichero entero. También con sw_kill. Va después del deploy, así que no bloquea nada; si falla, el job sale en rojo
       - name: Humo (la URL publicada sirve este build)
         run: |
           url='${{ steps.deployment.outputs.page_url }}'
@@ -49,7 +49,7 @@ jobs:
           [ -n "$want" ] || { echo "::error::dist/index.html no referencia assets/index-*.js"; exit 1; }
           for i in 1 2 3 4 5; do
             got=$(curl -fsS "${url}?smoke=${GITHUB_RUN_ID}-$i" | grep -o 'assets/index-[^"]*\.js' | head -1) || true
-            if [ "$got" = "$want" ] && curl -fsS "${url}sw.js?smoke=${GITHUB_RUN_ID}-$i" | cmp -s - dist/sw.js; then echo "Humo OK: $want"; exit 0; fi
+            if [ "$got" = "$want" ] && [ "$(curl -fsS "${url}sw.js?smoke=${GITHUB_RUN_ID}-$i" | head -1)" = "$(head -1 dist/sw.js)" ]; then echo "Humo OK: $want"; exit 0; fi
             echo "Intento $i/5: publicado '$got', esperado '$want' (o sw.js distinto)"; sleep 10
           done
           echo "::error::Humo: la URL publicada no sirve este build. Ver docs/DEPLOY.md «Volver atrás»"; exit 1
