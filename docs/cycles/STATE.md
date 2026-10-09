@@ -13,10 +13,10 @@ Orden: 10 → 11. El primero no cerrado de la lista es el siguiente a especifica
 - Ciclo 5 — cerrado (bc660e8).
 - Ciclo 6 — cerrado (df87f37).
 - Ciclo 7 — cerrado (ef60fdc).
-- Ciclo 9 — cerrado (4760257).
-- Ciclo 11 — paso 1 (proponer).
-- Ciclo 10 (P9.1 + P9.4) — paso 4 (spec).
 - Ciclo 8 — cerrado (3906d6f). P7.2a no aprobada todavía.
+- Ciclo 9 — cerrado (4760257).
+- Ciclo 10 (P9.1 + P9.4) — paso 5 (implementar). Spec: `docs/TECH_SPEC-deuda-y-a11y.md`.
+- Ciclo 11 — paso 3 (okay del usuario). Propuestas y evaluación en `docs/cycles/cycle-11/`; falta el okay a la regla de P11.1.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -56,3 +56,8 @@ Orden: 10 → 11. El primero no cerrado de la lista es el siguiente a especifica
 | P9.2 | Proponer a una party una actividad existente | aprobada | 9 |
 | P9.3 | Ranking prorrateado (regla aprobada) | aprobada | 9 |
 | P9.4 | Avisos accesibles + axe | aprobada | 10 |
+| P11.1 | Objetivo vigente por semana (`goalLog`), absorbe P11.5 | evaluada, espera okay de regla | 11 |
+| P11.2 | Límite semanal VILLAIN (`weeklyLimit`, sustituye a P7.2a) | evaluada: posponer | 12 |
+| P11.3 | No perder registros en silencio si falla el guardado | evaluada, espera okay | 11 |
+| P11.4 | Registrar desde «Te faltan» en la home | evaluada, espera okay | 11 o 12 |
+| P11.5 | Menores de objetivos → dentro de P11.1 | evaluada | 11 |
