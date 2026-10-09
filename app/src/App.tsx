@@ -2,7 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
-import { clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
+import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal } from './core/trackers'
@@ -79,6 +79,7 @@ export default function App() {
 
   const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals, custom.goalLog), [custom.trackers, custom.goals, custom.goalLog])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
+  const weeks = useMemo(() => branchWeekly(events, trackers, today), [events, trackers, today])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
     () => PARTIES.map(p => derivePartyState(p, events, today, trackers, custom.proposals)),
@@ -197,7 +198,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView game={game} summary={summary} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />

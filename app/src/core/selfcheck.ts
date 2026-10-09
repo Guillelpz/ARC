@@ -1,8 +1,8 @@
 import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker, WeekRow } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
-import { allTrackers, logGoal, setGoal, TRACKERS } from './trackers'
-import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
-import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
+import { allTrackers, logGoal, setGoal, TRACKERS, unitFor } from './trackers'
+import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
+import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseCustom } from './storage'
@@ -135,6 +135,21 @@ export function runSelfCheck() {
   ok(editTracker(TRACKERS[0], { name: 'X', increment: 9, weeklyGoal: 1 }) === TRACKERS[0], 'E4 fija intacta')
   const sumE = (g: GameState) => [g.hero.xp, g.villain.xp, g.player.xp, g.weeklyHeroXp].join()
   ok(sumE(deriveGame(em, DEMO_DATE, allTrackers([{ ...editTracker(med, { name: 'M2', increment: 5, weeklyGoal: 3 }), archived: true }, pizza]))) === sumE(deriveGame(em, DEMO_DATE, all)), 'E5 XP invariante')
+
+  // BW1–BW3 — XP por rama y semana
+  const bw = branchWeekly(SEED_EVENTS, TRACKERS, DEMO_DATE)
+  ok(bw.length === 8 && bw[0].monday === '2026-08-17' && bw[7].current && bw.filter(r => r.current).length === 1
+    && bw[7].hero === g0.weeklyHeroXp && bw[7].villain === weeklyXp(g0, 'villain'), 'BW1 semana en curso = XP semanal')
+  ok((['hero', 'villain'] as const).every(b => bw.reduce((s, r) => s + r[b], 0) ===
+    TRACKERS.filter(t => t.branch === b).reduce((s, t) => s + total(SEED_EVENTS, t.id, '2026-08-17', addDays(DEMO_DATE, 1)) * t.xpPerUnit, 0)), 'BW2 suma = XP del rango')
+  // em = semilla + 1 registro de med (20 XP) hoy; archivada o no, cuenta igual
+  const bwa = (archived: boolean) => branchWeekly(em, allTrackers([archived ? { ...med, archived: true } : med, pizza]), DEMO_DATE)
+  ok(JSON.stringify(bwa(true)) === JSON.stringify(bwa(false)) && bwa(true)[7].hero === bw[7].hero + 20, 'BW3 archivadas cuentan')
+
+  // P1 — singular coherente con los buttonLabel de las fijas
+  ok(unitFor(1, 'sesiones') === 'sesión' && unitFor(-1, 'clases') === 'clase' && unitFor(1, 'unidades') === 'unidad'
+    && unitFor(2, 'sesiones') === 'sesiones' && unitFor(1, 'km') === 'km' && unitFor(1, 'páginas') === 'páginas' && unitFor(1, 'constructor') === 'constructor'
+    && TRACKERS.filter(t => t.increment === 1 && t.unit !== 'unidades').every(t => t.buttonLabel === `+1 ${unitFor(1, t.unit)}`), 'P1 unitFor')
 
   const vg = vote('villain', gymP), vo = vote('villain', ofi)
   ok(vg.accepted && vg.yes === 2 && vg.votes.find(v => v.name === 'Carlos')?.yes === false, 'VILLAIN: Gym 2/3, Carlos no')

@@ -124,3 +124,10 @@ export type Classification = {
   matchId?: string // actividad existente equivalente (sinónimo, otro idioma, errata)
 }
 export type TrackerDraft = { name: string; branch: Branch; type: Tracker['type']; xpPerUnit: number; unit?: string }
+
+export type BranchWeek = {
+  monday: string    // YYYY-MM-DD
+  hero: number      // XP neta de la semana (en curso: hasta today incluido)
+  villain: number
+  current: boolean  // solo la última
+}

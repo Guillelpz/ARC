@@ -1,9 +1,11 @@
 import { useRef } from 'react'
 import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
-import type { ActivityEvent, Branch, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
+import type { ActivityEvent, Branch, BranchWeek, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
+import { unitFor } from '../core/trackers'
+import { shortDate } from '../core/stats'
 import { PlayerHeader } from './PlayerHeader'
 import { SaveFailBanner } from './SaveFailBanner'
 const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
@@ -11,6 +13,7 @@ const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 type Props = {
   game: GameState
   summary: TodaySummary
+  weeks: BranchWeek[]
   partyStates: PartyState[]
   archived: Tracker[]
   onUnarchive: (t: Tracker) => void
@@ -60,13 +63,17 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
   )
 }
 
-export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
+const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
+
+export function HomeView({ game, summary, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const hoyRef = useRef<HTMLHeadingElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
   }
 
+  const maxXp = Math.max(1, ...weeks.flatMap(w => [w.hero, w.villain]))
   return (
     <div className="min-h-dvh bg-app-bg text-app-text">
       <nav aria-label="Elige tu camino" className="relative grid min-h-[calc(100dvh-3.5rem)] grid-rows-2 sm:grid-cols-2 sm:grid-rows-1">
@@ -133,7 +140,7 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
               <TodayList rows={summary.done.map(d => {
                 const u = d.undo
                 return { t: d.tracker, text: `+${Math.round(d.amount)} ${d.tracker.unit}`, ...(u && { action: {
-                  label: 'Deshacer', aria: `Deshacer +${u.amount} ${d.tracker.unit} en ${d.tracker.name}`,
+                  label: 'Deshacer', aria: `Deshacer +${u.amount} ${unitFor(u.amount, d.tracker.unit)} en ${d.tracker.name}`,
                   run: () => { if (d.amount + onUndo(d.tracker, u) <= 0) hoyRef.current?.focus() } } }) }
               })} onGo={onNavigate} />
             </>
@@ -153,7 +160,31 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
             </>
           )}
         </section>
-        <div className="rise"><PlayerHeader game={game} /></div>
+        <div className="rise flex flex-col gap-6">
+          <PlayerHeader game={game} />
+          {weeks.some(w => w.hero !== 0 || w.villain !== 0) && (
+            <section aria-labelledby="ultimas-semanas" className="flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5">
+              <h2 id="ultimas-semanas" className="text-lg font-semibold">Últimas semanas</h2>
+              <p className="text-xs leading-5 text-app-muted">XP neta por semana</p>
+              <div aria-hidden className="flex h-24 items-end gap-2 border-b border-app-border">
+                {weeks.map(w => (
+                  <div key={w.monday} className="flex h-full flex-1 items-end gap-0.5">
+                    {(['hero', 'villain'] as const).map(b => (
+                      <div key={b} style={{ height: `${Math.max(0, w[b]) / maxXp * 100}%` }}
+                        className={`flex-1 rounded-t ${w.current ? BAR_CUR[b] : BAR[b]}`} />
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div aria-hidden className="flex flex-wrap items-center gap-2 text-xs text-app-muted">
+                <span className="size-3 rounded-sm bg-hero" /> HERO · <span className="size-3 rounded-sm bg-villain-bg" /> VILLAIN · borde discontinuo: semana en curso
+              </div>
+              <ul className="sr-only">
+                {weeks.map(w => <li key={w.monday}>{`Semana del ${shortDate(w.monday)}${w.current ? ' (en curso)' : ''}: HERO ${w.hero} XP, VILLAIN ${w.villain} XP`}</li>)}
+              </ul>
+            </section>
+          )}
+        </div>
 
         <div className="rise flex flex-col gap-6" style={{ animationDelay: '80ms' }}>
           <section className="flex flex-col gap-3">

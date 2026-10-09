@@ -59,7 +59,7 @@ test('U4 deshacer', () => {
   render(<App />); go('HERO')
   fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
   fireEvent.click(card('Gym').getByText('Últimos registros'))
-  fireEvent.click(card('Gym').getByRole('button', { name: 'Deshacer 1 sesiones de Hoy' }))
+  fireEvent.click(card('Gym').getByRole('button', { name: 'Deshacer 1 sesión de Hoy' }))
   const ev = stored()
   expect(ev[1]).toMatchObject({ amount: -1, undoes: ev[0].id })
   expect(card('Gym').getAllByText('deshecho').length).toBeGreaterThan(0)
@@ -353,7 +353,7 @@ test('U22 cumplir el objetivo desde la home', async () => {
 
 test('U23 deshacer desde la home', async () => {
   const plus = () => fireEvent.click(screen.getByRole('button', { name: '+1 sesión en Gym' }))
-  const undoBtn = () => screen.getByRole('button', { name: 'Deshacer +1 sesiones en Gym' })
+  const undoBtn = () => screen.getByRole('button', { name: 'Deshacer +1 sesión en Gym' })
   render(<App />)
   plus(); fireEvent.click(undoBtn())
   await vi.waitFor(() => expect(stored()).toHaveLength(2))
@@ -373,4 +373,15 @@ test('U23 deshacer desde la home', async () => {
   render(<App />)
   expect(screen.getByRole('button', { name: /^Gym \+1 sesiones/ })).toBeTruthy()
   expect(screen.queryByRole('button', { name: /^Deshacer/ })).toBeNull()
+})
+
+test('U-HV1 HERO contra VILLAIN en la home', () => {
+  render(<App />)
+  expect(screen.queryByRole('heading', { name: 'Últimas semanas' })).toBeNull() // usuario nuevo
+  cleanup(); streakEvents(); render(<App />)
+  expect(screen.getByRole('heading', { name: 'Últimas semanas' })).toBeTruthy()
+  expect(screen.getByText(/^Semana del 28 sep.*: HERO 120 XP, VILLAIN 0 XP$/)).toBeTruthy()
+  expect(screen.getByText(/^Semana del 5 oct.* \(en curso\): HERO 60 XP, VILLAIN 0 XP$/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '+1 sesión en Gym' }))
+  expect(screen.getByText(/\(en curso\): HERO 90 XP, VILLAIN 0 XP$/)).toBeTruthy()
 })
