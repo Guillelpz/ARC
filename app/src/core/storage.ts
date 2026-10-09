@@ -133,7 +133,9 @@ export function parseBackup(raw: string): { events: ActivityEvent[]; custom: Cus
 export type Meta = { lastExportAt: string } // ISO 8601 (Date.toISOString())
 export type CopyStatus = { days: number | null; due: boolean } // days null = nunca exportado
 
-const META_KEY = 'life-rpg-meta-v1'
+export const META_KEY = 'life-rpg-meta-v1'
+// null = localStorage.clear() en otra pestaña
+export const isDataKey = (k: string | null) => k === null || k === KEY || k === CUSTOM_KEY
 // ponytail: recordatorio fijo a 14 días; hacerlo configurable si alguien lo pide o cuando haya copias automáticas.
 export const EXPORT_REMIND_DAYS = 14
 

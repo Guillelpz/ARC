@@ -1,6 +1,6 @@
 # Despliegue estático (GitHub Pages o Cloudflare Pages)
 
-Nada de esto está activado. La app es un sitio estático: `npm run build` en `app/` genera `app/dist`.
+GitHub Pages está activo en `https://guillelpz.github.io/ARC/`. La app es un sitio estático: `npm run build` en `app/` genera `app/dist`.
 
 ## Antes de elegir
 
@@ -14,10 +14,9 @@ Nada de esto está activado. La app es un sitio estático: `npm run build` en `a
 
 1. El repo tiene que ser público en el plan gratuito.
 2. Settings → Pages → Source «GitHub Actions».
-3. Actions → «Deploy Pages» → Run workflow (`.github/workflows/deploy-pages.yml`, solo manual).
+3. Despliegue automático (`.github/workflows/deploy-pages.yml`) en cada push a `main` que toque `app/**` o el workflow; los push de solo `docs/` no publican. Actions → «Deploy Pages» → Run workflow sigue sirviendo para redesplegar a mano y para `sw_kill`.
 4. URL: `https://<usuario>.github.io/<repo>/`.
-5. Para desplegar en cada push a `main`, añade `push: { branches: [main] }` al `on:` del workflow.
-6. Aviso: todas las páginas de proyecto de un usuario comparten el origen `<usuario>.github.io` y, por tanto, el localStorage.
+5. Aviso: todas las páginas de proyecto de un usuario comparten el origen `<usuario>.github.io` y, por tanto, el localStorage.
 
 ## Cloudflare Pages
 
@@ -31,6 +30,9 @@ Nada de esto está activado. La app es un sitio estático: `npm run build` en `a
 1. Si se publica un service worker roto, lanzar «Deploy Pages» con `sw_kill` marcado. Las visitas siguientes borran la caché, desregistran el service worker y recargan.
 2. Para volver a la normalidad, desplegar sin marcarlo.
 3. Cada build genera un `sw.js` nuevo, así que no hay que tocar nada a mano.
+4. Con el kill switch activo, el siguiente push a `main` que toque `app/` vuelve a registrar el service worker, así que tiene que llevar el arreglo.
+5. `concurrency: cancel-in-progress` cancela un despliegue en curso si entra otro, incluido el del kill switch: no hacer push mientras se publica el kill.
+6. El despliegue con `sw_kill` se salta el e2e.
 
 ## Comprobar tras desplegar
 
@@ -46,4 +48,4 @@ Nada de esto está activado. La app es un sitio estático: `npm run build` en `a
 - [ ] Kill switch, una vez: desplegar con `sw_kill`. Tras abrir y recargar, Application → Service Workers queda vacío y Cache Storage no tiene `rpg-life-*`. Desplegar de nuevo sin `sw_kill` para restaurar.
 - [ ] `npm run dev` no registra ningún service worker.
 
-Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`.
+Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`. En Git Bash, antepón `MSYS_NO_PATHCONV=1` (si no, `/rpg/` se convierte en una ruta de Windows).

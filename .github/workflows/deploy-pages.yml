@@ -1,6 +1,9 @@
 name: Deploy Pages
-# Desactivado: solo manual (input sw_kill = kill switch del service worker, ver docs/DEPLOY.md). Para activarlo tras elegir GitHub Pages, añadir `push: { branches: [main] }` (ver docs/DEPLOY.md).
+# Publica en cada push a main que toque app/ o este archivo, y a mano (Run workflow) con el input sw_kill = kill switch. Ver docs/DEPLOY.md.
 on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/deploy-pages.yml']
   workflow_dispatch:
     inputs:
       sw_kill:
@@ -19,9 +22,18 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json }
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npm run build
+      # lint, test y e2e = puerta antes de publicar; con sw_kill se saltan (en una emergencia nada debe bloquear el kill switch)
+      - if: ${{ !inputs.sw_kill }}
+        run: npm run lint
+      - if: ${{ !inputs.sw_kill }}
+        run: npm test
+      - if: ${{ !inputs.sw_kill }}
+        run: npx playwright install --with-deps chromium
+      - if: ${{ !inputs.sw_kill }}
+        run: npm run e2e
+      - run: |
+          echo "SW_KILL=[$SW_KILL]"
+          npm run build
         env: { BASE_PATH: '/${{ github.event.repository.name }}/', SW_KILL: "${{ inputs.sw_kill && '1' || '' }}" }
       - uses: actions/upload-pages-artifact@v3
         with: { path: app/dist }

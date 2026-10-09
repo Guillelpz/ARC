@@ -3,7 +3,7 @@ import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -64,6 +64,21 @@ export default function App() {
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
   const saveFailed = unsaved.events || unsaved.custom
+  // ponytail: si dos pestañas escriben en menos tiempo del que tarda en llegar el evento `storage`, la última escritura pisa a la otra.
+  // Cerrarlo de verdad exige fusionar eventos o Web Locks.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === META_KEY) return setLastExport(loadLastExport())
+      if (!isDataKey(e.key)) return
+      const r = loadAll()
+      setCanRestore(hasLastBackup()); setLastExport(loadLastExport())
+      if (r.problems.length) return setNotice(noticeFor(r.problems)) // se conserva lo que se ve; el original queda copiado aparte
+      unlockStorage() // lo guardado se ha leído entero: guardar ya no destruye nada
+      setEvents(r.events); setCustom(r.custom)
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2400)
