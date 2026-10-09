@@ -1,6 +1,6 @@
 # Estado actual — RPG Life Tracker
 
-> Fecha de corte: 2026-10-09 (tras ciclo 12). El proyecto nació como demo de hackathon (Build Day) y pasa a desarrollo real.
+> Fecha de corte: 2026-10-09 (tras ciclo 13). El proyecto nació como demo de hackathon (Build Day) y pasa a desarrollo real.
 > Este documento describe **lo que hay hoy en el código** y lo que lo separa de un producto en producción. Es la referencia principal; los PRD y specs anteriores quedan como histórico (ver §7).
 
 ## 1. Qué es
@@ -45,13 +45,13 @@ Sin router, sin gestor de estado, sin backend. Tests con Vitest (`npm test`): `s
 | `rpg.ts` | `deriveGame()`: XP = allTime × `xpPerUnit`; umbrales lineales `THRESHOLD` (actividad 60, rama 200, player 250). `diffLevelUps/Downs()`. |
 | `party.ts` | `PARTIES` hardcodeadas; votación simulada por `stance` (mayoría estricta); estado por party con su propio `deriveGame`; `buildRanking(…, today)` prorratea a los amigos (semanal × días transcurridos / 7). |
 | `classify.ts` | `classifyAI()` (Claude Haiku vía proxy) con fallback a `classify()` (palabras clave). `editTracker()` edita nombre/incremento/objetivo de una custom sin tocar `xpPerUnit`. `findSimilar()` (prefijo + Levenshtein). |
-| `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents` (repara un `undoes` inválido conservando el evento)/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar, `restoreLast` (intercambio atómico con `.backup.last`) y helper privado `writeAll`. `saveEvents`/`saveCustom` devuelven `true`/`false`/`null` (clave bloqueada). |
+| `storage.ts` | Única capa de persistencia (localStorage): validadores puros `readEvents` (repara un `undoes` inválido conservando el evento)/`readCustom`, `loadAll` con backup, bloqueo de claves, exportar/importar (las claves desconocidas de `life-rpg-custom-v1` se conservan al guardar), `restoreLast` (intercambio atómico con `.backup.last`) y helper privado `writeAll`. `saveEvents`/`saveCustom` devuelven `true`/`false`/`null` (clave bloqueada). |
 | `seed.ts` | `seedFor(today)`: 28 eventos de ejemplo relativos a semanas enteras respecto a `today`. `DEMO_DATE` y `SEED_EVENTS` solo los usan selfcheck y tests. |
 | `selfcheck.ts` | Asserts de dominio, se ejecutan en DEV al arrancar y en `npm test`. |
 
 - **UI:** `App.tsx` tiene todo el estado y la navegación; `src/components/` son presentacionales con callbacks.
 - **Persistencia:** localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (`{ trackers, proposals, goals?, goalLog? }`; `goalLog` apunta el objetivo anterior al cambiarlo, `until` = lunes exclusivo), validados al leer (eventos y custom; `readEvents`/`readCustom` separan descartados de reparados). Si hay datos ilegibles o inválidos, el valor bruto se copia a `<clave>.backup.<stamp>` antes de sobrescribir y se avisa en la home; clave ilegible → arranca vacía (no semilla). `life-rpg-meta-v1` (`{ lastExportAt }`) guarda la última exportación. Antes de borrar o importar se hace copia interna atómica de eventos+custom en `<clave>.backup.last` (rota a `.backup.prev`); si falla, se aborta con aviso. La app restaura solo `.backup.last` (`.backup.prev` y `.backup.<stamp>` solo por DevTools; los sellados no se purgan). `exportData` pide `navigator.storage.persist()`. Si el backup falla, la clave se bloquea (`save*` no escribe) hasta importar una copia.
-- **IA:** `vite.config.ts` monta un proxy `/api/claude` → `api.anthropic.com` solo en `dev`/`preview`, con `ANTHROPIC_API_KEY` de `app/.env.local` (nunca entra al bundle). En un build estático no existe y siempre se usa la heurística.
+- **IA:** `vite.config.ts` monta un proxy `/api/claude` → `api.anthropic.com` solo en `dev`/`preview`, con `ANTHROPIC_API_KEY` de `app/.env.local` (nunca entra al bundle). `__AI_PROXY__` (define de Vite) es `true` solo con key; en un build estático (CI, hosting) es `false` y `classifyAI` usa la heurística sin llamar. Despliegue preparado pero **no activado**: `BASE_PATH` para `base`, workflow manual `deploy-pages.yml` (solo `workflow_dispatch`) y guía en `docs/DEPLOY.md`.
 
 ## 5. Herencia de la demo (lo que falta para producción)
 
@@ -64,12 +64,12 @@ Cosas que funcionan pero son atajos de hackathon. Ninguna está decidida; cada u
 | Party | Amigos, parties y votos son ficticios y deterministas (`PARTIES`, `stance`). | Requiere backend, cuentas e invitaciones para ser real. |
 | Usuarios | Un único usuario local, sin cuenta. | Sin auth ni sincronización entre dispositivos. |
 | Persistencia | Solo localStorage del navegador, con exportar/importar manual. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador (persist es solo petición); recordatorio fijo de 14 días, sin copias automáticas, UI para restaurar solo `.backup.last` (el resto, manual en DevTools; backups con sello sin purgar) ni migraciones de esquema. |
-| IA | Proxy de Vite solo en local; sin reintentos, caché ni límite de uso. | Necesita un endpoint de servidor para funcionar desplegada. |
+| IA | Proxy de Vite solo en local (en este equipo no existe `app/.env.local`: la IA no se ha usado en local); sin reintentos, caché ni límite de uso. | Necesita un endpoint de servidor para funcionar desplegada (P13.4). Un `npm run build` local con key genera `__AI_PROXY__ = true`: no publicar ese build. |
 | Progresión | Umbrales lineales y XP/unidad fijos; sin límite de registros por día; solo la corrección se limita al total del día. | Balance de juego sin validar con usuarios. |
 | Calidad | `npm test` cubre selfcheck, storage y los flujos críticos de UI (`App.test.tsx`, ciclo 6); sin e2e en navegador real. CI ya existe (ciclo 2). | Ampliar `App.test.tsx` al añadir flujos; los tests dependen de textos de la UI. |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Revisar cuando se quiten los atajos anteriores. |
 
-Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `party.ts` (amigos simulados a ritmo lineal; lun 1/7 … dom 7/7) y `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev) y `App.tsx` (aviso `role="status"`: dos avisos seguidos con el mismo texto pueden no repetirse en el lector) y `App.tsx`/`trackers.ts` (`setGoal` persiste `goals: {}` al volver al valor por defecto; inocuo) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas); `streak` es O(semanas·eventos) por tarjeta) y `trackers.ts` (`goalLog` crece una entrada por actividad y semana con cambio, sin compactar) y `App.tsx` (efecto de guardado con setState: 2 warnings `set-state-in-effect` aceptados; sin objetivos anteriores al registro: semanas previas al primer apunte usan ese primer objetivo).
+Simplificaciones marcadas en código con `ponytail:` (límite conocido + cómo crecer): `party.ts` (amigos simulados a ritmo lineal; lun 1/7 … dom 7/7) y `classify.ts` (heurística por palabras clave, llamada única a Claude sin reintentos, similitud por prefijo/erratas) y `vite.config.ts` (proxy solo en dev y con key; endpoint real pendiente) y `storage.ts` (claves desconocidas de custom copiadas sin validar) y `App.tsx` (aviso `role="status"`: dos avisos seguidos con el mismo texto pueden no repetirse en el lector) y `App.tsx`/`trackers.ts` (`setGoal` persiste `goals: {}` al volver al valor por defecto; inocuo) y `storage.ts` (restaurar solo `.backup.last`, sin purga de sellados; copia de dos niveles; `persist()` solo petición; recordatorio fijo a 14 días) y `App.tsx` («hoy» recalculado en render y al volver a la pestaña) y `stats.ts` (`history` recorre todos los eventos por tarjeta, O(n·tarjetas); `streak` es O(semanas·eventos) por tarjeta) y `trackers.ts` (`goalLog` crece una entrada por actividad y semana con cambio, sin compactar) y `App.tsx` (efecto de guardado con setState: 2 warnings `set-state-in-effect` aceptados; sin objetivos anteriores al registro: semanas previas al primer apunte usan ese primer objetivo).
 
 ## 6. Cómo trabajar
 
@@ -88,6 +88,7 @@ Regla: `selfcheck.ts` es el oráculo del dominio; si falla, se arregla el motor,
 | Documento | Estado |
 |---|---|
 | `docs/ESTADO-ACTUAL.md` | **Vigente.** Este documento. |
+| `docs/DEPLOY.md` | **Vigente.** Despliegue estático (Pages/Cloudflare), aún sin activar. |
 | `docs/STYLE_GUIDE.md` | **Vigente.** Tokens, tipografía, tono visual. |
 | `docs/DESIGN-V2.md` | Vigente como descripción de pantallas; nació para la demo. |
 | `MVP-RPG.md`, `docs/PRD-V2.md` | Histórico: PRD de la demo (V1 y V2). Útiles para entender el porqué de reglas. |
