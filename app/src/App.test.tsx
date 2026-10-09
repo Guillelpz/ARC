@@ -203,6 +203,33 @@ test('U13 objetivo de fijas', () => {
   expect(screen.queryByRole('button', { name: 'Editar objetivo de Beer' })).toBeNull()
 })
 
+const custom = () => JSON.parse(localStorage.getItem(CU)!)
+
+test('U19 registro de objetivos: fija', async () => {
+  render(<App />); go('HERO')
+  const edit = (v: string) => {
+    fireEvent.click(btn('Editar objetivo de Gym'))
+    fireEvent.change(card('Gym').getAllByRole('spinbutton')[0], { target: { value: v } })
+    fireEvent.click(btn('Guardar'))
+  }
+  const entry = { trackerId: 'gym', goal: 4, until: '2026-10-05' }
+  edit('3')
+  await vi.waitFor(() => { expect(custom().goals).toEqual({ gym: 3 }); expect(custom().goalLog).toEqual([entry]) })
+  edit('')
+  await vi.waitFor(() => { expect(custom()).not.toHaveProperty('goals'); expect(custom().goalLog).toEqual([entry]) })
+})
+
+test('U19 registro de objetivos: propia', async () => {
+  preload(); render(<App />); go('HERO')
+  fireEvent.click(btn('Editar Meditar'))
+  fireEvent.change(card('Meditar').getByLabelText(/^Objetivo semanal .unidades/), { target: { value: '5' } })
+  fireEvent.click(btn('Guardar'))
+  await vi.waitFor(() => {
+    expect(custom().goalLog).toContainEqual({ trackerId: 'custom-med', goal: null, until: '2026-10-05' })
+    expect(custom().trackers[0]).not.toHaveProperty('pastGoals')
+  })
+})
+
 test('U15 ranking prorrateado', () => {
   render(<App />)
   fireEvent.click(btn('Cargar ejemplo')); go('Party')
