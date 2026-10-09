@@ -22,9 +22,11 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm, cache-dependency-path: app/package-lock.json }
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      # e2e = puerta antes de publicar; con sw_kill se salta (en una emergencia el build puede estar roto)
+      # lint, test y e2e = puerta antes de publicar; con sw_kill se saltan (en una emergencia nada debe bloquear el kill switch)
+      - if: ${{ !inputs.sw_kill }}
+        run: npm run lint
+      - if: ${{ !inputs.sw_kill }}
+        run: npm test
       - if: ${{ !inputs.sw_kill }}
         run: npx playwright install --with-deps chromium
       - if: ${{ !inputs.sw_kill }}
