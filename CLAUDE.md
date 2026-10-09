@@ -15,7 +15,7 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
 
 ## Documentos
 
-- **Vigente:** `docs/ESTADO-ACTUAL.md` (qué hay, arquitectura, lo que falta para producción), `docs/DEPLOY.md` (despliegue estático, no activado), `docs/STYLE_GUIDE.md` (tokens, tipografía, botones, tono) y `docs/DESIGN-V2.md` (pantallas).
+- **Vigente:** `docs/ESTADO-ACTUAL.md` (qué hay, arquitectura, lo que falta para producción), `docs/DEPLOY.md` (despliegue a Pages), `docs/STYLE_GUIDE.md` (tokens, tipografía, botones, tono) y `docs/DESIGN-V2.md` (pantallas).
 - **Histórico (demo):** `MVP-RPG.md`, `docs/PRD-V2.md`, `docs/TECH_SPEC.md`, `docs/TECH_SPEC-V2.md`. Explican el porqué de las reglas implementadas; no fijan el alcance futuro.
 - Las instrucciones recientes del usuario prevalecen sobre cualquier documento.
 
@@ -29,7 +29,7 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
   - `classify.ts` — `classifyAI()` llama a Claude Haiku vía el proxy de Vite `/api/claude`, solo en `npm run dev` (key en `app/.env.local` como `ANTHROPIC_API_KEY`); sin key o en cualquier build (`__AI_PROXY__` false) ni llama; ante cualquier fallo usa `classify()`, la heurística determinista por palabras clave que comprueba el selfcheck.
   - `trackers.ts` (trackers fijos + custom), `seed.ts` (`seedFor(today)` desplaza los 28 eventos de ejemplo por semanas; `DEMO_DATE` solo fija la fecha del selfcheck), `types.ts`.
   - `storage.ts` — única capa de persistencia: localStorage `life-rpg-demo-v1` (eventos) y `life-rpg-custom-v1` (trackers custom + propuestas + `goals`, overrides de objetivo de las fijas HERO, + `goalLog`, objetivos anteriores para la racha), con validación (incl. `weeklyGoal`/`archived` de trackers custom); clave ausente → vacío, clave corrupta → backup `<clave>.backup.<stamp>` + aviso. Exportar/importar copia en JSON (`life-rpg-meta-v1` guarda la fecha de la última exportación); antes de importar o «Borrar todo», `backupCurrent` copia de forma atómica a `.backup.last` (rotando a `.backup.prev`); `restoreLast` restaura `.backup.last` intercambiándola con el estado actual (botón «Recuperar copia anterior»). `requestPersist()` se pide al exportar.
-- PWA: `vite.config.ts` genera `sw.js` en el build (solo PROD; `dev` no registra service worker) y el aviso de versión nueva sale en la UI. Kill switch: `sw_kill` en `deploy-pages.yml` (`SW_KILL=1`), ver `docs/DEPLOY.md`.
+- PWA: `vite.config.ts` genera `sw.js` en el build (solo PROD; `dev` no registra service worker) y el aviso de versión nueva sale en la UI. **Todo push a main que toque `app/` despliega a producción (GitHub Pages)** tras lint, test y e2e. Kill switch: `sw_kill` en `deploy-pages.yml` (`SW_KILL=1`), ver `docs/DEPLOY.md`.
 - `App.tsx` tiene todo el estado y la navegación por `screen` (`home | hero | villain | new | party`), sin router. Los componentes de `src/components/` son presentacionales y reciben callbacks.
 - Fechas: fecha local real (`localDate` en `stats.ts`; `nowStamp(day?)` en `App.tsx`); cada pantalla de misiones tiene selector de día (sin futuro). Usuario nuevo arranca vacío con «Cargar ejemplo».
 
