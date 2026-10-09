@@ -1,5 +1,6 @@
-import type { ActivityEvent, CustomData, Goals, Proposal, Tracker } from './types'
+import type { ActivityEvent, CustomData, GoalLogEntry, Goals, Proposal, Tracker } from './types'
 import { defaultGoal } from './trackers'
+import { mondayOf } from './stats'
 
 const KEY = 'life-rpg-demo-v1'
 const CUSTOM_KEY = 'life-rpg-custom-v1'
@@ -56,8 +57,20 @@ export function readCustom(v: unknown): Parsed<CustomData> {
       else gDropped++
     }
   }
+  const goalLog: GoalLogEntry[] = []
+  if (v.goalLog !== undefined) {
+    if (!Array.isArray(v.goalLog)) gDropped++
+    else for (const e of v.goalLog) {
+      if (isObj(e) && typeof e.trackerId === 'string' && e.trackerId !== '' &&
+        (e.goal === null || (typeof e.goal === 'number' && Number.isFinite(e.goal) && e.goal > 0)) &&
+        typeof e.until === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(e.until) && mondayOf(e.until) === e.until)
+        goalLog.push({ trackerId: e.trackerId, goal: e.goal, until: e.until })
+      else gDropped++
+    }
+  }
   const data: CustomData = { trackers, proposals }
   if (Object.keys(goals).length > 0) data.goals = goals
+  if (goalLog.length > 0) data.goalLog = goalLog
   return { data, dropped: rawT.length - trackers.length + rawP.length - proposals.length + gDropped, fixed: fixedN }
 }
 
