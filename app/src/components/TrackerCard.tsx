@@ -3,7 +3,7 @@ import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pen
 import type { HistoryRow, Party, Tracker, TrackerStats, VoteResult, WeekRow } from '../core/types'
 import { defaultGoal, unitFor } from '../core/trackers'
 import { editTracker, isValidName } from '../core/classify'
-import { dayLabel } from '../core/stats'
+import { dayLabel, shortDate } from '../core/stats'
 import { ProgressBar } from './ProgressBar'
 
 export type Gain = { trackerId: string; xp: number; branch: 'hero' | 'villain'; key: string }
@@ -38,7 +38,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
   const c = THEME[t.branch]
   const max = Math.max(1, ...weeks.map(w => w.total))
   const weekText = (w: WeekRow) => {
-    const d = new Date(w.monday + 'T00:00:00Z').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    const d = shortDate(w.monday)
     return `Semana del ${d}${w.current ? ' (en curso)' : ''}: ${w.goal ? `${w.total} de ${w.goal} ${t.unit}` : `${w.total} ${t.unit}`}${w.met ? ', cumplida' : w.goal && !w.current ? ', no cumplida' : ''}`
   }
   const fixed = !t.custom

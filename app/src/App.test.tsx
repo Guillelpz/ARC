@@ -374,3 +374,14 @@ test('U23 deshacer desde la home', async () => {
   expect(screen.getByRole('button', { name: /^Gym \+1 sesiones/ })).toBeTruthy()
   expect(screen.queryByRole('button', { name: /^Deshacer/ })).toBeNull()
 })
+
+test('U-HV1 HERO contra VILLAIN en la home', () => {
+  render(<App />)
+  expect(screen.queryByRole('heading', { name: 'Últimas semanas' })).toBeNull() // usuario nuevo
+  cleanup(); streakEvents(); render(<App />)
+  expect(screen.getByRole('heading', { name: 'Últimas semanas' })).toBeTruthy()
+  expect(screen.getByText(/^Semana del 28 sep.*: HERO 120 XP, VILLAIN 0 XP$/)).toBeTruthy()
+  expect(screen.getByText(/^Semana del 5 oct.* \(en curso\): HERO 60 XP, VILLAIN 0 XP$/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '+1 sesión en Gym' }))
+  expect(screen.getByText(/\(en curso\): HERO 90 XP, VILLAIN 0 XP$/)).toBeTruthy()
+})
