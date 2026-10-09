@@ -1,4 +1,5 @@
-import type { Goals, Tracker } from './types'
+import type { GoalLogEntry, Goals, PastGoal, Tracker } from './types'
+import { mondayOf } from './stats'
 
 export const TRACKERS: Tracker[] = [
   { id: 'gym', name: 'Gym', branch: 'hero', type: 'count', unit: 'sesiones', increment: 1, buttonLabel: '+1 sesión', xpPerUnit: 30, weeklyGoal: 4 },
@@ -11,10 +12,27 @@ export const TRACKERS: Tracker[] = [
 
 export const defaultGoal = (id: string): number | undefined => TRACKERS.find(t => t.id === id)?.weeklyGoal
 
-export const allTrackers = (custom: Tracker[], goals: Goals = {}): Tracker[] => [
-  ...TRACKERS.map(t => (goals[t.id] && t.weeklyGoal ? { ...t, weeklyGoal: goals[t.id] } : t)),
-  ...custom,
-]
+// Devuelve `log` (misma referencia) si no hay cambio o ya hay apunte de esta semana (cuenta el primero).
+// ponytail: crece como mucho una entrada por actividad y semana con cambio; sin compactar. Compactar si algún día pesa.
+export function logGoal(log: GoalLogEntry[] = [], trackerId: string, old: number | null, next: number | null, today: string): GoalLogEntry[] {
+  if (old === next) return log
+  const until = mondayOf(today)
+  if (log.some(e => e.trackerId === trackerId && e.until === until)) return log
+  return [...log, { trackerId, goal: old, until }]
+}
+
+export function allTrackers(custom: Tracker[], goals: Goals = {}, goalLog: GoalLogEntry[] = []): Tracker[] {
+  const past = new Map<string, PastGoal[]>()
+  for (const { trackerId, goal, until } of [...goalLog].sort((a, b) => a.until.localeCompare(b.until))) // estable: empate → el primero apuntado
+    past.set(trackerId, [...(past.get(trackerId) ?? []), { goal, until }])
+  const withPast = (t: Tracker): Tracker => {
+    const p = past.get(t.id)
+    if (!p && !t.pastGoals) return t // mantiene la identidad de TRACKERS
+    const { pastGoals: _, ...b } = t
+    return p ? { ...b, pastGoals: p } : b
+  }
+  return [...TRACKERS.map(t => (goals[t.id] && t.weeklyGoal ? { ...t, weeklyGoal: goals[t.id] } : t)), ...custom].map(withPast)
+}
 
 // Devuelve un objeto nuevo. Sin la clave `id` si: goal null o redondeado < 1, igual al valor por defecto,
 // o `id` no es una fija con objetivo (en ese caso devuelve `goals` sin tocar).

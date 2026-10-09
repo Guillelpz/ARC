@@ -5,6 +5,7 @@ import { countsIn, vote } from '../core/party'
 import { addDays, byRecent, dayLabel, dayTotal, history } from '../core/stats'
 import { isDuplicateName, normalizeText } from '../core/classify'
 import { ProgressBar } from './ProgressBar'
+import { SaveFailBanner } from './SaveFailBanner'
 import { TrackerCard, type Gain } from './TrackerCard'
 
 type Props = {
@@ -18,9 +19,11 @@ type Props = {
   onUndo: (t: Tracker, e: ActivityEvent) => void
   onSave: (t: Tracker) => void
   onPropose: (trackerId: string, partyIds: string[]) => void
+  saveFailed: boolean
+  onExport: () => void
 }
 
-export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd, onUndo, onSave, onPropose }: Props) {
+export function MissionsView({ branch, game, partyStates, gain, events, today, onAdd, onUndo, onSave, onPropose, saveFailed, onExport }: Props) {
   const hero = branch === 'hero'
   const name = hero ? 'HERO' : 'VILLAIN'
   const info = game[branch]
@@ -54,6 +57,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
           <ProgressBar value={info.progress} tone={branch} label={`Progreso ${name}`} />
           <span className={`text-xs leading-5 tabular-nums ${hero ? 'text-hero-muted' : 'text-villain-muted'}`}>{info.xpInLevel} / {info.threshold} XP</span>
         </header>
+        {saveFailed && <SaveFailBanner tone={branch} onExport={onExport} />}
         <label className="relative">
           <Search className={`pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 ${muted}`} aria-hidden />
           <input

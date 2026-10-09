@@ -5,7 +5,7 @@ import { seedFor } from './core/seed'
 import { clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
-import { allTrackers, setGoal } from './core/trackers'
+import { allTrackers, defaultGoal, logGoal, setGoal } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
 import { BottomNav, type Screen } from './components/BottomNav'
 import { HomeView } from './components/HomeView'
@@ -13,6 +13,7 @@ import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
+import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { liveText } from './components/liveText'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
@@ -49,11 +50,14 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
-  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0
+  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0
   const copy = backupDue(lastExport, now, hasData)
 
-  useEffect(() => saveEvents(events), [events])
-  useEffect(() => saveCustom(custom), [custom])
+  const [unsaved, setUnsaved] = useState({ events: false, custom: false }) // false en cada clave con su siguiente guardado correcto
+  // ponytail: setState dentro del efecto de guardado (aviso de lint aceptado); guardar en cada handler evitaría el render extra, a costa de tocar todos los setEvents/setCustom
+  useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
+  useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
+  const saveFailed = unsaved.events || unsaved.custom
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2400)
@@ -71,7 +75,7 @@ export default function App() {
     return () => clearTimeout(id)
   }, [overtake, toast])
 
-  const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals), [custom.trackers, custom.goals])
+  const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals, custom.goalLog), [custom.trackers, custom.goals, custom.goalLog])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
@@ -116,9 +120,22 @@ export default function App() {
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
-  const saveTracker = (t: Tracker) => t.custom
-    ? setCustom(c => ({ ...c, trackers: c.trackers.map(x => (x.id === t.id ? t : x)) }))
-    : setCustom(c => ({ ...c, goals: setGoal(c.goals, t.id, t.weeklyGoal ?? null) }))
+  const saveTracker = (input: Tracker) => {
+    const { pastGoals: _, ...t } = input // derivado: no se persiste
+    setCustom(c => {
+      const old = t.custom ? c.trackers.find(x => x.id === t.id)?.weeklyGoal : (c.goals?.[t.id] ?? defaultGoal(t.id))
+      let next: CustomData, now: number | undefined
+      if (t.custom) { next = { ...c, trackers: c.trackers.map(x => (x.id === t.id ? t : x)) }; now = t.weeklyGoal }
+      else {
+        const { goals: _g, ...rest } = c
+        const goals = setGoal(c.goals, t.id, t.weeklyGoal ?? null)
+        next = Object.keys(goals).length ? { ...rest, goals } : rest // sin goals: {}
+        now = goals[t.id] ?? defaultGoal(t.id)
+      }
+      const goalLog = logGoal(c.goalLog, t.id, old ?? null, now ?? null, today)
+      return goalLog.length ? { ...next, goalLog } : next
+    })
+  }
   const unarchive = (t: Tracker) => saveTracker({ ...t, archived: false })
   const archived = useMemo(() => custom.trackers.filter(t => t.archived), [custom.trackers])
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
@@ -180,10 +197,10 @@ export default function App() {
         <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
-          notice={notice} onDismissNotice={() => setNotice(null)} />
+          notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
-        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} />
+        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} saveFailed={saveFailed} onExport={exportData} />
       )}
       {screen === 'new' && (
         <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
@@ -194,7 +211,7 @@ export default function App() {
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
-      <p role="status" className="sr-only">{liveText(toast, overtake)}</p>
+      <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={go} />
     </>
   )

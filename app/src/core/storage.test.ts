@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -98,8 +98,14 @@ describe('loadAll', () => {
   test('sin poder copiar: bloquea', () => {
     const s = fakeStore({ [EV]: '{roto' }, true)
     expect(loadAll(s, D).problems[0].backupKey).toBeNull()
-    saveEvents([good], s)
+    expect(saveEvents([good], s)).toBeNull() // W2
     expect(s.m.get(EV)).toBe('{roto')
+  })
+  test('W1 resultado de guardar', () => {
+    expect(saveEvents([good], fakeStore())).toBe(true)
+    expect(saveCustom(EMPTY_CUSTOM, fakeStore())).toBe(true)
+    expect(saveEvents([good], fakeStore({}, true))).toBe(false)
+    expect(saveCustom(EMPTY_CUSTOM, fakeStore({}, true))).toBe(false)
   })
 })
 
@@ -280,5 +286,28 @@ describe('readCustom: goals', () => {
   })
   test('C9 export/import', () => {
     expect(parseBackup(exportBackup([], { trackers: [], proposals: [], goals: { gym: 2 } }, 'x'))?.custom.goals).toEqual({ gym: 2 })
+  })
+})
+
+describe('readCustom: goalLog', () => {
+  const e = { trackerId: 'gym', goal: 4, until: '2026-10-05' }
+  test('C10 válidos', () => {
+    const log = [e, { trackerId: 'custom-x', goal: null, until: '2026-09-28' }]
+    const r = readCustom({ goalLog: log })
+    expect(r?.data.goalLog).toEqual(log); expect(r?.dropped).toBe(0); expect(r?.fixed).toBe(0)
+    expect(readCustom({})!.data).not.toHaveProperty('goalLog')
+  })
+  test('C11 inválidos', () => {
+    const a = readCustom({ goalLog: 'x' })
+    expect(a!.data).not.toHaveProperty('goalLog'); expect(a!.dropped).toBe(1)
+    const b = readCustom({ goalLog: [null, { ...e, trackerId: '' }, { ...e, goal: 0 }, { ...e, goal: '3' }, { ...e, until: '2026-10-06' }, { ...e, until: '5/10' }, e] })
+    expect(b!.data.goalLog).toEqual([e]); expect(b!.dropped).toBe(6)
+  })
+  test('C12 round-trip', () => {
+    expect(parseBackup(exportBackup([], { trackers: [], proposals: [], goalLog: [e] }, 'x'))?.custom.goalLog).toEqual([e])
+    const s = fakeStore({ [CU]: JSON.stringify({ trackers: [], proposals: [], goalLog: [e] }) })
+    backupCurrent(s)
+    const r = readLast(s)
+    expect(r !== 'none' && r !== 'unreadable' && r.custom?.goalLog).toEqual([e])
   })
 })

@@ -48,8 +48,14 @@ export const dayLabel = (day: string, today: string) =>
   day === today ? 'Hoy' : day === addDays(today, -1) ? 'Ayer'
     : new Date(day + 'T00:00:00Z').toLocaleDateString('es-ES', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' })
 
-// ponytail: usa el weeklyGoal actual también para semanas pasadas (si baja el objetivo, la racha
-// crece hacia atrás); guardar el histórico de objetivos si importa. O(semanas · eventos del tracker).
+// objetivo vigente en la semana pasada que empieza en `mon`: el primer apunte con until > mon; sin apunte posterior, el actual.
+// Requiere pastGoals en orden ascendente (lo garantiza allTrackers). No usar `??`: goal null es un valor válido.
+export const goalAt = (t: Tracker, mon: string): number | null | undefined => {
+  const p = t.pastGoals?.find(x => x.until > mon)
+  return p ? p.goal : t.weeklyGoal
+}
+
+// semanas pasadas con el objetivo vigente entonces (goalAt); la semana en curso, con el actual. O(semanas · eventos del tracker).
 export function streak(events: ActivityEvent[], t: Tracker, today: string): number {
   const goal = t.weeklyGoal
   if (!goal) return 0
@@ -59,7 +65,8 @@ export function streak(events: ActivityEvent[], t: Tracker, today: string): numb
   const cur = mondayOf(today)
   let n = total(own, t.id, cur, addDays(today, 1)) >= goal ? 1 : 0 // la semana en curso suma, no rompe
   for (let w = addDays(cur, -7); w >= first; w = addDays(w, -7)) {
-    if (total(own, t.id, w, addDays(w, 7)) < goal) break
+    const g = goalAt(t, w)
+    if (!g || total(own, t.id, w, addDays(w, 7)) < g) break
     n++
   }
   return n
@@ -81,6 +88,7 @@ export function trackerStats(t: Tracker, events: ActivityEvent[], today: string)
 // lunes = 7 … domingo = 1
 export const daysLeftInWeek = (today: string) => 7 - ((new Date(today + 'T00:00:00Z').getUTCDay() + 6) % 7)
 
+// stats debe venir de deriveGame(events, today, …) con el mismo today: missing usa s.week, que es la semana de ese today.
 // archivadas fuera; XP neto por rama de hoy, registrado hoy, objetivos pendientes
 export function todaySummary(events: ActivityEvent[], stats: TrackerStats[], today: string): TodaySummary {
   const live = stats.filter(s => !s.tracker.archived)

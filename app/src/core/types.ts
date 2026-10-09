@@ -12,7 +12,11 @@ export type Tracker = {
   weeklyGoal?: number
   custom?: true
   archived?: boolean // ausente = activo
+  pastGoals?: PastGoal[] // derivado en allTrackers desde custom.goalLog, orden ascendente por until; nunca se persiste
 }
+
+export type GoalLogEntry = { trackerId: string; goal: number | null; until: string } // until: lunes YYYY-MM-DD, exclusivo; goal rige en semanas < until (null = sin objetivo)
+export type PastGoal = Omit<GoalLogEntry, 'trackerId'>
 
 export type TrackerEdit = { name: string; increment: number; weeklyGoal: number | null } // null = sin objetivo
 
@@ -80,7 +84,7 @@ export type Party = { id: string; name: string; members: Friend[]; seedCriteria:
 
 export type Proposal = { trackerId: string; partyId: string; proposedAt: string } // 'YYYY-MM-DDTHH:mm:ss'
 export type Goals = Record<string, number> // trackerId fijo HERO → weeklyGoal (entero ≥ 1)
-export type CustomData = { trackers: Tracker[]; proposals: Proposal[]; goals?: Goals } // goals ausente = sin overrides
+export type CustomData = { trackers: Tracker[]; proposals: Proposal[]; goals?: Goals; goalLog?: GoalLogEntry[] } // goals/goalLog ausentes = sin overrides/cambios registrados
 
 export type VoteResult = {
   partyId: string

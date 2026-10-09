@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
+import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 
 const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
@@ -201,6 +202,53 @@ test('U13 objetivo de fijas', () => {
   expect(card('Gym').getByText(/\/ 4 sesiones esta semana/)).toBeTruthy()
   go('VILLAIN')
   expect(screen.queryByRole('button', { name: 'Editar objetivo de Beer' })).toBeNull()
+})
+
+const custom = () => JSON.parse(localStorage.getItem(CU)!)
+
+test('U19 registro de objetivos: fija', async () => {
+  render(<App />); go('HERO')
+  const edit = (v: string) => {
+    fireEvent.click(btn('Editar objetivo de Gym'))
+    fireEvent.change(card('Gym').getAllByRole('spinbutton')[0], { target: { value: v } })
+    fireEvent.click(btn('Guardar'))
+  }
+  const entry = { trackerId: 'gym', goal: 4, until: '2026-10-05' }
+  edit('3')
+  await vi.waitFor(() => { expect(custom().goals).toEqual({ gym: 3 }); expect(custom().goalLog).toEqual([entry]) })
+  edit('')
+  await vi.waitFor(() => { expect(custom()).not.toHaveProperty('goals'); expect(custom().goalLog).toEqual([entry]) })
+})
+
+test('U19 registro de objetivos: propia', async () => {
+  preload(); render(<App />); go('HERO')
+  fireEvent.click(btn('Editar Meditar'))
+  fireEvent.change(card('Meditar').getByLabelText(/^Objetivo semanal .unidades/), { target: { value: '5' } })
+  fireEvent.click(btn('Guardar'))
+  await vi.waitFor(() => {
+    expect(custom().goalLog).toContainEqual({ trackerId: 'custom-med', goal: null, until: '2026-10-05' })
+    expect(custom().trackers[0]).not.toHaveProperty('pastGoals')
+  })
+})
+
+test('U20 guardado fallido', async () => {
+  render(<App />); go('HERO')
+  const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError') })
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  await vi.waitFor(() => {
+    expect(screen.getAllByText(SAVE_FAIL_TEXT).length).toBeGreaterThan(0)
+    expect(screen.getByRole('status').textContent).toBe(SAVE_FAIL_TEXT)
+  })
+  go('Inicio')
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar copia ahora' }))
+  expect(URL.createObjectURL).toHaveBeenCalled()
+  spy.mockRestore()
+  go('HERO')
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  await vi.waitFor(() => {
+    expect(screen.queryAllByText(SAVE_FAIL_TEXT)).toHaveLength(0)
+    expect(stored()).toHaveLength(2)
+  })
 })
 
 test('U15 ranking prorrateado', () => {
