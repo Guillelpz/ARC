@@ -4,7 +4,7 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 15 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente a especificar.
+Orden: 15 → 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente a especificar.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
@@ -18,8 +18,9 @@ Orden: 15 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente 
 - Ciclo 10 — cerrado (7d6d19e).
 - Ciclo 11 — cerrado (26b7c76).
 - Ciclo 13 — cerrado (b31ba3d).
-- Ciclo 15 (P15.3 reducida → P15.1) — paso 5 (implementación).
-- Ciclo 16 — paso 1 (proponer). Se adelanta al 14 por estar este bloqueado.
+- Ciclo 15 (P15.3 reducida → P15.1) — fusionado; paso 8 (análisis).
+- Ciclo 16 (P16.3 → P16.1) — paso 4 (spec).
+- Ciclo 17 (P16.2): aprobado. Se adelanta al 14 por estar este bloqueado.
 - Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
 - Ciclo 12 — cerrado. P11.2 no aprobada.
 
@@ -34,6 +35,7 @@ Orden: 15 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente 
 - P9.3: prorrateo lineal de la XP semanal de los amigos simulados por día transcurrido; asserts de ranking actuales se mueven al domingo 2026-10-11 + asserts nuevos de miércoles y lunes.
 - P11.1 (2026-10-09): `goalLog?` en life-rpg-custom-v1; racha con el objetivo vigente cada semana; antes del primer apunte, el objetivo vigente justo antes de ese cambio (aclarado 2026-10-09: bajar el objetivo nunca alarga la racha pasada); sin apuntes, objetivo de hoy; varios cambios en una semana → el primero; de «sin objetivo» a objetivo → la racha empieza en la semana del cambio.
 - P13.2 (2026-10-09): hosting sin decidir → se deja el despliegue preparado (build + workflow) sin activar; sin IA en producción.
+- P16.3 (2026-10-09): la IA solo funciona en `npm run dev` (`__AI_PROXY__ = command === 'serve' && !!key`); preview usa la heurística.
 - Repo remoto: lo crea el usuario. La CI se escribe para GitHub Actions; no hay push.
 
 ## Propuestas
@@ -76,3 +78,6 @@ Orden: 15 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente 
 | P15.1 | Deshacer desde «Hoy» (con cambios) | aprobada | 15 |
 | P15.2 | Exportar con Web Share en móvil instalado | no aprobada por ahora | — |
 | P15.3 | Lint `--deny-warnings` (reducida: silenciar los 3 warnings aceptados con su ponytail) | aprobada | 15 |
+| P16.1 | Tendencia 8 semanas por actividad (barras CSS accesibles) | aprobada | 16 |
+| P16.2 | HERO vs VILLAIN semana a semana en la home | aprobada | 17 |
+| P16.3 | Menores del ciclo 13 (IA solo en dev) | aprobada | 16 |
