@@ -1,6 +1,12 @@
 name: Deploy Pages
-# Desactivado: solo manual. Para activarlo tras elegir GitHub Pages, añadir `push: { branches: [main] }` (ver docs/DEPLOY.md).
-on: workflow_dispatch
+# Desactivado: solo manual (input sw_kill = kill switch del service worker, ver docs/DEPLOY.md). Para activarlo tras elegir GitHub Pages, añadir `push: { branches: [main] }` (ver docs/DEPLOY.md).
+on:
+  workflow_dispatch:
+    inputs:
+      sw_kill:
+        description: 'Emergencia: publicar un sw.js que desinstala el service worker'
+        type: boolean
+        default: false
 permissions: { contents: read, pages: write, id-token: write }
 concurrency: { group: pages, cancel-in-progress: true }
 jobs:
@@ -16,7 +22,7 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
-        env: { BASE_PATH: '/${{ github.event.repository.name }}/' }
+        env: { BASE_PATH: '/${{ github.event.repository.name }}/', SW_KILL: "${{ inputs.sw_kill && '1' || '' }}" }
       - uses: actions/upload-pages-artifact@v3
         with: { path: app/dist }
       - id: deployment

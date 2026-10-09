@@ -26,6 +26,12 @@ Nada de esto está activado. La app es un sitio estático: `npm run build` en `a
 - URL: `https://<proyecto>.pages.dev`. Despliega en cada push y crea previews por rama.
 - Si usas Cloudflare, borra `deploy-pages.yml`. Es la única opción que deja abierto un endpoint de IA futuro.
 
+## PWA y kill switch
+
+1. Si se publica un service worker roto, lanzar «Deploy Pages» con `sw_kill` marcado. Las visitas siguientes borran la caché, desregistran el service worker y recargan.
+2. Para volver a la normalidad, desplegar sin marcarlo.
+3. Cada build genera un `sw.js` nuevo, así que no hay que tocar nada a mano.
+
 ## Comprobar tras desplegar
 
 - [ ] La URL carga con estilos y favicon.
@@ -33,5 +39,11 @@ Nada de esto está activado. La app es un sitio estático: `npm run build` en `a
 - [ ] Exportar en local → Importar en el sitio: los datos aparecen.
 - [ ] «Nuevo» responde al instante con la propuesta heurística y no hay peticiones a `/api/claude` en Network.
 - [ ] Probado desde el móvil.
+- [ ] Android/Chrome: aparece «Instalar app». La app instalada abre en `/ARC/` a pantalla completa con su icono.
+- [ ] Con modo avión, después de una visita, la app abre con los datos.
+- [ ] Desplegar otra vez con algún cambio, con la app ya abierta. Al volver a la pestaña sale «Hay una versión nueva · Recargar» con el tono de la pantalla; «Recargar» carga la versión nueva y la X lo cierra.
+- [ ] iOS/Safari: «Añadir a pantalla de inicio» usa el icono de 180. La app instalada arranca vacía y, al importar una copia exportada en Safari, aparecen los datos.
+- [ ] Kill switch, una vez: desplegar con `sw_kill`. Tras abrir y recargar, Application → Service Workers queda vacío y Cache Storage no tiene `rpg-life-*`. Desplegar de nuevo sin `sw_kill` para restaurar.
+- [ ] `npm run dev` no registra ningún service worker.
 
 Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`.

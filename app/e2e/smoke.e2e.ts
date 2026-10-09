@@ -39,3 +39,18 @@ test('E3 axe con contraste', async ({ page }) => {
     expect(bad, `${screen}: ${bad.join('\n')}`).toEqual([])
   }
 })
+
+test('E2 recarga sin red tras la primera visita', async ({ page, context, request }) => {
+  await page.goto('./')
+  expect((await request.get('manifest.webmanifest')).status()).toBe(200)
+  await page.waitForFunction(() => navigator.serviceWorker.controller)
+  await page.getByRole('button', { name: 'Cargar ejemplo' }).click()
+  await context.setOffline(true)
+  // Comprobación previa: sin esto, el test pasaría aunque el service worker conservara la red.
+  expect(await page.evaluate(() => fetch('./nada-' + Date.now()).then(() => 'red', () => 'sin red'))).toBe('sin red')
+  await page.reload()
+  await expect(page.getByRole('heading', { name: 'Tus datos' })).toBeVisible()
+  await expect(page.getByText('Empieza tu historial')).toBeHidden()
+  await nav(page, 'HERO')
+  await expect(page.getByRole('group', { name: 'Gym' })).toBeVisible()
+})
