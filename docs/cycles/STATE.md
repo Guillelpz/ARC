@@ -21,9 +21,13 @@ Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el sig
 - Ciclo 15 — cerrado (2a20baa).
 - Ciclo 16 — cerrado (418aaf5).
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales; el usuario activa el despliegue (P18.1). Después, ciclo 14.
-- Ciclo 17 (P16.2 + P18.2) — paso 4 (spec). Se adelanta al 14 por estar este bloqueado.
+- Ciclo 17 (P16.2 + P18.2) — paso 5 (implementación). Se adelanta al 14 por estar este bloqueado.
 - Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
 - Ciclo 12 — cerrado. P11.2 no aprobada.
+
+## Nota
+
+El 2026-10-09 se reescribió el historial (email noreply) antes del primer push: los hashes citados en este archivo y en `docs/cycles/` son anteriores y ya no existen.
 
 ## Decisiones del usuario (2026-10-08)
 
@@ -82,5 +86,5 @@ Orden: 16 → 17 → 14 (bloqueado). El primero no cerrado de la lista es el sig
 | P16.1 | Tendencia 8 semanas por actividad (barras CSS accesibles) | aprobada | 16 |
 | P16.2 | HERO vs VILLAIN semana a semana en la home | aprobada | 17 |
 | P16.3 | Menores del ciclo 13 (IA solo en dev) | aprobada | 16 |
-| P18.1 | Activar despliegue en GitHub Pages | aprobada (espera repo del usuario) | — |
+| P18.1 | Activar despliegue en GitHub Pages | repo creado y main subido (2026-10-09); falta que el usuario active Pages y lance el workflow | — |
 | P18.2 | Plural en aria-label de «Deshacer» | aprobada (dentro del ciclo 17) | 17 |
