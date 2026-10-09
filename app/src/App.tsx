@@ -54,6 +54,7 @@ export default function App() {
   const copy = backupDue(lastExport, now, hasData)
 
   const [unsaved, setUnsaved] = useState({ events: false, custom: false }) // false en cada clave con su siguiente guardado correcto
+  // ponytail: setState dentro del efecto de guardado (aviso de lint aceptado); guardar en cada handler evitaría el render extra, a costa de tocar todos los setEvents/setCustom
   useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
   const saveFailed = unsaved.events || unsaved.custom
