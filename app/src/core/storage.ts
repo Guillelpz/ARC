@@ -88,6 +88,8 @@ export type Loaded = { events: ActivityEvent[]; custom: CustomData; problems: Lo
 
 const locked = new Set<string>() // claves que no se pueden escribir en esta sesión
 export const unlockStorage = () => locked.clear()
+// Solo desde onStorage: otra pestaña guardó datos que esta no ha podido leer. Al arrancar no se usa (bloquearía para siempre).
+export const lockStorage = (keys: readonly string[] = [KEY, CUSTOM_KEY]) => keys.forEach(k => locked.add(k))
 
 // ponytail: restaurar `.backup.<stamp>` es manual (DevTools); no se purgan; uno por incidente de datos dañados.
 export function loadAll(store: Store = localStorage, now = new Date()): Loaded {

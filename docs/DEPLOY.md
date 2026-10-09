@@ -32,7 +32,21 @@ GitHub Pages está activo en `https://guillelpz.github.io/ARC/`. La app es un si
 3. Cada build genera un `sw.js` nuevo, así que no hay que tocar nada a mano.
 4. Con el kill switch activo, el siguiente push a `main` que toque `app/` vuelve a registrar el service worker, así que tiene que llevar el arreglo.
 5. `concurrency: cancel-in-progress` cancela un despliegue en curso si entra otro, incluido el del kill switch: no hacer push mientras se publica el kill.
-6. El despliegue con `sw_kill` se salta el e2e.
+6. El despliegue con `sw_kill` se salta lint, test y e2e, pero no el humo final, que comprueba que el `sw.js` de desinstalación está publicado.
+
+## Volver atrás
+
+1. Principal: `git revert <commit>` + `git push` a `main`. Vuelve a pasar la puerta (lint, test, e2e), despliega y se queda en la historia.
+2. Vía rápida: Actions → «Deploy Pages» → la última ejecución verde anterior → «Re-run all jobs». Avisos: solo funciona dentro de los 30 días siguientes a la ejecución original, y el siguiente push a `main` vuelve a publicar HEAD si no se ha revertido.
+3. Si lo roto es el service worker: `sw_kill` (sección anterior).
+4. Si el paso de humo sale en rojo, abrir la URL. Si sirve la versión anterior, relanzar el workflow; si sirve una versión rota, aplicar el punto 1.
+
+## Proteger producción (pasos en GitHub, los hace el usuario)
+
+- [ ] Settings → Environments → `github-pages` → «Deployment branches and tags» → «Selected branches and tags» → Add rule `main`. **Es la protección real** contra publicar desde otra rama; el `if` del workflow es cosmético.
+- [ ] Settings → Rules → Rulesets → New ruleset → New branch ruleset: nombre `main`, Enforcement «Active», Target «Include default branch», con «Restrict deletions» y «Block force pushes». **No** marcar «Require a pull request» ni «Require status checks», porque bloquean el push directo del orquestador.
+- [ ] (Opcional, no recomendado de entrada) En el mismo entorno, «Required reviewers» = tú. Cada despliegue espera tu clic.
+- [ ] Settings → Pages → Source sigue en «GitHub Actions».
 
 ## Comprobar tras desplegar
 

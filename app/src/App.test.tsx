@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
+import { STALE_TAB_TEXT } from './components/UpdateBanner'
 
 const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
@@ -409,10 +410,38 @@ test('U-pestañas sincroniza el estado entre pestañas', async () => {
   await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Recuperar copia anterior' })).toBeTruthy())
   go('HERO')
   localStorage.setItem(EV, '{roto'); fire(EV)
-  go('Inicio')
-  await vi.waitFor(() => expect(screen.getByText(/Parte de tus datos guardados no se pudo leer/)).toBeTruthy())
-  go('HERO')
+  await vi.waitFor(() => expect(screen.getByText(STALE_TAB_TEXT)).toBeTruthy())
   expect(gym()).toMatch(/^1 \//)
   localStorage.clear(); fire(null)
   await vi.waitFor(() => expect(gym()).toMatch(/^0 \//))
+  expect(screen.queryByText(STALE_TAB_TEXT)).toBeNull()
+})
+
+test('U-pestañas-bloqueo no pisa datos de otra pestaña', async () => {
+  render(<App />); go('HERO')
+  const fire = (key: string) => window.dispatchEvent(new StorageEvent('storage', { key }))
+  const gym = () => card('Gym').getByText(/sesiones esta semana/).textContent
+  const plus = () => fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  const one = JSON.stringify([{ id: 't1', trackerId: 'gym', amount: 1, occurredAt: '2026-10-07T09:00:00' }])
+  const banner = () => screen.getByText(STALE_TAB_TEXT)
+  plus()
+  for (const bad of [EV, CU]) {
+    localStorage.setItem(bad, '{roto'); fire(bad)
+    await vi.waitFor(() => expect(banner()).toBeTruthy())
+    fireEvent.click(screen.getByRole('button', { name: 'Inicio' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Borrar todo' }))
+    await vi.waitFor(() => expect(screen.getByText('Recarga la página antes de cambiar tus datos.')).toBeTruthy())
+    expect(window.confirm).not.toHaveBeenCalled()
+    go('HERO')
+    plus()
+    expect(gym()).toMatch(/^2 \//)
+    await vi.waitFor(() => expect(localStorage.getItem(bad)).toBe('{roto'))
+    if (bad === CU) expect(localStorage.getItem(EV)).toBe(one) // las dos claves quedan bloqueadas
+    localStorage.setItem(bad, bad === EV ? one : JSON.stringify({ proposals: [], trackers: [] })); fire(bad)
+    await vi.waitFor(() => expect(screen.queryByText(STALE_TAB_TEXT)).toBeNull())
+    await vi.waitFor(() => expect(gym()).toMatch(/^1 \//))
+    plus()
+    await vi.waitFor(() => expect(stored()).toHaveLength(2))
+    if (bad === EV) { localStorage.setItem(EV, one); fire(EV); await vi.waitFor(() => expect(gym()).toMatch(/^1 \//)) }
+  }
 })

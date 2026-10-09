@@ -3,7 +3,7 @@ import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -14,7 +14,7 @@ import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
-import { UpdateBanner } from './components/UpdateBanner'
+import { STALE_TAB_TEXT, UpdateBanner } from './components/UpdateBanner'
 import { registerSW } from './pwa'
 import { liveText } from './components/liveText'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
@@ -22,6 +22,7 @@ import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast }
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
 
+const STALE_BLOCK_TEXT = 'Recarga la página antes de cambiar tus datos.'
 const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
   : problems.some(p => p.backupKey === null)
     ? 'Parte de tus datos guardados no se pudo leer ni copiar. Tus cambios no se guardarán en este navegador hasta que importes una copia.'
@@ -32,6 +33,7 @@ const noticeFor = (problems: LoadProblem[]) => !problems.length ? null
 export default function App() {
   const [loaded] = useState(loadAll)
   const [update, setUpdate] = useState(false)
+  const [stale, setStale] = useState(false)
   useEffect(() => registerSW(() => setUpdate(true)), [])
   const [events, setEvents] = useState<ActivityEvent[]>(loaded.events)
   const [custom, setCustom] = useState<CustomData>(loaded.custom)
@@ -72,8 +74,8 @@ export default function App() {
       if (!isDataKey(e.key)) return
       const r = loadAll()
       setCanRestore(hasLastBackup()); setLastExport(loadLastExport())
-      if (r.problems.length) return setNotice(noticeFor(r.problems)) // se conserva lo que se ve; el original queda copiado aparte
-      unlockStorage() // lo guardado se ha leído entero: guardar ya no destruye nada
+      if (r.problems.length) { lockStorage(); return setStale(true) } // no pisar lo de la otra pestaña: recargar lo lee (original en .backup.<stamp>)
+      unlockStorage(); setStale(false) // lo guardado se ha leído entero: guardar ya no destruye nada
       setEvents(r.events); setCustom(r.custom)
     }
     window.addEventListener('storage', onStorage)
@@ -171,6 +173,7 @@ export default function App() {
   const loadExample = () => setEvents(seedFor(today))
 
   function reset() {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
     if (copy.due && hasData && window.confirm('No tienes una copia reciente de tus datos. ¿Exportar una antes de borrar? Aceptar exporta y no borra nada; Cancelar sigue con el borrado.')) {
       exportData(); setNotice('Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.'); return
     }
@@ -192,6 +195,7 @@ export default function App() {
   }
 
   function importData(text: string) {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
     const b = parseBackup(text)
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
     const n = b.events.length, m = b.custom.trackers.length
@@ -204,6 +208,7 @@ export default function App() {
   }
 
   function restore() {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
     const r = readLast()
     if (r === 'none') { setCanRestore(false); return setNotice('No hay ninguna copia interna que recuperar.') }
     if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
@@ -236,7 +241,8 @@ export default function App() {
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
       <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={go} />
-      {update && <UpdateBanner tone={screen === 'hero' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
+      {stale ? <UpdateBanner tone={screen === 'hero' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
+        : update && <UpdateBanner tone={screen === 'hero' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
     </>
   )
 }
