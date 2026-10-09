@@ -23,7 +23,7 @@ export function LevelUpToast({ toast }: { toast: Toast }) {
   const c = THEME[toast.tone]
   if (toast.down) return <LevelDownToast toast={toast} />
   return (
-    <div key={toast.key} aria-live="polite" className="levelup-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
+    <div key={toast.key} aria-hidden className="levelup-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
       style={{ '--glow': c.glow } as CSSProperties}>
       <div className="levelup-rays absolute size-[140vmax]" aria-hidden />
       {SPARKS.map(a => (
@@ -42,7 +42,7 @@ export function LevelUpToast({ toast }: { toast: Toast }) {
 function LevelDownToast({ toast }: { toast: Toast }) {
   const c = THEME[toast.tone]
   return (
-    <div key={toast.key} aria-live="polite" className="leveldown-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
+    <div key={toast.key} aria-hidden className="leveldown-backdrop pointer-events-none fixed inset-0 z-50 grid place-items-center px-4"
       style={{ '--glow': c.glow } as CSSProperties}>
       {SHARDS.map((s, i) => (
         <span key={i} className="shard absolute size-3" aria-hidden
@@ -66,7 +66,7 @@ export function OvertakeBanner({ o }: { o: Overtake }) {
   const lead = o.position === 1
   const Icon = lead ? Crown : TrendingUp
   return (
-    <div key={o.key} aria-live="polite" className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+    <div key={o.key} aria-hidden className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
       <div className="slide-down shine flex items-center gap-3 rounded-xl border-2 border-gold bg-app-text px-5 py-3 text-app-surface shadow-xl">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-gold text-app-text"><Icon className="size-5" aria-hidden /></span>
         <span className="flex flex-col">
@@ -89,7 +89,7 @@ const RANK_NAME: Record<RankMetric, string> = { hero: 'HERO', villain: 'VILLAIN'
 export function PassedBanner({ o, lost }: { o: Overtake; lost: RankMetric }) {
   const t = PASSED[lost]
   return (
-    <div key={o.key} aria-live="polite" className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+    <div key={o.key} aria-hidden className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
       <div className={`relative flex items-center gap-3 overflow-hidden rounded-xl border-2 px-5 py-3 shadow-xl ${t.card}`}>
         {lost === 'hero' && (
           <span className="zoom-by absolute inset-y-0 left-0 flex items-center gap-1" aria-hidden>
@@ -108,4 +108,12 @@ export function PassedBanner({ o, lost }: { o: Overtake; lost: RankMetric }) {
       </div>
     </div>
   )
+}
+
+export function liveText(toast: Toast | null, o: Overtake | null): string {
+  if (toast) return toast.detail ? `${toast.title}. ${toast.detail}` : toast.title
+  if (!o) return ''
+  const where = `${o.position}.º en ${o.party}`
+  if (o.lost) return `${PASSED[o.lost].title}: ${o.names.join(', ')} te ${o.names.length > 1 ? 'superan' : 'supera'} en ${RANK_NAME[o.lost]} · ${where}`
+  return `${o.position === 1 ? 'Líder de la party' : 'Adelantamiento'}: Superas a ${o.names.join(', ')} · ${where}`
 }

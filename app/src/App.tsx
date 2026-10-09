@@ -13,7 +13,7 @@ import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
-import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
+import { LevelUpToast, OvertakeBanner, PassedBanner, liveText, type Overtake, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
@@ -192,6 +192,8 @@ export default function App() {
       )}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
+      {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
+      <p role="status" className="sr-only">{liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={go} />
     </>
   )

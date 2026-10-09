@@ -99,6 +99,10 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
     setStep('write')
   }
 
+  const statusText = step === 'parties' && created ? `Misión creada: ${created.name}. Ya cuenta en tu personaje.`
+    : step === 'result' ? results.map(r => `${parties.find(p => p.id === r.partyId)?.name}: ${r.accepted ? 'Aceptada' : 'Rechazada'} ${r.yes}/${r.total}`).join('. ')
+    : ''
+
   const goButton = (b: Branch) => (
     <button type="button" className={BRANCH_BTN[b]} onClick={() => onGoToMissions(b)}>Ir a Misiones {LABEL[b]}</button>
   )
@@ -250,7 +254,7 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
 
           {step === 'parties' && created && (
             <div className="rise flex flex-col gap-6">
-              <p aria-live="polite" className="text-sm leading-6">
+              <p className="text-sm leading-6">
                 Misión creada: <span className="font-semibold">{created.name}</span>. Ya cuenta en tu personaje.
               </p>
               {skipped ? (
@@ -285,7 +289,7 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
 
           {step === 'result' && created && (
             <div className="rise flex flex-col gap-6">
-              <div aria-live="polite" className="flex flex-col rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5">
+              <div className="flex flex-col rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5">
                 {results.map((r, i) => (
                   <div key={r.partyId} style={{ animationDelay: `${150 + i * 120}ms` }} className={`rise flex flex-col gap-1 py-3 ${i > 0 ? 'border-t border-app-border' : ''}`}>
                     <div className="flex items-center justify-between gap-3">
@@ -315,6 +319,7 @@ export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onG
             </div>
           )}
         </div>
+        <p role="status" className="sr-only">{statusText}</p>
       </main>
     </div>
   )

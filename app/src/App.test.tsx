@@ -261,3 +261,12 @@ test('U17 duplicado de archivada en Nuevo', () => {
   expect(screen.getByRole('group', { name: 'Meditar' })).toBeTruthy()
   expect(JSON.parse(localStorage.getItem(CU)!).trackers[0].archived).toBe(false)
 })
+
+test('U18 región status del level-up', () => {
+  render(<App />); go('HERO')
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  expect(screen.getByRole('status').textContent).toMatch(/^LEVEL UP\. .*Gym Lv\. 2/)
+  expect(document.querySelector('.levelup-backdrop')!.getAttribute('aria-hidden')).toBe('true')
+  expect(document.querySelector('.levelup-backdrop[aria-live]')).toBeNull()
+})
