@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
+import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 
 const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
@@ -227,6 +228,26 @@ test('U19 registro de objetivos: propia', async () => {
   await vi.waitFor(() => {
     expect(custom().goalLog).toContainEqual({ trackerId: 'custom-med', goal: null, until: '2026-10-05' })
     expect(custom().trackers[0]).not.toHaveProperty('pastGoals')
+  })
+})
+
+test('U20 guardado fallido', async () => {
+  render(<App />); go('HERO')
+  const spy = vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new DOMException('quota', 'QuotaExceededError') })
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  await vi.waitFor(() => {
+    expect(screen.getAllByText(SAVE_FAIL_TEXT).length).toBeGreaterThan(0)
+    expect(screen.getByRole('status').textContent).toBe(SAVE_FAIL_TEXT)
+  })
+  go('Inicio')
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar copia ahora' }))
+  expect(URL.createObjectURL).toHaveBeenCalled()
+  spy.mockRestore()
+  go('HERO')
+  fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
+  await vi.waitFor(() => {
+    expect(screen.queryAllByText(SAVE_FAIL_TEXT)).toHaveLength(0)
+    expect(stored()).toHaveLength(2)
   })
 })
 

@@ -13,6 +13,7 @@ import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
 import type { Gain } from './components/TrackerCard'
+import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { liveText } from './components/liveText'
 import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
 
@@ -52,8 +53,10 @@ export default function App() {
   const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0
   const copy = backupDue(lastExport, now, hasData)
 
-  useEffect(() => { saveEvents(events) }, [events])
-  useEffect(() => { saveCustom(custom) }, [custom])
+  const [unsaved, setUnsaved] = useState({ events: false, custom: false }) // false en cada clave con su siguiente guardado correcto
+  useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
+  useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
+  const saveFailed = unsaved.events || unsaved.custom
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2400)
@@ -193,10 +196,10 @@ export default function App() {
         <HomeView game={game} summary={summary} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
-          notice={notice} onDismissNotice={() => setNotice(null)} />
+          notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (
-        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} />
+        <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} saveFailed={saveFailed} onExport={exportData} />
       )}
       {screen === 'new' && (
         <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
@@ -207,7 +210,7 @@ export default function App() {
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
-      <p role="status" className="sr-only">{liveText(toast, overtake)}</p>
+      <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={go} />
     </>
   )

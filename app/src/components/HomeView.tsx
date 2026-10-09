@@ -5,6 +5,7 @@ import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
 import { PlayerHeader } from './PlayerHeader'
+import { SaveFailBanner } from './SaveFailBanner'
 const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 
 type Props = {
@@ -23,6 +24,7 @@ type Props = {
   onImportError: () => void
   copy: CopyStatus
   notice: string | null
+  saveFailed: boolean
   onDismissNotice: () => void
 }
 
@@ -50,7 +52,7 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string }[]; onGo:
   )
 }
 
-export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, onDismissNotice }: Props) {
+export function HomeView({ game, summary, partyStates, archived, onUnarchive, onNavigate, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
@@ -87,6 +89,7 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
       </nav>
 
       <main className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pt-6 pb-28 sm:max-w-2xl lg:grid lg:max-w-4xl lg:grid-cols-2 lg:items-start">
+        {saveFailed && <SaveFailBanner tone="app" onExport={onExport} className="lg:col-span-2" />}
         {notice && (
           <div role="status" className="flex items-start gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm lg:col-span-2">
             <CircleAlert className="mt-0.5 size-5 shrink-0" aria-hidden />
