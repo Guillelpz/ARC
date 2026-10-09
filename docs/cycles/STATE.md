@@ -19,7 +19,7 @@ Orden: 12 → 13 → 14. El primero no cerrado de la lista es el siguiente a esp
 - Ciclo 11 — cerrado (26b7c76).
 - Ciclo 13 (P13.1 + P13.2): aprobado.
 - Ciclo 14 (P13.3 + P13.5): aprobado, después de comprobar el primer despliegue en el móvil.
-- Ciclo 12 (P11.4) — paso 4 (spec). P11.2 no aprobada.
+- Ciclo 12 (P11.4) — paso 5 (implementación). P11.2 no aprobada.
 
 ## Decisiones del usuario (2026-10-08)
 
