@@ -4,6 +4,7 @@ import type { ActivityEvent, Branch, GameState, PartyState, TodaySummary, Tracke
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
+import { unitFor } from '../core/trackers'
 import { PlayerHeader } from './PlayerHeader'
 import { SaveFailBanner } from './SaveFailBanner'
 const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
@@ -133,7 +134,7 @@ export function HomeView({ game, summary, partyStates, archived, onUnarchive, on
               <TodayList rows={summary.done.map(d => {
                 const u = d.undo
                 return { t: d.tracker, text: `+${Math.round(d.amount)} ${d.tracker.unit}`, ...(u && { action: {
-                  label: 'Deshacer', aria: `Deshacer +${u.amount} ${d.tracker.unit} en ${d.tracker.name}`,
+                  label: 'Deshacer', aria: `Deshacer +${u.amount} ${unitFor(u.amount, d.tracker.unit)} en ${d.tracker.name}`,
                   run: () => { if (d.amount + onUndo(d.tracker, u) <= 0) hoyRef.current?.focus() } } }) }
               })} onGo={onNavigate} />
             </>

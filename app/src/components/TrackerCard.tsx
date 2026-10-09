@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, Users, type LucideIcon } from 'lucide-react'
 import type { HistoryRow, Party, Tracker, TrackerStats, VoteResult, WeekRow } from '../core/types'
-import { defaultGoal } from '../core/trackers'
+import { defaultGoal, unitFor } from '../core/trackers'
 import { editTracker, isValidName } from '../core/classify'
 import { dayLabel } from '../core/stats'
 import { ProgressBar } from './ProgressBar'
@@ -240,7 +240,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
                     : undone
                       ? <span className={`rounded-md border px-2 py-0.5 font-medium ${c.chip}`}>deshecho</span>
                       : <button type="button" onClick={() => onUndo(e)} disabled={!canUndo}
-                          aria-label={`Deshacer ${e.amount} ${t.unit} de ${day}`}
+                          aria-label={`Deshacer ${e.amount} ${unitFor(e.amount, t.unit)} de ${day}`}
                           className={`min-h-11 rounded-lg border px-3 text-xs font-medium focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40 ${c.chip}`}>Deshacer</button>}
                 </li>
               )

@@ -59,7 +59,7 @@ test('U4 deshacer', () => {
   render(<App />); go('HERO')
   fireEvent.click(card('Gym').getByRole('button', { name: '+1 sesiones' }))
   fireEvent.click(card('Gym').getByText('Últimos registros'))
-  fireEvent.click(card('Gym').getByRole('button', { name: 'Deshacer 1 sesiones de Hoy' }))
+  fireEvent.click(card('Gym').getByRole('button', { name: 'Deshacer 1 sesión de Hoy' }))
   const ev = stored()
   expect(ev[1]).toMatchObject({ amount: -1, undoes: ev[0].id })
   expect(card('Gym').getAllByText('deshecho').length).toBeGreaterThan(0)
@@ -353,7 +353,7 @@ test('U22 cumplir el objetivo desde la home', async () => {
 
 test('U23 deshacer desde la home', async () => {
   const plus = () => fireEvent.click(screen.getByRole('button', { name: '+1 sesión en Gym' }))
-  const undoBtn = () => screen.getByRole('button', { name: 'Deshacer +1 sesiones en Gym' })
+  const undoBtn = () => screen.getByRole('button', { name: 'Deshacer +1 sesión en Gym' })
   render(<App />)
   plus(); fireEvent.click(undoBtn())
   await vi.waitFor(() => expect(stored()).toHaveLength(2))
