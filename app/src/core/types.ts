@@ -28,6 +28,14 @@ export type ActivityEvent = {
   undoes?: string    // id del evento positivo que este negativo deshace
 }
 
+export type WeekRow = {
+  monday: string        // YYYY-MM-DD, lunes de la semana
+  total: number         // neto de la semana; la en curso, hasta today incluido
+  goal: number | null   // objetivo vigente (en curso: t.weeklyGoal; pasadas: goalAt); null sin objetivo actual
+  met: boolean          // goal !== null && total >= goal
+  current: boolean      // true solo en la última fila
+}
+
 export type HistoryRow = { event: ActivityEvent; undone: boolean; canUndo: boolean }
 
 export type LevelInfo = {

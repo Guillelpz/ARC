@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, Users, type LucideIcon } from 'lucide-react'
-import type { HistoryRow, Party, Tracker, TrackerStats, VoteResult } from '../core/types'
+import type { HistoryRow, Party, Tracker, TrackerStats, VoteResult, WeekRow } from '../core/types'
 import { defaultGoal } from '../core/trackers'
 import { editTracker, isValidName } from '../core/classify'
 import { dayLabel } from '../core/stats'
@@ -17,12 +17,12 @@ const THEME = {
   hero: {
     card: 'border-hero-border bg-hero-surface text-hero-text',
     accent: 'text-hero', muted: 'text-hero-muted', chip: 'border-hero-border text-hero-muted',
-    button: 'bg-hero text-hero-on-accent hover:bg-hero/90 outline-hero', check: 'accent-hero',
+    button: 'bg-hero text-hero-on-accent hover:bg-hero/90 outline-hero', check: 'accent-hero', bar: 'bg-hero', barNow: 'border-hero',
   },
   villain: {
     card: 'border-villain-border bg-villain-surface text-villain-text',
     accent: 'text-villain', muted: 'text-villain-muted', chip: 'border-villain-border text-villain-muted',
-    button: 'bg-villain text-villain-on-accent hover:bg-villain/90 outline-villain', check: 'accent-villain scheme-dark',
+    button: 'bg-villain text-villain-on-accent hover:bg-villain/90 outline-villain', check: 'accent-villain scheme-dark', bar: 'bg-villain', barNow: 'border-villain',
   },
 }
 
@@ -30,12 +30,17 @@ const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '±0')
 // km/min se añaden a la diferencia; sesiones/clases/unidades no
 const withUnit = (n: string, unit: string) => (unit === 'km' || unit === 'min' ? `${n} ${unit}` : n)
 
-type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; today: string; history: HistoryRow[]; onUndo: (e: HistoryRow['event']) => void; onAdd: (amount: number) => void; countsIn: string[]; onSave?: (t: Tracker) => void; nameTaken?: (name: string) => boolean; proposable?: Party[]; proposals?: { party: string; result: VoteResult }[]; onPropose?: (partyIds: string[]) => void }
+type Props = { stats: TrackerStats; gain: Gain | null; dayTotal: number; dayNote?: string; today: string; history: HistoryRow[]; weeks: WeekRow[]; onUndo: (e: HistoryRow['event']) => void; onAdd: (amount: number) => void; countsIn: string[]; onSave?: (t: Tracker) => void; nameTaken?: (name: string) => boolean; proposable?: Party[]; proposals?: { party: string; result: VoteResult }[]; onPropose?: (partyIds: string[]) => void }
 
-export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, onUndo, onAdd, countsIn, onSave, nameTaken, proposable, proposals, onPropose }: Props) {
+export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, weeks, onUndo, onAdd, countsIn, onSave, nameTaken, proposable, proposals, onPropose }: Props) {
   const { tracker: t, week, diff, allTime, goalPct, xp } = stats
   const Icon = ICONS[t.id] ?? Sparkles
   const c = THEME[t.branch]
+  const max = Math.max(1, ...weeks.map(w => w.total))
+  const weekText = (w: WeekRow) => {
+    const d = new Date(w.monday + 'T00:00:00Z').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    return `Semana del ${d}${w.current ? ' (en curso)' : ''}: ${w.goal ? `${w.total} de ${w.goal} ${t.unit}` : `${w.total} ${t.unit}`}${w.met ? ', cumplida' : w.goal && !w.current ? ', no cumplida' : ''}`
+  }
   const fixed = !t.custom
   const [qty, setQty] = useState(String(t.increment))
   const n = Math.round(Number(qty))
@@ -204,6 +209,21 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, on
           </span>
         )}
       </div>
+      )}
+
+      {weeks.some(w => w.total !== 0) && (
+        <details className={`text-xs leading-5 ${c.muted}`}>
+          <summary className="min-h-11 cursor-pointer py-3">Últimas 8 semanas</summary>
+          <div aria-hidden className={`flex h-16 items-end gap-1 border-b ${c.chip}`}>
+            {weeks.map(w => <div key={w.monday} className="flex h-full flex-1 items-end">
+              <div className={`w-full rounded-t ${w.current ? `min-h-1 border-2 border-dashed ${c.barNow}` : c.bar}`}
+                style={{ height: `${w.total > 0 ? (w.total / max) * 100 : 0}%` }} />
+            </div>)}
+          </div>
+          <div aria-hidden className="flex gap-1">{weeks.map(w => <span key={w.monday} className="flex h-4 flex-1 justify-center">{w.met && <Check className="size-3" />}</span>)}</div>
+          <p aria-hidden className="flex flex-wrap items-center gap-1"><Check className="size-3" /> objetivo cumplido · borde discontinuo: semana en curso</p>
+          <ul className="sr-only">{weeks.map(w => <li key={w.monday}>{weekText(w)}</li>)}</ul>
+        </details>
       )}
 
       {history.length > 0 && (

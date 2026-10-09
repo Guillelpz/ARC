@@ -29,6 +29,7 @@ export function readEvents(v: unknown): Parsed<ActivityEvent[]> {
   return { data, dropped, fixed: fixedC }
 }
 
+// '__proto__' no es un campo: está para que el bucle de claves desconocidas no haga data['__proto__'] = x, que cambiaría el prototipo.
 const KNOWN = new Set(['trackers', 'proposals', 'goals', 'goalLog', '__proto__'])
 
 export function readCustom(v: unknown): Parsed<CustomData> {

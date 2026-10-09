@@ -1,4 +1,4 @@
-import type { ActivityEvent, HistoryRow, TodaySummary, Tracker, TrackerStats } from './types'
+import type { ActivityEvent, HistoryRow, TodaySummary, Tracker, TrackerStats, WeekRow } from './types'
 
 export const addDays = (d: string, n: number): string => {
   const t = new Date(d + 'T00:00:00Z')
@@ -117,4 +117,18 @@ export function byRecent(trackers: Tracker[], events: ActivityEvent[]): Tracker[
   for (const e of events) if (e.amount > 0 && e.occurredAt > (last.get(e.trackerId) ?? '')) last.set(e.trackerId, e.occurredAt)
   const key = (t: Tracker) => last.get(t.id) ?? '￿'
   return [...trackers].sort((a, b) => (key(a) < key(b) ? 1 : key(a) > key(b) ? -1 : 0))
+}
+
+// Misma regla que streak: sin objetivo actual no hay semanas cumplidas.
+// ponytail: 8 sumas sobre los eventos del tracker por tarjeta y render; indexar por semana si se nota.
+export function weekly(events: ActivityEvent[], t: Tracker, today: string, n = 8): WeekRow[] {
+  const own = events.filter(e => e.trackerId === t.id)
+  const cur = mondayOf(today)
+  return Array.from({ length: n }, (_, i) => {
+    const monday = addDays(cur, -7 * (n - 1 - i))
+    const current = i === n - 1
+    const tot = total(own, t.id, monday, current ? addDays(today, 1) : addDays(monday, 7))
+    const goal = t.weeklyGoal ? (current ? t.weeklyGoal : goalAt(t, monday)) || null : null
+    return { monday, total: tot, goal, met: goal !== null && tot >= goal, current }
+  })
 }

@@ -1,7 +1,7 @@
-import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker } from './types'
+import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker, WeekRow } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, logGoal, setGoal, TRACKERS } from './trackers'
-import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, undoneIds } from './stats'
+import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
@@ -243,6 +243,20 @@ export function runSelfCheck() {
   const ga6 = allTrackers([], { gym: 3 }, [{ trackerId: 'gym', goal: 2, until: '2026-10-05' }, { trackerId: 'gym', goal: 4, until: '2026-09-28' }])
   ok(ga6[0].pastGoals?.map(p => p.until).join() === '2026-09-28,2026-10-05' && ga6[1] === TRACKERS[1] && TRACKERS[0].pastGoals === undefined && streak(s3, ga6[0], DEMO_DATE) === 1, 'GL5 allTrackers: orden e inmutabilidad')
   ok(get(deriveGame(s3, DEMO_DATE, allTrackers([], { gym: 3 }, [{ trackerId: 'gym', goal: 4, until: '2026-10-05' }])), 'gym').streak === 1, 'GL6 el registro llega al motor')
+
+  // W1–W3 — tendencia semanal coherente con streak y total
+  const run = (w: WeekRow[]) => { let n = 0; for (let i = w.length - 2; i >= 0 && w[i].met; i--) n++; return n + (w[w.length - 1].met ? 1 : 0) }
+  const wc: [ActivityEvent[], Tracker][] = [[s2, G], [s2b, G], [s3, G], [[...s3, ev('gym', 1, '2026-09-26', 'wk-fix')], G], [s6, G], [SEED_EVENTS, G], [SEED_EVENTS, TRACKERS[4]],
+    [s3, { ...G, weeklyGoal: 3 }], [s3, { ...G, weeklyGoal: 3, pastGoals: [{ goal: 4, until: '2026-10-05' }] }],
+    [s3, { ...G, weeklyGoal: 5, pastGoals: [{ goal: 3, until: '2026-10-05' }] }], [s3, { ...G, weeklyGoal: 3, pastGoals: [{ goal: null, until: '2026-09-28' }] }]]
+  ok(wc.every(([e, t]) => run(weekly(e, t, DEMO_DATE)) === streak(e, t, DEMO_DATE)), 'W1 weekly coherente con streak')
+  const w2 = weekly(s3, { ...G, weeklyGoal: 5, pastGoals: [{ goal: 3, until: '2026-10-05' }] }, DEMO_DATE)
+  const w3 = weekly(s3, { ...G, weeklyGoal: 3, pastGoals: [{ goal: null, until: '2026-09-28' }] }, DEMO_DATE)
+  ok(w2.map(r => `${r.total}/${r.goal}/${+r.met}`).join() === '0/3/0,0/3/0,0/3/0,0/3/0,4/3/1,3/3/1,4/3/1,0/5/0'
+    && w2[0].monday === '2026-08-17' && w2[7].monday === '2026-10-05' && w2.filter(r => r.current).length === 1 && w2[7].current
+    && w3.map(r => `${r.goal}/${+r.met}`).slice(4).join() === 'null/0,null/0,3/1,3/0'
+    && weekly(SEED_EVENTS, TRACKERS[4], DEMO_DATE).every(r => r.goal === null && !r.met), 'W2 objetivos por semana a mano')
+  ok(TRACKERS.every(t => weekly(SEED_EVENTS, t, DEMO_DATE).reduce((s, r) => s + r.total, 0) === total(SEED_EVENTS, t.id, '2026-08-17', addDays(DEMO_DATE, 1))), 'W3 suma = total del rango')
   const hg = deriveGame(hv, DEMO_DATE), hm = todaySummary(hv, hg.trackers, DEMO_DATE).missing
   const hn = '2026-10-12', hmn = todaySummary(hv, deriveGame(hv, hn).trackers, hn).missing
   ok(hm.every(m => m.left === m.tracker.weeklyGoal! - get(hg, m.tracker.id).week) && hmn.find(m => m.tracker.id === 'gym')?.left === 4, 'H6 missing con el mismo today')

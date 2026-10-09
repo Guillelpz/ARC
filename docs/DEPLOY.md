@@ -7,7 +7,8 @@ Nada de esto está activado. La app es un sitio estático: `npm run build` en `a
 - Cada origen (`localhost`, `*.github.io`, `*.pages.dev`) tiene su propio localStorage. Para llevar tus datos: **Exportar** en local e **Importar** en el sitio.
 - No hay servidor: los datos siguen en el navegador de cada persona. La URL es pública.
 - **Nunca** definas `ANTHROPIC_API_KEY` en el hosting. Sin ella, la IA se desactiva sola y «Nuevo» usa la heurística. Publica siempre el build del hosting, no uno local.
-- Haz el build que vayas a publicar sin `app/.env.local` (o en CI): con la key, `__AI_PROXY__` queda a `true` y el sitio intentaría llamar a `/api/claude`, que no existe en el hosting. `npm run preview` en local sí usa la IA si hay key.
+- Un `npm run build` nunca usa la IA, aunque exista `app/.env.local`: `__AI_PROXY__` solo es `true` en `npm run dev`. `npm run preview` sirve ese mismo build, sin IA.
+- `index.html` enlaza `/favicon.svg`; Vite lo reescribe con `base` al hacer el build, no hay que tocarlo.
 
 ## GitHub Pages
 
