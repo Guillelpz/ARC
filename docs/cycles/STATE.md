@@ -4,7 +4,7 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 13 → 14. El primero no cerrado de la lista es el siguiente a especificar.
+Orden: 15 → 14 (bloqueado). El primero no cerrado de la lista es el siguiente a especificar.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
@@ -17,9 +17,9 @@ Orden: 13 → 14. El primero no cerrado de la lista es el siguiente a especifica
 - Ciclo 9 — cerrado (4760257).
 - Ciclo 10 — cerrado (7d6d19e).
 - Ciclo 11 — cerrado (26b7c76).
-- Ciclo 13 (P13.1 + P13.2) — paso 5 (implementación).
-- Ciclo 15 — paso 1 (proponer).
-- Ciclo 14 (P13.3 + P13.5): aprobado, después de comprobar el primer despliegue en el móvil.
+- Ciclo 13 (P13.1 + P13.2) — fusionado; paso 8 (análisis).
+- Ciclo 15 (P15.3 reducida → P15.1) — paso 4 (spec). Se adelanta al 14 por estar este bloqueado.
+- Ciclo 14 (P13.3 + P13.5): aprobado; **bloqueado** hasta que el usuario active el despliegue (elija hosting) y lo compruebe en el móvil.
 - Ciclo 12 — cerrado. P11.2 no aprobada.
 
 ## Decisiones del usuario (2026-10-08)
@@ -72,3 +72,6 @@ Orden: 13 → 14. El primero no cerrado de la lista es el siguiente a especifica
 | P13.3 | PWA instalable/offline (sw.js generado en build, kill switch) | aprobada | 14 |
 | P13.4 | Endpoint de IA en servidor | no aprobada | — |
 | P13.5 | e2e en Chromium real en la CI (Playwright) | aprobada | 14 |
+| P15.1 | Deshacer desde «Hoy» (con cambios) | aprobada | 15 |
+| P15.2 | Exportar con Web Share en móvil instalado | no aprobada por ahora | — |
+| P15.3 | Lint `--deny-warnings` (reducida: silenciar los 3 warnings aceptados con su ponytail) | aprobada | 15 |
