@@ -4,7 +4,7 @@ Ver `docs/WORKFLOW.md`.
 
 ## En curso
 
-Orden: 12 → 13 → 14. El primero no cerrado de la lista es el siguiente a especificar.
+Orden: 13 → 14. El primero no cerrado de la lista es el siguiente a especificar.
 
 - Ciclo 1 — cerrado (a712108).
 - Ciclo 2 — cerrado (7982124).
@@ -19,7 +19,7 @@ Orden: 12 → 13 → 14. El primero no cerrado de la lista es el siguiente a esp
 - Ciclo 11 — cerrado (26b7c76).
 - Ciclo 13 (P13.1 + P13.2) — paso 4 (spec).
 - Ciclo 14 (P13.3 + P13.5): aprobado, después de comprobar el primer despliegue en el móvil.
-- Ciclo 12 (P11.4) — fusionado; paso 8 (análisis). P11.2 no aprobada.
+- Ciclo 12 — cerrado. P11.2 no aprobada.
 
 ## Decisiones del usuario (2026-10-08)
 
