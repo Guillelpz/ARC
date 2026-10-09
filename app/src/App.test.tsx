@@ -27,8 +27,7 @@ test('U1 registrar hoy', () => {
   expect(ev).toHaveLength(1)
   expect(ev[0]).toMatchObject({ trackerId: 'gym', amount: 1 })
   expect(ev[0].occurredAt.startsWith('2026-10-07')).toBe(true)
-  expect(card('Gym').getByText('1')).toBeTruthy()
-  expect(card('Gym').getByText(/\/ 4 sesiones esta semana/)).toBeTruthy()
+  expect(card('Gym').getByText(/\/ 4 sesiones esta semana/).textContent).toMatch(/^1 \/ 4 sesiones esta semana/)
 })
 
 test('U2 día pasado', () => {
@@ -233,4 +232,19 @@ test('U14 proponer actividad existente', () => {
   fireEvent.click(btn('Proponer Pizza a una party'))
   expect(card('Pizza').getByLabelText('Los del Gym')).toBeTruthy()
   expect(card('Pizza').queryByLabelText('La Oficina')).toBeNull()
+})
+
+test('U16 archivar guarda cambios válidos', () => {
+  preload(); render(<App />); go('HERO')
+  fireEvent.click(btn('Editar Meditar'))
+  fireEvent.change(card('Meditar').getByLabelText(/^Nombre/), { target: { value: 'Meditar zen' } })
+  fireEvent.click(btn('Archivar'))
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0]).toMatchObject({ name: 'Meditar zen', archived: true })
+  go('Inicio')
+  fireEvent.click(btn('Reactivar Meditar zen'))
+  go('HERO')
+  fireEvent.click(btn('Editar Meditar zen'))
+  fireEvent.change(card('Meditar zen').getByLabelText(/^Nombre/), { target: { value: '' } })
+  fireEvent.click(btn('Archivar'))
+  expect(JSON.parse(localStorage.getItem(CU)!).trackers[0]).toMatchObject({ name: 'Meditar zen', archived: true })
 })
