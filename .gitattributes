@@ -1,0 +1,3 @@
+# LF en el repo y en el checkout: el BUILD_ID de sw.js (y el humo) no dependen del SO
+* text=auto eol=lf
+*.png binary

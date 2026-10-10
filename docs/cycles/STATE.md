@@ -9,8 +9,8 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
 - Ciclo 19 — cerrado; primer despliegue automático OK (2026-10-09). Desde aquí, cada push a main que toque app/ despliega a producción.
 - Ciclo 20 — cerrado. El usuario hace en paralelo los pasos de GitHub de P20.1.
-- Ciclo 21 (sync opción A + P15.2) — fusionado; paso 8 (análisis).
-- Ciclo 22 (P22.1: riesgos operativos, XS, lo aplica el orquestador) — aprobado. Después: **PAUSA del workflow** (decisión del usuario 2026-10-10) hasta que el usuario lo reactive con datos de uso real.
+- Ciclo 21 — cerrado.
+- Ciclo 22 (P22.1) — hecho: `.gitattributes` LF (sin cambios de contenido); humo verificado en el deploy del 21. **Pendiente del usuario:** limitar el entorno `github-pages` a `main`. Después: **PAUSA del workflow** (decisión del usuario 2026-10-10) hasta que el usuario lo reactive con datos de uso real.
 
 ## Nota
 
@@ -83,4 +83,4 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 | P20.1 | Proteger producción: humo post-deploy (JS publicado = dist), rollback con git revert; pasos de GitHub los hace el usuario | aprobada | 20 |
 | P20.2 | No pisar datos de otra pestaña tras aviso de datos dañados | aprobada | 20 |
 | P20.3 | Sincronización | opción A aprobada (ciclo 21); Worker descartado por ahora | 21 |
-| P22.1 | Riesgos operativos: humo del deploy 21, `.gitattributes` LF, entorno github-pages solo main (usuario: pendiente) | aprobada | 22 |
+| P22.1 | Riesgos operativos: humo del deploy 21, `.gitattributes` LF, entorno github-pages solo main (usuario: pendiente) | hecha (salvo el paso del usuario) | 22 |
