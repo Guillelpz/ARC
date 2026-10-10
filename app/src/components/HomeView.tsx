@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Merge, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { ActivityEvent, Branch, BranchWeek, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
@@ -26,6 +26,7 @@ type Props = {
   onRestore?: () => void
   onExport: () => void
   onImport: (text: string) => void
+  onMerge: (text: string) => void
   onImportError: () => void
   copy: CopyStatus
   notice: string | null
@@ -66,8 +67,9 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
 const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
 const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
 
-export function HomeView({ game, summary, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
+  const mode = useRef<'replace' | 'merge'>('replace')
   const hoyRef = useRef<HTMLHeadingElement>(null)
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
@@ -260,9 +262,13 @@ export function HomeView({ game, summary, weeks, partyStates, archived, onUnarch
                 className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
                 <Download className="size-4" aria-hidden /> Exportar copia
               </button>
-              <button type="button" onClick={() => fileRef.current?.click()}
+              <button type="button" onClick={() => { mode.current = 'replace'; fileRef.current?.click() }}
                 className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
                 <Upload className="size-4" aria-hidden /> Importar copia
+              </button>
+              <button type="button" onClick={() => { mode.current = 'merge'; fileRef.current?.click() }}
+                className={`${btn} border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-bg`}>
+                <Merge className="size-4" aria-hidden /> Importar y fusionar
               </button>
               {onRestore && (
                 <button type="button" onClick={onRestore}
@@ -273,7 +279,7 @@ export function HomeView({ game, summary, weeks, partyStates, archived, onUnarch
               <input ref={fileRef} type="file" accept=".json,application/json" hidden aria-label="Importar copia"
                 onChange={e => {
                   const input = e.currentTarget, file = input.files?.[0]
-                  if (file) file.text().then(onImport, onImportError)
+                  if (file) file.text().then(mode.current === 'merge' ? onMerge : onImport, onImportError)
                   input.value = ''
                 }} />
             </div>

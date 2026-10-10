@@ -96,6 +96,96 @@ test('U6 importar', async () => {
   await vi.waitFor(() => expect(stored()).toEqual(ev))
 })
 
+const mergeFile = (container: HTMLElement, text: string) => { fireEvent.click(btn('Importar y fusionar')); importFile(container, text) }
+const x1 = { id: 'x1', trackerId: 'gym', amount: 1, occurredAt: '2026-10-05T09:00:00' }
+const x2 = { id: 'x2', trackerId: 'bjj', amount: 1, occurredAt: '2026-10-06T09:00:00' }
+const seedX1 = () => localStorage.setItem(EV, JSON.stringify([x1]))
+
+test('U-F1 fusionar', async () => {
+  seedX1()
+  const { container } = render(<App />)
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  mergeFile(container, exportBackup([x1, x2], { trackers: [], proposals: [] }, 'x'))
+  expect(await screen.findByText('Copia fusionada: 1 registros y 0 misiones nuevas.')).toBeTruthy()
+  expect(vi.mocked(window.confirm).mock.calls[0][0]).toContain('1 registros nuevos (1 ya estaban)')
+  await vi.waitFor(() => expect(stored()).toEqual([x1, x2]))
+  expect(localStorage.getItem(EV + '.backup.last')).not.toBeNull()
+})
+
+test('U-F2 fusionar cancelado', async () => {
+  seedX1()
+  const { container } = render(<App />)
+  mergeFile(container, exportBackup([x1, x2], { trackers: [], proposals: [] }, 'x'))
+  await vi.waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1))
+  expect(stored()).toEqual([x1])
+  expect(localStorage.getItem(EV + '.backup.last')).toBeNull()
+})
+
+test('U-F3 fusionar dos veces', async () => {
+  seedX1()
+  const { container } = render(<App />)
+  const copia = exportBackup([x1, x2], { trackers: [], proposals: [] }, 'x')
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  mergeFile(container, copia)
+  await screen.findByText(/^Copia fusionada/)
+  mergeFile(container, copia)
+  expect(await screen.findByText(/^Esa copia no trae nada nuevo/)).toBeTruthy()
+  expect(window.confirm).toHaveBeenCalledTimes(1)
+})
+
+test('U-F4 fusionar y recuperar', async () => {
+  seedX1()
+  const { container } = render(<App />)
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  mergeFile(container, exportBackup([x1, x2], { trackers: [], proposals: [] }, 'x'))
+  await screen.findByText(/^Copia fusionada/)
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  fireEvent.click(btn('Recuperar copia anterior'))
+  await vi.waitFor(() => expect(stored()).toEqual([x1]))
+})
+
+const shareEnv = (canShare: boolean, share: () => Promise<void>) => {
+  window.matchMedia = vi.fn(() => ({ matches: true })) as never
+  Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => canShare })
+  Object.defineProperty(navigator, 'share', { configurable: true, value: vi.fn(share) })
+}
+const lastExport = () => JSON.parse(localStorage.getItem('life-rpg-meta-v1') ?? '{}').lastExportAt
+afterEach(() => { delete (navigator as never as Record<string, unknown>).canShare; delete (navigator as never as Record<string, unknown>).share; delete (window as never as Record<string, unknown>).matchMedia })
+
+test('U-S1 compartir', async () => {
+  shareEnv(true, () => Promise.resolve())
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  await vi.waitFor(() => expect(lastExport()).toBeTruthy())
+  expect(URL.createObjectURL).not.toHaveBeenCalled()
+})
+
+test('U-S2 compartir cancelado', async () => {
+  shareEnv(true, () => Promise.reject(new DOMException('x', 'AbortError')))
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  expect(await screen.findByText('No se ha exportado la copia.')).toBeTruthy()
+  expect(lastExport()).toBeUndefined()
+  expect(URL.createObjectURL).not.toHaveBeenCalled()
+})
+
+test('U-S3 compartir sin permiso cae a descarga', async () => {
+  shareEnv(true, () => Promise.reject(new DOMException('x', 'NotAllowedError')))
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  await vi.waitFor(() => expect(lastExport()).toBeTruthy())
+  expect(URL.createObjectURL).toHaveBeenCalled()
+})
+
+test('U-S4 sin canShare descarga', async () => {
+  shareEnv(false, () => Promise.resolve())
+  render(<App />)
+  fireEvent.click(btn('Exportar copia'))
+  await vi.waitFor(() => expect(lastExport()).toBeTruthy())
+  expect(URL.createObjectURL).toHaveBeenCalled()
+  expect(navigator.share).not.toHaveBeenCalled()
+})
+
 test('U7 borrar todo y U8 recuperar', () => {
   render(<App />)
   fireEvent.click(btn('Cargar ejemplo'))

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
+import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
@@ -175,7 +176,7 @@ export default function App() {
   function reset() {
     if (stale) return setNotice(STALE_BLOCK_TEXT)
     if (copy.due && hasData && window.confirm('No tienes una copia reciente de tus datos. ¿Exportar una antes de borrar? Aceptar exporta y no borra nada; Cancelar sigue con el borrado.')) {
-      exportData(); setNotice('Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.'); return
+      void exportData().then(ok => setNotice(ok ? 'Copia exportada. Pulsa «Borrar todo» otra vez si quieres borrar.' : 'No se ha exportado la copia y no se ha borrado nada.')); return
     }
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
@@ -183,15 +184,23 @@ export default function App() {
     setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
   }
 
-  function exportData() {
-    const stamp = new Date().toISOString()
-    const url = URL.createObjectURL(new Blob([exportBackup(events, custom, stamp)], { type: 'application/json' }))
+  async function exportData(): Promise<boolean> {
+    const stamp = new Date().toISOString(), name = `rpg-life-tracker-${stamp.slice(0, 10)}.json`
+    const text = exportBackup(events, custom, stamp)
+    const done = () => { saveLastExport(stamp); setLastExport(stamp); requestPersist(); return true } // requestPersist en el primer gesto (no al arrancar: Firefox muestra un diálogo)
+    const file = new File([text], name, { type: 'application/json' })
+    // ponytail: Chrome Android no comparte application/json (canShare = false) → descarga. Solo en la app instalada en táctil:
+    // en escritorio (incluida la PWA instalada) la hoja de compartir no tiene «Guardar archivo».
+    if (window.matchMedia?.('(display-mode: standalone)').matches && window.matchMedia('(pointer: coarse)').matches && navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file] }); return done() }
+      catch (e) { if (e instanceof DOMException && e.name === 'AbortError') { setNotice('No se ha exportado la copia.'); return false } } // NotAllowedError (sin gesto, p. ej. tras confirm) u otro → descarga
+    }
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
     const a = document.createElement('a')
-    a.href = url; a.download = `rpg-life-tracker-${stamp.slice(0, 10)}.json`; a.click()
+    a.href = url; a.download = name; a.click()
     setTimeout(() => URL.revokeObjectURL(url), 10_000)
-    // ponytail: cuenta como copia al lanzar la descarga; el navegador no confirma que se guardó.
-    saveLastExport(stamp); setLastExport(stamp)
-    requestPersist() // en el primer gesto del usuario (no al arrancar: Firefox muestra un diálogo de permiso)
+    // ponytail: la descarga cuenta como copia al lanzarse; el navegador no confirma que se guardó.
+    return done()
   }
 
   function importData(text: string) {
@@ -205,6 +214,24 @@ export default function App() {
     unlockStorage()
     setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
+  }
+
+  function mergeData(text: string) {
+    if (stale) return setNotice(STALE_BLOCK_TEXT)
+    const b = parseBackup(text)
+    if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
+    const r = mergeBackup({ events, custom }, b)
+    if (!r.changed) return setNotice(`Esa copia no trae nada nuevo: ya tienes todos sus registros.${r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios; se mantiene lo de este dispositivo.` : ''}`)
+    const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas.`
+      + (r.renamed > 0 ? ` ${r.renamed} registros coinciden en identificador con uno tuyo pero son distintos (p. ej. del ejemplo): se añaden aparte.` : '')
+      + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo o archivado): se mantiene lo de este dispositivo.` : '')
+      + (b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : '') + (b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : '')
+      + ' No se borra nada. Lo que hayas borrado aquí y siga en la copia volverá a aparecer. Si no te convence, «Recuperar copia anterior» lo deshace.'
+    if (!window.confirm(msg)) return
+    if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha fusionado nada. Exporta una copia y vuelve a intentarlo.')
+    setCanRestore(hasLastBackup()); unlockStorage()
+    setEvents(r.events); setCustom(r.custom); setToast(null); setGain(null); setOvertake(null)
+    setNotice(`Copia fusionada: ${r.added} registros y ${r.trackersAdded} misiones nuevas.`)
   }
 
   function restore() {
@@ -224,7 +251,7 @@ export default function App() {
       {screen === 'home' && (
         <HomeView game={game} summary={summary} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
-          onExport={exportData} onImport={importData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
+          onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
       )}
       {(screen === 'hero' || screen === 'villain') && (

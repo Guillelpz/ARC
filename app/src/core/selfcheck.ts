@@ -6,6 +6,7 @@ import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseCustom } from './storage'
+import { mergeBackup } from './merge'
 
 // Oráculo: §5 y §10 de TECH_SPEC. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -289,6 +290,36 @@ export function runSelfCheck() {
   ok(ids(sg1.ranking) === 'you,carlos,alex,dani' && !overtakes(sg1.ranking, sg0.ranking).length, 'K4 +Gym miércoles: sin adelantamiento')
   const rm = (n: number) => buildRanking(deriveGame(Array.from({ length: n }, (_, i) => ev('gym', 1, MON, `mon${i}`)), MON), gymP.members, 'hero', MON)
   ok(ids(rm(2)) === 'carlos,you,alex,dani' && ids(rm(3)) === 'you,carlos,alex,dani' && overtakes(rm(3), rm(2)).join() === 'Carlos', 'K5 adelantamiento en lunes')
+
+  // M1–M8 — fusión de copias
+  {
+    const e = (id: string, t: string, a: number, d: string, undoes?: string): ActivityEvent => ({ id, trackerId: t, amount: a, occurredAt: `${d}T12:00:00`, ...(undoes && { undoes }) })
+    const cA = createTracker({ name: 'Yoga', branch: 'hero', type: 'count', xpPerUnit: 10 }, 'custom-a')
+    const L = { events: [e('seed-01', 'gym', 1, '2026-10-05'), e('l2', 'bjj', 1, '2026-10-06'), e('l3', 'gym', 1, '2026-10-07')], custom: { trackers: [cA], proposals: [] as Proposal[] } }
+    const m1 = mergeBackup(L, L)
+    ok(m1.added === 0 && m1.existing === 3 && !m1.changed, 'M1 copia igual: nada nuevo')
+    const m2 = mergeBackup(L, { events: [e('u-1', 'gym', 1, '2026-10-08')], custom: L.custom })
+    ok(m2.added === 1 && m2.events.map(x => x.id).join() === 'seed-01,l2,l3,u-1', 'M2 nuevo al final, locales en orden')
+    const inc3 = { events: [e('seed-01', 'gym', 1, '2026-09-01')], custom: L.custom }
+    const m3 = mergeBackup(L, inc3)
+    ok(m3.renamed === 1 && m3.events[3].id === 'seed-01~2' && mergeBackup({ events: m3.events, custom: m3.custom }, inc3).added === 0, 'M3 colisión → seed-01~2, idempotente')
+    const m4 = mergeBackup(L, { events: [e('seed-01', 'gym', 1, '2026-09-01'), e('d1', 'gym', -1, '2026-09-02', 'seed-01')], custom: L.custom })
+    ok(m4.events[4].undoes === 'seed-01~2', 'M4 undoes reasignado al renombrado')
+    const LU = { events: [...L.events, e('d0', 'gym', -1, '2026-10-08', 'l3')], custom: L.custom }
+    const m5 = mergeBackup(LU, { events: [e('d9', 'gym', -1, '2026-10-09', 'l3')], custom: L.custom })
+    ok(m5.added === 0 && m5.existing === 1, 'M5 deshacer duplicado = ya estaba')
+    const cB = { ...cA, id: 'custom-b', name: 'Chess' }
+    const gl = (t: string) => ({ trackerId: t, goal: 2, until: '2026-10-05' })
+    const m6 = mergeBackup(L, { events: [], custom: { trackers: [cB], proposals: [], goalLog: [gl('custom-b'), gl('gym'), gl('custom-a')] } })
+    ok(m6.trackersAdded === 1 && m6.custom.goalLog?.length === 1 && m6.custom.goalLog[0].trackerId === 'custom-b', 'M6 tracker nuevo con su goalLog; el resto no')
+    const m7 = mergeBackup({ events: [], custom: { ...L.custom, goals: { gym: 5 } } }, { events: [], custom: { trackers: [{ ...cA, name: 'Otro' }], proposals: [] } })
+    ok(m7.custom.trackers[0].name === 'Yoga' && m7.conflicts.includes('Yoga') && m7.conflicts.includes('Gym') && !m7.changed, 'M7 conflictos: gana lo local')
+    const P = (t: string, p: string): Proposal => ({ trackerId: t, partyId: p, proposedAt: '2026-10-05T10:00:00' })
+    const lp = { events: L.events, custom: { trackers: [cA], proposals: [P('custom-a', 'gym')] } }
+    const ip = { events: [e('z', 'gym', 1, '2026-10-09')], custom: { trackers: [cA], proposals: [P('custom-a', 'gym'), P('custom-a', 'office')] } }
+    const before = JSON.stringify([lp, ip]), m8 = mergeBackup(lp, ip)
+    ok(m8.custom.proposals.length === 2 && JSON.stringify([lp, ip]) === before, 'M8 propuestas por (tracker, party), sin mutar')
+  }
 
   console.info('[selfcheck] done')
 }
