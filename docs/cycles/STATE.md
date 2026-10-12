@@ -33,7 +33,7 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 - Salto −/+ de **2,5 kg / 5 lbs**; catálogo de 21 ejercicios **sin plancha**.
 - P24.6-P24.12 pospuestas.
 
-**Paso actual:** 4 (tech-lead → `docs/TECH_SPEC-gym.md`).
+**Paso actual:** 5 (implementer en `cycle-24`; spec `docs/TECH_SPEC-gym.md` sin decisiones pendientes).
 
 ## Decisiones vigentes del usuario
 
