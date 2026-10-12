@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, GymData, GymSet, GymUndo, RecordKind, Tracker, WeightUnit } from './core/types'
+import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, RecordKind, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
@@ -182,6 +182,13 @@ export default function App() {
   }
   const setUnit = (u: WeightUnit) => setGym(g => { const { unit: _, ...rest } = g; return u === 'lbs' ? { ...rest, unit: u } : rest })
 
+  const createExercise = (e: Exercise) => setGym(g => ({ ...g, exercises: [...g.exercises, e] }))
+  const setExerciseArchived = (id: string, archived: boolean) => setGym(g => ({ ...g, exercises: g.exercises.map(x => {
+    if (x.id !== id) return x
+    const { archived: _, ...rest } = x
+    return archived ? { ...rest, archived: true } : rest
+  }) }))
+
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
   const saveTracker = (input: Tracker) => {
@@ -315,7 +322,7 @@ export default function App() {
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
       {screen === 'me' && <MeView onOpenGym={() => goTo('gym')} focusGym={focusGym} />}
-      {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}

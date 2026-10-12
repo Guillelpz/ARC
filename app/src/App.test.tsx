@@ -694,3 +694,30 @@ test('U31 ayer, repetir serie y borrar todo', async () => {
   fireEvent.click(btn('Borrar todo'))
   await vi.waitFor(() => expect(gymStored().log).toEqual([]))
 })
+
+test('U30 ejercicios propios: crear, duplicado, archivar y reactivar', async () => {
+  render(<App />); openGym()
+  const select = () => screen.getByLabelText('Ejercicio') as HTMLSelectElement
+  const create = (name: string) => {
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: name } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear ejercicio' }))
+  }
+  create('remo pendlay')
+  expect(select().selectedOptions[0].textContent).toBe('Remo pendlay')
+  await vi.waitFor(() => expect(gymStored().exercises).toHaveLength(1))
+  expect(gymStored().exercises[0]).toMatchObject({ name: 'Remo pendlay', group: 'chest', kind: 'load' })
+  expect(gymStored().exercises[0].id.startsWith('custom-')).toBe(true)
+  create('Press banca')
+  expect(screen.getByText('Ya existe un ejercicio con ese nombre.')).toBeTruthy()
+  create('REMO PENDLAY')
+  expect(screen.getByText('Ya existe un ejercicio con ese nombre.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Archivar Remo pendlay' }))
+  expect([...select().options].some(o => o.textContent === 'Remo pendlay')).toBe(false)
+  expect(select().selectedOptions[0].textContent).toBe('Press banca')
+  await vi.waitFor(() => expect(gymStored().exercises[0].archived).toBe(true))
+  create('Remo Pendlay')
+  expect(screen.getByText('Ya tienes «Remo pendlay» archivado: reactívalo abajo.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Reactivar Remo pendlay' }))
+  expect([...select().options].some(o => o.textContent === 'Remo pendlay')).toBe(true)
+  await vi.waitFor(() => expect(gymStored().exercises[0]).not.toHaveProperty('archived'))
+})

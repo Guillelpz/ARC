@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react'
 import { ArrowLeft, CircleAlert, Minus, Plus } from 'lucide-react'
-import type { Exercise, GymData, GymSet, RecordKind, WeightUnit } from '../core/types'
+import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, WeightUnit } from '../core/types'
 import { GROUPS, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, lastSet, liveSets, parseReps, parseWeight, recordText, records, stepWeight } from '../core/gym'
 import { dayLabel } from '../core/stats'
+import { isValidName, normalizeText, trackerName } from '../core/classify'
 import { DayPicker } from './DayPicker'
 import { SaveFailBanner } from './SaveFailBanner'
 import { Segmented } from './Segmented'
@@ -13,6 +14,8 @@ type Props = {
   onAddSet: (input: Omit<GymSet, 'id' | 'occurredAt'>, day: string) => { kinds: RecordKind[]; auto: boolean }
   onUndoSet: (s: GymSet) => { retracted: boolean }
   onSetUnit: (u: WeightUnit) => void
+  onCreateExercise: (e: Exercise) => void
+  onArchiveExercise: (id: string, archived: boolean) => void
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
@@ -26,7 +29,7 @@ const primary = `${btnBase} bg-hero text-hero-on-accent hover:bg-hero/90 active:
 const secondary = `${btnBase} border border-hero-border bg-transparent text-hero-text hover:bg-hero-surface`
 const num = (n: number) => String(n).replace('.', ',')
 
-export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onBack, saveFailed, onExport }: Props) {
+export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onBack, saveFailed, onExport }: Props) {
   const unit = gym.unit ?? 'kg'
   const exercises = allExercises(gym.exercises)
   const active = exercises.filter(x => !x.archived)
@@ -44,6 +47,10 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onBack, sa
   const [errors, setErrors] = useState<{ weight?: string; reps?: string }>({})
   const [status, setStatus] = useState('')
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const [newName, setNewName] = useState('')
+  const [newGroup, setNewGroup] = useState<MuscleGroup>('chest')
+  const [newKind, setNewKind] = useState<Exercise['kind']>('load')
+  const [newErr, setNewErr] = useState('')
 
   const sel = active.some(x => x.id === exerciseId) ? exerciseId : DEFAULT_EXERCISE
   const kind = kindOf(sel)
@@ -66,6 +73,20 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onBack, sa
     setStatus(res.kinds.length
       ? `${recordText(res.kinds, s, nm, unit, k)}.${sessionNote(res.auto)}`
       : `Serie registrada: ${nm}, ${fmtSet(s, unit, k)}.${sessionNote(res.auto)}`)
+  }
+  const create = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isValidName(newName)) return setNewErr('El nombre debe tener entre 2 y 40 caracteres.')
+    const dup = exercises.find(x => normalizeText(x.name) === normalizeText(newName))
+    if (dup) return setNewErr(dup.archived ? `Ya tienes «${dup.name}» archivado: reactívalo abajo.` : 'Ya existe un ejercicio con ese nombre.')
+    const x: Exercise = { id: `custom-${crypto.randomUUID()}`, name: trackerName(newName), group: newGroup, kind: newKind }
+    onCreateExercise(x)
+    setNewName(''); setNewErr('')
+    setExerciseId(x.id); setForm(prefill(x.id, unit)); setErrors({}) // queda seleccionado
+  }
+  const archive = (id: string, archived: boolean) => {
+    onArchiveExercise(id, archived)
+    if (archived && id === sel) changeExercise(DEFAULT_EXERCISE)
   }
   const submit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -186,6 +207,40 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onBack, sa
                 )
               })}
             </div>
+          )}
+        </section>
+
+        <section aria-labelledby="gym-custom" className={card}>
+          <h2 id="gym-custom" className="text-base font-semibold">Ejercicios propios</h2>
+          <details className="flex flex-col gap-3">
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold outline-hero focus-visible:outline-2 focus-visible:outline-offset-2">Añadir ejercicio</summary>
+            <form onSubmit={create} className="flex flex-col gap-3" noValidate>
+              <label className="flex flex-col gap-1 text-xs font-medium">Nombre
+                <input value={newName} onChange={e => setNewName(e.target.value)} maxLength={40} autoComplete="off" aria-invalid={!!newErr} aria-describedby={newErr ? 'gym-new-err' : undefined} className={field} />
+              </label>
+              {newErr && <p id="gym-new-err" className="flex items-center gap-2 text-sm text-hero-text"><CircleAlert className="size-4 shrink-0" aria-hidden />{newErr}</p>}
+              <label className="flex flex-col gap-1 text-xs font-medium">Grupo
+                <select value={newGroup} onChange={e => setNewGroup(e.target.value as MuscleGroup)} className={field}>
+                  {GROUPS.map(g => <option key={g.id} value={g.id}>{g.label}</option>)}
+                </select>
+              </label>
+              <Segmented<Exercise['kind']> label="Tipo" value={newKind} onChange={setNewKind} toneFor={() => 'hero'}
+                options={[{ value: 'load', label: 'Con carga' }, { value: 'bodyweight', label: 'Peso corporal' }]} />
+              <button type="submit" className={primary}>Crear ejercicio</button>
+            </form>
+          </details>
+          {gym.exercises.length > 0 && (
+            <ul className="divide-y divide-hero-border rounded-lg border border-hero-border">
+              {gym.exercises.map(x => (
+                <li key={x.id} className="flex items-center justify-between gap-2 pl-3">
+                  <span className="text-sm">{x.name}{x.archived && <span className="text-hero-muted"> · archivado</span>}</span>
+                  <button type="button" onClick={() => archive(x.id, !x.archived)} aria-label={`${x.archived ? 'Reactivar' : 'Archivar'} ${x.name}`}
+                    className="m-1 inline-flex min-h-11 items-center justify-center rounded-lg border border-hero-border px-3 text-sm font-semibold text-hero-text outline-hero hover:bg-hero-bg focus-visible:outline-2 focus-visible:outline-offset-2">
+                    {x.archived ? 'Reactivar' : 'Archivar'}
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       </main>
