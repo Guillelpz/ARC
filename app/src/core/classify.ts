@@ -120,6 +120,11 @@ export function editTracker(t: Tracker, e: TrackerEdit): Tracker {
   const next: Tracker = { ...t, name: trackerName(e.name), increment, buttonLabel: buttonLabel(t.unit, increment) }
   if (t.branch === 'hero' && e.weeklyGoal !== null && Number.isFinite(e.weeklyGoal) && e.weeklyGoal >= 1) next.weeklyGoal = Math.round(e.weeklyGoal)
   else delete next.weeklyGoal
+  if (e.weeklyLimit !== undefined) {
+    if (t.branch === 'villain' && e.weeklyLimit !== null && Number.isFinite(e.weeklyLimit) && e.weeklyLimit >= 1) next.weeklyLimit = Math.round(e.weeklyLimit)
+    else delete next.weeklyLimit
+  }
+  if (t.branch === 'hero') delete next.weeklyLimit // una HERO nunca lleva límite
   return next
 }
 

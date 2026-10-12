@@ -1,6 +1,6 @@
 import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker, WeekRow } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
-import { allTrackers, logGoal, setGoal, TRACKERS, unitFor } from './trackers'
+import { allTrackers, logGoal, setGoal, setLimit, TRACKERS, unitFor } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
@@ -290,6 +290,33 @@ export function runSelfCheck() {
   ok(ids(sg1.ranking) === 'you,carlos,alex,dani' && !overtakes(sg1.ranking, sg0.ranking).length, 'K4 +Gym miércoles: sin adelantamiento')
   const rm = (n: number) => buildRanking(deriveGame(Array.from({ length: n }, (_, i) => ev('gym', 1, MON, `mon${i}`)), MON), gymP.members, 'hero', MON)
   ok(ids(rm(2)) === 'carlos,you,alex,dani' && ids(rm(3)) === 'you,carlos,alex,dani' && overtakes(rm(3), rm(2)).join() === 'Carlos', 'K5 adelantamiento en lunes')
+
+  // L1–L6 — límite semanal VILLAIN
+  {
+    const lim = { beer: 2 }, limBefore = JSON.stringify(lim)
+    ok(JSON.stringify(setLimit({}, 'beer', 2.6)) === '{"beer":3}' && Object.keys(setLimit({ beer: 2 }, 'beer', null)).length === 0 &&
+      Object.keys(setLimit({ beer: 2 }, 'beer', 0)).length === 0 && Object.keys(setLimit({}, 'gym', 2)).length === 0 &&
+      Object.keys(setLimit({}, 'custom-x', 2)).length === 0 && (setLimit(lim, 'beer', 5), JSON.stringify(lim) === limBefore), 'L1 setLimit')
+    const l2 = allTrackers([], {}, [], { beer: 2, gym: 5 })
+    ok(l2[4].weeklyLimit === 2 && l2[0].weeklyLimit === undefined && l2[0].weeklyGoal === 4 && TRACKERS[4].weeklyLimit === undefined && l2[1] === TRACKERS[1], 'L2 allTrackers con límites')
+    const overOf = (limits: Record<string, number>) => get(deriveGame(SEED_EVENTS, DEMO_DATE, allTrackers([], {}, [], limits)), 'beer').over
+    ok(overOf({ beer: 2 }) === 2 && overOf({ beer: 4 }) === 0 && overOf({ beer: 5 }) === 0 && overOf({}) === null, 'L3 over')
+    const lt = allTrackers([], {}, [], { beer: 1, burgers: 1 })
+    const gl = deriveGame(SEED_EVENTS, DEMO_DATE, lt)
+    const tsL = todaySummary(SEED_EVENTS, gl.trackers, DEMO_DATE), ts0 = todaySummary(SEED_EVENTS, g0.trackers, DEMO_DATE)
+    const [lg, lo] = ps(SEED_EVENTS, lt)
+    ok(sum(gl) === sum(g0) && get(gl, 'beer').streak === 0 && get(gl, 'beer').goalPct === null &&
+      tsL.missing.every(m => m.tracker.branch === 'hero') && tsL.best?.tracker.id === ts0.best?.tracker.id && tsL.best?.weeks === ts0.best?.weeks &&
+      sum(lg.game) === sum(sg0.game) && sum(lo.game) === sum(so0.game) && ids(lg.ranking) === ids(sg0.ranking) && ids(lo.ranking) === ids(so0.ranking) &&
+      weekly(SEED_EVENTS, lt[4], DEMO_DATE).every(w => w.goal === null), 'L4 el límite solo avisa')
+    const lp = createTracker({ name: 'Pizza', branch: 'villain', type: 'count', xpPerUnit: 10 }, 'custom-lp')
+    const lm = createTracker({ name: 'Meditar', branch: 'hero', type: 'count', xpPerUnit: 10 }, 'custom-lm')
+    const lpl = editTracker(lp, { name: 'Pizza', increment: 1, weeklyGoal: null, weeklyLimit: 2.4 })
+    ok(lpl.weeklyLimit === 2 && !('weeklyLimit' in editTracker(lpl, { name: 'Pizza', increment: 1, weeklyGoal: null, weeklyLimit: null })) &&
+      editTracker(lpl, { name: 'Pizza', increment: 1, weeklyGoal: null }).weeklyLimit === 2 &&
+      !('weeklyLimit' in editTracker(lm, { name: 'Meditar', increment: 1, weeklyGoal: null, weeklyLimit: 3 })) &&
+      editTracker(TRACKERS[4], { name: 'X', increment: 9, weeklyGoal: null, weeklyLimit: 3 }) === TRACKERS[4], 'L5 editTracker')
+  }
 
   // M1–M8 — fusión de copias
   {

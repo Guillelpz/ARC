@@ -1,4 +1,4 @@
-import type { GoalLogEntry, Goals, PastGoal, Tracker } from './types'
+import type { GoalLogEntry, Goals, Limits, PastGoal, Tracker } from './types'
 import { mondayOf } from './stats'
 
 export const TRACKERS: Tracker[] = [
@@ -25,7 +25,7 @@ export function logGoal(log: GoalLogEntry[] = [], trackerId: string, old: number
   return [...log, { trackerId, goal: old, until }]
 }
 
-export function allTrackers(custom: Tracker[], goals: Goals = {}, goalLog: GoalLogEntry[] = []): Tracker[] {
+export function allTrackers(custom: Tracker[], goals: Goals = {}, goalLog: GoalLogEntry[] = [], limits: Limits = {}): Tracker[] {
   const past = new Map<string, PastGoal[]>()
   for (const { trackerId, goal, until } of [...goalLog].sort((a, b) => a.until.localeCompare(b.until))) // estable: empate → el primero apuntado
     past.set(trackerId, [...(past.get(trackerId) ?? []), { goal, until }])
@@ -35,7 +35,7 @@ export function allTrackers(custom: Tracker[], goals: Goals = {}, goalLog: GoalL
     const { pastGoals: _, ...b } = t
     return p ? { ...b, pastGoals: p } : b
   }
-  return [...TRACKERS.map(t => (goals[t.id] && t.weeklyGoal ? { ...t, weeklyGoal: goals[t.id] } : t)), ...custom].map(withPast)
+  return [...TRACKERS.map(t => (goals[t.id] && t.weeklyGoal ? { ...t, weeklyGoal: goals[t.id] } : t.branch === 'villain' && limits[t.id] ? { ...t, weeklyLimit: limits[t.id] } : t)), ...custom].map(withPast)
 }
 
 // Devuelve un objeto nuevo. Sin la clave `id` si: goal null o redondeado < 1, igual al valor por defecto,
@@ -46,4 +46,14 @@ export function setGoal(goals: Goals = {}, id: string, goal: number | null): Goa
   const { [id]: _old, ...rest } = goals
   const g = goal === null ? 0 : Math.round(goal)
   return g < 1 || g === def ? rest : { ...rest, [id]: g }
+}
+
+export const isFixedVillain = (id: string) => TRACKERS.some(t => t.id === id && t.branch === 'villain')
+
+// Objeto nuevo. Sin la clave si limit es null o redondeado < 1. Si `id` no es fija VILLAIN, devuelve `limits` sin tocar.
+export function setLimit(limits: Limits = {}, id: string, limit: number | null): Limits {
+  if (!isFixedVillain(id)) return limits
+  const { [id]: _old, ...rest } = limits
+  const l = limit === null ? 0 : Math.round(limit)
+  return l < 1 ? rest : { ...rest, [id]: l }
 }

@@ -10,6 +10,7 @@ export type Tracker = {
   buttonLabel: string
   xpPerUnit: number
   weeklyGoal?: number
+  weeklyLimit?: number // solo VILLAIN, entero ≥ 1; ausente = sin límite. Solo avisa: no afecta a XP, rachas ni party
   custom?: true
   archived?: boolean // ausente = activo
   pastGoals?: PastGoal[] // derivado en allTrackers desde custom.goalLog, orden ascendente por until; nunca se persiste
@@ -18,7 +19,7 @@ export type Tracker = {
 export type GoalLogEntry = { trackerId: string; goal: number | null; until: string } // until: lunes YYYY-MM-DD, exclusivo; goal rige en semanas < until (null = sin objetivo)
 export type PastGoal = Omit<GoalLogEntry, 'trackerId'>
 
-export type TrackerEdit = { name: string; increment: number; weeklyGoal: number | null } // null = sin objetivo
+export type TrackerEdit = { name: string; increment: number; weeklyGoal: number | null; weeklyLimit?: number | null } // weeklyGoal null = sin objetivo; weeklyLimit undefined = no tocar, null = sin límite
 
 export type ActivityEvent = {
   id: string
@@ -54,6 +55,7 @@ export type TrackerStats = {
   allTime: number
   goalPct: number | null
   streak: number // semanas seguidas con objetivo cumplido; 0 si no hay objetivo
+  over: number | null // unidades por encima de weeklyLimit en la semana en curso; null = sin límite
   xp: LevelInfo
 }
 
@@ -92,7 +94,8 @@ export type Party = { id: string; name: string; members: Friend[]; seedCriteria:
 
 export type Proposal = { trackerId: string; partyId: string; proposedAt: string } // 'YYYY-MM-DDTHH:mm:ss'
 export type Goals = Record<string, number> // trackerId fijo HERO → weeklyGoal (entero ≥ 1)
-export type CustomData = { trackers: Tracker[]; proposals: Proposal[]; goals?: Goals; goalLog?: GoalLogEntry[] } // goals/goalLog ausentes = sin overrides/cambios registrados
+export type Limits = Record<string, number> // trackerId fijo VILLAIN → weeklyLimit (entero ≥ 1)
+export type CustomData = { trackers: Tracker[]; proposals: Proposal[]; goals?: Goals; goalLog?: GoalLogEntry[]; limits?: Limits } // goals/goalLog ausentes = sin overrides/cambios registrados
 
 export type VoteResult = {
   partyId: string
