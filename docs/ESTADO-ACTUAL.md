@@ -1,6 +1,6 @@
 # Estado actual — RPG Life Tracker
 
-> Fecha de corte: 2026-10-12 (tras ciclo 25). Describe lo que hay en el código que no está ya en `CLAUDE.md` (comandos, arquitectura de `core/`, restricciones) y lo que lo separa de un producto en producción.
+> Fecha de corte: 2026-10-12 (tras ciclo 26). Describe lo que hay en el código que no está ya en `CLAUDE.md` (comandos, arquitectura de `core/`, restricciones) y lo que lo separa de un producto en producción.
 
 ## 1. Qué es
 
@@ -53,6 +53,7 @@ Feedback: avisos anunciados por regiones `role="status"` (`liveText` en `compone
 | Voz | Parser de un solo ejercicio y un peso por comando (alias sin erratas ni plurales automáticos); solo Gym. | **T8 pendiente de la prueba en iPhone** (PWA instalada): `KEYBOARD_ON_IOS` está en `'never'` y se fijará (`'standalone'` o `'always'`) según el resultado de «Probar voz». Mientras tanto, cualquier fallo de la voz cae al campo de texto. |
 | Progresión | Umbrales lineales y XP/unidad fijos; sin límite de registros por día. | Balance de juego sin validar con usuarios. |
 | Calidad | El aviso de versión nueva e iOS solo en el checklist manual de `DEPLOY.md`. | Ampliar `App.test.tsx` al añadir flujos; los tests dependen de textos de la UI. |
+| Calidad (CI) | Una ejecución local de `npm test` falló en 12 tests (axe A4-A13, U-F4) y no se reprodujo en 14 más: probable timeout por carga (5 s por defecto de Vitest). | Vigilar en la CI; si reaparece, subir `testTimeout`. |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Se quedan de momento (decisión 2026-10-12). |
 
 Simplificaciones deliberadas: comentarios `ponytail:` en el código (`git grep -n "ponytail:"`).

@@ -5,7 +5,7 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y docu
 ## En curso
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
-- Ciclo 26 (registro de series de Gym por voz) — **en curso** (ver sección «Ciclo 26»).
+- Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
 
 ## Ciclo 26 — Registro de series de Gym por voz
 
@@ -22,7 +22,7 @@ Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pa
 
 **Decisiones de spec aprobadas (2026-10-12), todas las recomendadas (§13 de la spec):** A `fetch` directo, sin SDK; B prueba en iPhone con `vite preview` + túnel `cloudflared` (o Pages con okay); C plan B en iOS = el botón abre el campo de texto y se dicta con el teclado, solo donde falle según la prueba; D «Borrar todo» no toca la clave; E sin unidad dicha → preferencia del gym (kg por defecto). El usuario pide hacerlo todo seguido y hará la prueba del iPhone al final: T8 (`KEYBOARD_ON_IOS`) se queda en `'never'` con caída al texto tras error de voz hasta que la prueba dé resultado.
 
-**Estado:** **en curso** — implementación (implementer en `cycle-26`).
+**Estado:** **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 (`KEYBOARD_ON_IOS`) pendiente de la prueba del usuario en iPhone, ya posible en la PWA de Pages (checklist en `docs/DEPLOY.md`). El workflow vuelve a pausa.
 
 ## Ciclo 25 — Gym: progreso, volumen, rutinas y «Hoy»
 
