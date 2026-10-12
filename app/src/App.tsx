@@ -4,7 +4,7 @@ import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, Rec
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets } from './core/gym'
+import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
@@ -283,7 +283,8 @@ export default function App() {
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
     unlockStorage()
-    setEvents(b.events); setCustom(b.custom); setGym(b.gym ?? EMPTY_GYM); setToast(null); setGain(null); setOvertake(null)
+    const g = b.gym ?? EMPTY_GYM // la regla de sesiones también rige al importar (normalmente no añade nada)
+    setEvents([...b.events, ...ensureAuto(b.events, g.log, setDays(g.log))]); setCustom(b.custom); setGym(g); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
   }
 
@@ -303,7 +304,8 @@ export default function App() {
     if (!window.confirm(msg)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha fusionado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup()); unlockStorage()
-    setEvents(r.events); setCustom(r.custom); setGym(r.gym); setToast(null); setGain(null); setOvertake(null)
+    // una fusión puede juntar una serie viva de un dispositivo con la sesión retirada en el otro
+    setEvents([...r.events, ...ensureAuto(r.events, r.gym.log, setDays(r.gym.log))]); setCustom(r.custom); setGym(r.gym); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia fusionada: ${r.added} registros y ${r.trackersAdded} misiones nuevas${gymText}.`)
   }
 
@@ -313,11 +315,14 @@ export default function App() {
     if (r === 'none') { setCanRestore(false); return setNotice('No hay ninguna copia interna que recuperar.') }
     if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
     const ev = r.events ?? events, cu = r.custom ?? custom
-    // ponytail: una copia anterior al módulo Gym (r.gym null) conserva el gym actual mientras cambian los eventos: pueden quedar series sin su sesión automática. Se arregla con «+1» o importando una copia con gym.
-    const gymText = r.gym ? ` Series de gym: ${liveSets(gym.log).length} → ${liveSets(r.gym.log).length}.` : ''
+    // copia anterior al módulo Gym (r.gym null): se conserva el gym actual y se recrean las sesiones de los días con series
+    const ev2 = r.gym === null ? [...ev, ...ensureAuto(ev, gym.log, setDays(gym.log))] : ev
+    const kLocal = liveSets(gym.log).length
+    const gymText = r.gym ? ` Series de gym: ${kLocal} → ${liveSets(r.gym.log).length}.`
+      : kLocal > 0 ? ` Esta copia es anterior al módulo Gym: tus ${kLocal} series de gym se conservan y los días con series vuelven a contar como sesión.` : ''
     if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''}${gymText} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
     if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
-    setEvents(ev); setCustom(cu); setGym(r.gym ?? gym); setToast(null); setGain(null); setOvertake(null)
+    setEvents(ev2); setCustom(cu); setGym(r.gym ?? gym); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)
   }
 

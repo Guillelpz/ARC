@@ -751,3 +751,15 @@ test('U33 deshacer o restar la sesión de un día con series la repone sin toast
   await vi.waitFor(() => expect(gymEvents()).toHaveLength(5))
   expect(card('Gym').getByText(/ sesiones esta semana/).textContent).toMatch(/^1 \/ 4 sesiones/)
 })
+
+test('U34 recuperar una copia sin gym conserva las series y recrea las sesiones', async () => {
+  const set = (id: string, day: string) => ({ id, exerciseId: 'bench-press', weight: 100, unit: 'kg', reps: 5, occurredAt: `${day}T10:00:00` })
+  localStorage.setItem(GY, JSON.stringify({ log: [set('s1', '2026-10-06'), set('s2', '2026-10-07')], exercises: [] }))
+  localStorage.setItem(EV + '.backup.last', JSON.stringify([{ id: 'old', trackerId: 'gym', amount: 1, occurredAt: '2026-10-01T09:00:00' }]))
+  render(<App />)
+  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(true)
+  fireEvent.click(btn('Recuperar copia anterior'))
+  expect(confirm.mock.calls.at(-1)![0]).toContain('Esta copia es anterior al módulo Gym: tus 2 series de gym se conservan y los días con series vuelven a contar como sesión.')
+  await vi.waitFor(() => expect(gymEvents().map((e: { id: string }) => e.id)).toEqual(['old', 'gym-auto-2026-10-06', 'gym-auto-2026-10-07']))
+  expect(gymStored().log).toHaveLength(2)
+})
