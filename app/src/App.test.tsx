@@ -778,3 +778,16 @@ test('U35 progreso del 1RM: lista accesible, estado vacío y unidad preferida', 
   fireEvent.click(screen.getByRole('button', { name: 'Deshacer serie 1 de Press banca: 220,5 lbs × 5' }))
   expect(screen.getByText(/^Aún no hay datos para el progreso/)).toBeTruthy()
 })
+
+test('U36 volumen semanal: kg y lbs mezclados y comparación con la semana anterior', async () => {
+  const set = (id: string, w: number, unit: string, day: string) => ({ id, exerciseId: 'bench-press', weight: w, unit, reps: 5, occurredAt: `${day}T10:00:00` })
+  localStorage.setItem(GY, JSON.stringify({ log: [set('a', 100, 'kg', '2026-10-06'), set('b', 220, 'lbs', '2026-10-06'), set('c', 80, 'kg', '2026-09-30')], exercises: [] }))
+  render(<App />); openGym()
+  const vol = () => within(screen.getByRole('region', { name: 'Volumen semanal' }))
+  expect(vol().getByText('Pecho · 2 series · 999 kg')).toBeTruthy()
+  expect(vol().getByText('semana anterior hasta hoy: 1 serie · 400 kg')).toBeTruthy()
+  expect(vol().queryByText(/^Espalda/)).toBeNull()
+  fireEvent.click(within(screen.getByRole('group', { name: 'Unidad de peso' })).getByRole('button', { name: 'lbs' }))
+  expect(vol().getByText('Pecho · 2 series · 2.202 lbs')).toBeTruthy()
+  expect(vol().getByText('semana anterior hasta hoy: 1 serie · 882 lbs')).toBeTruthy()
+})

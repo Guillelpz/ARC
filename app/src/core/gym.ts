@@ -1,4 +1,4 @@
-import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeekBest, WeightUnit } from './types'
+import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, GroupVolume, MuscleGroup, RecordKind, WeekBest, WeightUnit } from './types'
 import { addDays, clampAmount, dayTotal, mondayOf, undoneIds } from './stats'
 
 export const EMPTY_GYM: GymData = { log: [], exercises: [] }
@@ -171,4 +171,20 @@ export function weeklyBest1rm(log: GymEntry[], exerciseId: string, today: string
     }
     return { monday, kg, current: i === n - 1 }
   })
+}
+
+// Series y volumen (Σ kg×reps, kg normalizados) por grupo: semana en curso hasta hoy frente al mismo tramo de la anterior.
+// ponytail: un ejercicio que no está en el catálogo ni en los propios (p. ej. de otra copia) no tiene grupo y se ignora.
+export function groupVolume(log: GymEntry[], custom: Exercise[], today: string): GroupVolume[] {
+  const mon = mondayOf(today), pMon = addDays(mon, -7), pEnd = addDays(today, -7), all = allExercises(custom)
+  const out: GroupVolume[] = GROUPS.map(g => ({ group: g.id, label: g.label, sets: 0, kg: 0, prevSets: 0, prevKg: 0 }))
+  for (const s of liveSets(log)) {
+    const d = s.occurredAt.slice(0, 10), cur = d >= mon && d <= today, prev = d >= pMon && d <= pEnd
+    if (!cur && !prev) continue
+    const x = all.find(e => e.id === s.exerciseId)
+    if (!x) continue
+    const row = out.find(r => r.group === x.group)!, kg = toKg(s.weight, s.unit) * s.reps
+    if (cur) { row.sets++; row.kg += kg } else { row.prevSets++; row.prevKg += kg }
+  }
+  return out
 }

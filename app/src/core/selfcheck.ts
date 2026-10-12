@@ -7,7 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
-import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
+import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -464,6 +464,19 @@ export function runSelfCheck() {
       ok(wb.length === 8 && wb.filter(w => w.current).length === 1 && wb[7].current && wb[7].monday === mon && Math.abs((wb[7].kg ?? 0) - 116.667) < 0.01 &&
         wb[6].kg === null && wb[0].kg === null && wb.slice(0, 7).every(w => w.kg === null) &&
         Math.abs((weeklyBest1rm([mk('b', 220, 'lbs', 3, D15)], 'bench-press', D15)[7].kg ?? 0) - 109.77) < 0.01, 'GY15 weeklyBest1rm')
+    }
+    // GY16 — groupVolume
+    {
+      const mk = (id: string, ex: string, w: number, u: 'kg' | 'lbs', r: number, day: string): GymSet => ({ id, exerciseId: ex, weight: w, unit: u, reps: r, occurredAt: `${day}T10:00:00` })
+      const mon = mondayOf(D), cx = { id: 'custom-1', name: 'Remo', group: 'back' as const, kind: 'load' as const }
+      const log16 = [mk('a', 'bench-press', 100, 'kg', 5, D), mk('b', 'bench-press', 220, 'lbs', 5, D), mk('c', 'pull-up', 0, 'kg', 10, D), mk('d', 'custom-1', 50, 'kg', 10, D),
+        mk('e', 'ghost', 50, 'kg', 10, D), mk('f', 'bench-press', 100, 'kg', 10, mon), mk('g', 'bench-press', 80, 'kg', 5, addDays(mon, -7)), mk('h', 'bench-press', 80, 'kg', 5, addDays(D, -7)),
+        mk('i', 'bench-press', 80, 'kg', 5, addDays(D, -6)), mk('j', 'bench-press', 999, 'kg', 5, D)]
+      const v = groupVolume([...log16, un('uj', 'j')], [cx], D)
+      const chest = v[0], back = v[1]
+      ok(v.map(r => r.group).join() === GROUPS.map(g => g.id).join() && chest.sets === 3 && Math.abs(chest.kg - (500 + 220 * LB_KG * 5 + 1000)) < 0.01 &&
+        Math.abs(fromKg(500 + 220 * LB_KG * 5, 'lbs') - 2202.3) < 0.1 && back.sets === 2 && Math.abs(back.kg - 500) < 0.01 &&
+        chest.prevSets === 2 && Math.abs(chest.prevKg - 800) < 0.01 && v.slice(2).every(r => r.sets === 0 && r.prevSets === 0), 'GY16 groupVolume')
     }
   }
 

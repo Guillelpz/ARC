@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CircleAlert, Minus, Plus } from 'lucide-react'
 import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, WeightUnit } from '../core/types'
-import { GROUPS, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, lastSet, liveSets, parseReps, parseWeight, recordText, records, stepWeight, weeklyBest1rm } from '../core/gym'
+import { GROUPS, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, groupVolume, lastSet, liveSets, parseReps, parseWeight, recordText, records, stepWeight, weeklyBest1rm } from '../core/gym'
 import { dayLabel, shortDate } from '../core/stats'
 import { isValidName, normalizeText, trackerName } from '../core/classify'
 import { DayPicker } from './DayPicker'
@@ -27,6 +27,7 @@ const field = 'min-h-11 w-full rounded-lg border border-hero-border bg-transpare
 const btnBase = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold outline-hero transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
 const primary = `${btnBase} bg-hero text-hero-on-accent hover:bg-hero/90 active:scale-[0.98] motion-reduce:transform-none`
 const secondary = `${btnBase} border border-hero-border bg-transparent text-hero-text hover:bg-hero-surface`
+const int = (kg: number, u: WeightUnit) => `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: 'always' }).format(Math.round(fromKg(kg, u)))} ${u}`
 const num = (n: number) => String(n).replace('.', ',')
 
 export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onBack, saveFailed, onExport }: Props) {
@@ -59,6 +60,8 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
   const recs = records(liveSets(gym.log).filter(s => s.exerciseId === sel))
   const sessionSets = daySets(gym.log, day)
   const progress = useMemo(() => weeklyBest1rm(gym.log, sel, today), [gym.log, sel, today])
+  const volume = useMemo(() => groupVolume(gym.log, gym.exercises, today).filter(v => v.sets > 0 || v.prevSets > 0), [gym.log, gym.exercises, today])
+  const maxSets = Math.max(1, ...volume.map(v => v.sets))
   const withData = progress.flatMap(w => (w.kg === null ? [] : [w.kg]))
   const pMin = Math.min(...withData), pMax = Math.max(...withData)
   const px = (i: number) => 6 + i * (88 / (progress.length - 1))
@@ -237,6 +240,22 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
               })}
             </div>
           )}
+        </section>
+
+        <section aria-labelledby="gym-volume" className={card}>
+          <h2 id="gym-volume" className="text-base font-semibold">Volumen semanal</h2>
+          {volume.length === 0 ? <p className="text-sm text-hero-muted">Aún no hay series esta semana.</p> : (
+            <ul className="flex flex-col gap-3">
+              {volume.map(v => (
+                <li key={v.group} className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold tabular-nums">{`${v.label} · ${v.sets} ${v.sets === 1 ? 'serie' : 'series'} · ${int(v.kg, unit)}`}</span>
+                  <span className="h-2 w-full overflow-hidden rounded-full bg-hero-border" aria-hidden><span className="block h-full rounded-full bg-hero" style={{ width: `${(v.sets / maxSets) * 100}%` }} /></span>
+                  <span className="text-xs text-hero-muted tabular-nums">{`semana anterior hasta hoy: ${v.prevSets} ${v.prevSets === 1 ? 'serie' : 'series'} · ${int(v.prevKg, unit)}`}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-hero-muted">El volumen es peso × repeticiones; el peso corporal sin lastre cuenta solo como serie.</p>
         </section>
 
         <section aria-labelledby="gym-custom" className={card}>
