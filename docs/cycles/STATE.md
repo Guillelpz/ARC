@@ -14,7 +14,7 @@ No aprobadas en este ciclo: P24.6 (nivel Gym), P24.9 (sobrecarga), P24.11 (tempo
 
 Decisiones de spec aprobadas (2026-10-12), todas las recomendadas: la sesión automática se recrea al deshacer/«−» con series vivas, también al importar y fusionar; «Recuperar» con copia sin gym conserva las series y recrea sesiones con aviso; las rutinas se fusionan (conflicto → local + aviso); «Hoy» muestra «Gym · N series · M ejercicios»; «Volver» desde Gym abierto desde «Hoy» → Inicio con foco en «Hoy».
 
-**Paso actual:** 5 (implementer en `cycle-25`, spec `docs/TECH_SPEC-gym-2.md`).
+**Estado:** **cerrado** (merge 0766842, push a origin; análisis en `cycle-25/analysis.md`). El workflow vuelve a pausa hasta que el usuario lo reactive.
 
 ## Ciclo 24 — Módulo Gym (preparado)
 
@@ -63,10 +63,6 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 |---|---|---|
 | P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta |
 | P24.6 | Nivel Gym propio (requiere peso corporal y cambia reglas de juego) | pospuesta |
-| P24.7 | G5 Progreso por ejercicio (1RM estimado por semanas) | aprobada (ciclo 25) |
-| P24.8 | G7 Volumen semanal por grupo muscular | aprobada (ciclo 25) |
 | P24.9 | G8 Sugerencia de sobrecarga progresiva | pospuesta |
-| P24.10 | G9 Rutinas/plantillas | aprobada (ciclo 25) |
 | P24.11 | G10 Temporizador de descanso | pospuesta |
-| P24.12 | Integración del gym con el bloque «Hoy» | aprobada (ciclo 25) |
 | P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |
