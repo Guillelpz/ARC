@@ -309,14 +309,17 @@ export function restoreLast(r: LastBackup, store: WStore = localStorage): boolea
 
 // Ajustes de voz de este dispositivo: fuera de las copias, de la fusión y de «Borrar todo» (no son datos del juego).
 export const VOICE_KEY = 'life-rpg-voice-v1'
-export type VoicePrefs = { privacyAck?: string } // ISO de cuándo se aceptó el aviso de privacidad de la voz
+export type VoiceLang = 'es-ES' | 'en-US'
+// privacyAck: ISO de cuándo se aceptó el aviso de privacidad; lang: idioma del dictado (sin él, español)
+export type VoicePrefs = { privacyAck?: string; lang?: VoiceLang }
 
 export function loadVoicePrefs(store: Pick<Storage, 'getItem'> = localStorage): VoicePrefs {
   try {
     const raw = store.getItem(VOICE_KEY)
     if (raw === null) return {}
     const v = json(raw)
-    return isObj(v) && typeof v.privacyAck === 'string' ? { privacyAck: v.privacyAck } : {}
+    if (!isObj(v)) return {}
+    return { ...(typeof v.privacyAck === 'string' && { privacyAck: v.privacyAck }), ...((v.lang === 'es-ES' || v.lang === 'en-US') && { lang: v.lang }) }
   } catch { return {} }
 }
 

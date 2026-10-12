@@ -1,5 +1,6 @@
 // Envoltorio de la Web Speech API. Fuera de `core/`: es una API del navegador (como pwa.ts).
 // Tipos mínimos propios: `lib.dom` no trae los de webkitSpeechRecognition.
+import { loadVoicePrefs, type VoiceLang } from './core/storage'
 
 export type SpeechError = 'not-supported' | 'not-allowed' | 'service-not-allowed' | 'no-speech' | 'audio-capture'
   | 'network' | 'aborted' | 'timeout' | 'no-result' | 'other'
@@ -34,7 +35,8 @@ export const getRecognition = (): Ctor | undefined => {
 export const speechSupported = () => getRecognition() !== undefined && navigator.onLine !== false
 export const isIosStandalone = () => (navigator as { standalone?: boolean }).standalone === true
 export const isStandaloneApp = () => isIosStandalone() || window.matchMedia?.('(display-mode: standalone)').matches === true
-export const speechLang = () => navigator.language?.toLowerCase().startsWith('en') ? 'en-US' : 'es-ES'
+// Idioma elegido en Ajustes, no el del sistema: con el móvil en inglés y la app en español, el dictado debe ser en español.
+export const speechLang = (): VoiceLang => loadVoicePrefs().lang ?? 'es-ES'
 // ¿hay que saltarse la voz y abrir el campo de texto? (iOS según KEYBOARD_ON_IOS)
 export const keyboardFirst = () => {
   const ios = (navigator as { standalone?: boolean }).standalone !== undefined
