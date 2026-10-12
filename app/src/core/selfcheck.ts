@@ -346,6 +346,16 @@ export function runSelfCheck() {
     const ip = { events: [e('z', 'gym', 1, '2026-10-09')], custom: { trackers: [cA], proposals: [P('custom-a', 'gym'), P('custom-a', 'office')] } }
     const before = JSON.stringify([lp, ip]), m8 = mergeBackup(lp, ip)
     ok(m8.custom.proposals.length === 2 && JSON.stringify([lp, ip]) === before, 'M8 propuestas por (tracker, party), sin mutar')
+    // L6 — límite semanal en la fusión
+    {
+      const lb = { events: [] as ActivityEvent[], custom: { trackers: [] as Tracker[], proposals: [] as Proposal[] } }
+      const l6a = mergeBackup({ ...lb, custom: { ...lb.custom, limits: { beer: 2 } } }, { ...lb, custom: { ...lb.custom, limits: { beer: 3 } } })
+      const l6b = mergeBackup(lb, { ...lb, custom: { ...lb.custom, limits: { beer: 3 } } })
+      const pz = createTracker({ name: 'Pizza', branch: 'villain', type: 'count', xpPerUnit: 10 }, 'custom-pz')
+      const l6c = mergeBackup({ ...lb, custom: { ...lb.custom, trackers: [pz] } }, { ...lb, custom: { ...lb.custom, trackers: [{ ...pz, weeklyLimit: 4 }] } })
+      ok(l6a.conflicts.includes('Beer') && JSON.stringify(l6a.custom.limits) === '{"beer":2}' && !l6a.changed &&
+        l6b.conflicts.includes('Beer') && !('limits' in l6b.custom) && l6c.conflicts.includes('Pizza'), 'L6 fusión de límites')
+    }
   }
 
   console.info('[selfcheck] done')
