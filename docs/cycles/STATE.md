@@ -32,6 +32,15 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 - Sincronización (2026-10-10): opción A, sin servidor — «Importar y fusionar» (unión por id + backup) + compartir copia (P15.2). Worker/servidor descartado por ahora (RGPD art. 9).
 - Despliegue (2026-10-09): GitHub Pages (repo público). El usuario crea el repo vacío en la web y pasa la URL; el orquestador añade el remoto y hace push. Commits nuevos con el email noreply de GitHub (el usuario lo facilita); reescribir el historial solo con su okay.
 
+## Decisiones del usuario (2026-10-12)
+
+- Balance de XP: se deja como está.
+- PARTY: sigue simulada.
+- IA: solo heurística en producción, sin endpoint.
+- Sincronización: se sigue con la opción A (sin servidor).
+- Límite VILLAIN: **sí**, límite semanal opcional que se puede sobrepasar (aviso, no bloqueo). Retoma P11.2; pendiente de abrir ciclo.
+- Herencia «demo» (claves, textos): se queda de momento.
+
 ## Propuestas
 
 | id | título | estado | ciclo |
