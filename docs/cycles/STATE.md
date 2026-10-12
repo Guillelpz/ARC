@@ -20,7 +20,9 @@ Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pa
 
 **Ejecución:** tech-lead (`docs/TECH_SPEC-voz-gym.md`: verificación previa en iPhone/PWA, parser ES/EN en `core/` con asserts nuevos, Haiku 5.5 con clave en Ajustes y structured outputs, guardar y revisar, micro en Gym y «Hoy», tests UI/a11y/e2e con APIs simuladas) → **okay del usuario** (resumen ≤15 líneas + decisiones abiertas) → implementer en `cycle-26` → reviewer (máx. 2 vueltas) → merge `--no-ff` con build/lint/test/e2e → push a `main` → cycle-analyst.
 
-**Estado:** **en curso** — spec del tech-lead.
+**Decisiones de spec aprobadas (2026-10-12), todas las recomendadas (§13 de la spec):** A `fetch` directo, sin SDK; B prueba en iPhone con `vite preview` + túnel `cloudflared` (o Pages con okay); C plan B en iOS = el botón abre el campo de texto y se dicta con el teclado, solo donde falle según la prueba; D «Borrar todo» no toca la clave; E sin unidad dicha → preferencia del gym (kg por defecto). El usuario pide hacerlo todo seguido y hará la prueba del iPhone al final: T8 (`KEYBOARD_ON_IOS`) se queda en `'never'` con caída al texto tras error de voz hasta que la prueba dé resultado.
+
+**Estado:** **en curso** — implementación (implementer en `cycle-26`).
 
 ## Ciclo 25 — Gym: progreso, volumen, rutinas y «Hoy»
 
