@@ -6,6 +6,14 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y docu
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
 
+## Ciclo 25 — Gym: progreso, volumen, rutinas y «Hoy»
+
+Aprobado directamente por el usuario el 2026-10-12 a partir de las pospuestas del ciclo 24 (pasos 1-2 omitidos): **P24.7** progreso por ejercicio (mejor 1RM estimado por semanas), **P24.8** volumen semanal por grupo muscular, **P24.10** rutinas/plantillas, **P24.12** gym en el bloque «Hoy», y la **deuda de sesiones del ciclo 24** (los dos `ponytail:`: deshacer la manual con series vivas; `restoreLast` con copia sin gym). Para la deuda, el tech-lead propone el comportamiento y se pregunta al usuario. Siguen vigentes D1-D8 del ciclo 24 (sin party, XP sin cambios, sin dependencias de runtime, paleta HERO).
+
+No aprobadas en este ciclo: P24.6 (nivel Gym), P24.9 (sobrecarga), P24.11 (temporizador) siguen pospuestas; P3.5 y P13.4 sin cambios.
+
+**Paso actual:** 4 (tech-lead → `docs/TECH_SPEC-gym-2.md`).
+
 ## Ciclo 24 — Módulo Gym (preparado)
 
 Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del encargo llegaron truncadas; donde se indica «(interpretación)» es la lectura del orquestador, y lo no cubierto lo decide el tech-lead o se pregunta.
@@ -53,10 +61,10 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 |---|---|---|
 | P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta |
 | P24.6 | Nivel Gym propio (requiere peso corporal y cambia reglas de juego) | pospuesta |
-| P24.7 | G5 Progreso por ejercicio (1RM estimado por semanas) | pospuesta |
-| P24.8 | G7 Volumen semanal por grupo muscular | pospuesta |
+| P24.7 | G5 Progreso por ejercicio (1RM estimado por semanas) | aprobada (ciclo 25) |
+| P24.8 | G7 Volumen semanal por grupo muscular | aprobada (ciclo 25) |
 | P24.9 | G8 Sugerencia de sobrecarga progresiva | pospuesta |
-| P24.10 | G9 Rutinas/plantillas | pospuesta |
+| P24.10 | G9 Rutinas/plantillas | aprobada (ciclo 25) |
 | P24.11 | G10 Temporizador de descanso | pospuesta |
-| P24.12 | Integración del gym con el bloque «Hoy» | pospuesta |
+| P24.12 | Integración del gym con el bloque «Hoy» | aprobada (ciclo 25) |
 | P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |
