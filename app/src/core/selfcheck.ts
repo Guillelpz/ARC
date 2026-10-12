@@ -523,6 +523,11 @@ export function runSelfCheck() {
         again.routinesAdded === 0 && !again.changed && JSON.stringify([L, inc]) === before &&
         !none.changed && JSON.stringify(none.gym.routines) === JSON.stringify([ra]) && !('routines' in nog.gym), 'GY20 fusión de rutinas')
     }
+    // GY21 — la sesión repuesta tras deshacer la manual no cambia la XP de gym
+    {
+      const m21 = man('m'), u21 = { id: 'um', trackerId: 'gym', amount: -1, occurredAt: m21.occurredAt, undoes: 'm' }
+      ok(get(deriveGame([m21, u21, a1], D), 'gym').xp.xp === get(deriveGame([m21], D), 'gym').xp.xp, 'GY21 XP neta 0 al reponer la sesión')
+    }
   }
 
   console.info('[selfcheck] done')
