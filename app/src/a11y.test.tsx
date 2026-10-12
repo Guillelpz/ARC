@@ -103,3 +103,10 @@ test('A11 Gym con el aviso de privacidad de la voz y con la tarjeta del resultad
     expect(await serious()).toEqual([])
   } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
 })
+
+test('A13 Inicio con el campo de texto de voz abierto', async () => {
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Escribir' }))
+  expect(screen.getByLabelText('Serie')).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

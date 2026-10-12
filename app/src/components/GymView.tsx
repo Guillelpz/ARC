@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, Check, CircleAlert, Minus, Plus } from 'lucide-react'
 import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, Routine, WeightUnit } from '../core/types'
 import { GROUPS, MAX_ROUTINES, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, groupVolume, lastSet, liveSets, parseReps, parseWeight, recordText, records, routineFromDay, routineProgress, stepWeight, weeklyBest1rm } from '../core/gym'
 import { dayLabel, shortDate } from '../core/stats'
 import { isValidName, normalizeText, trackerName } from '../core/classify'
-import { draftText, type GymDraft, type VoiceCommand } from '../core/voice'
+import type { GymDraft, VoiceCommand } from '../core/voice'
+import { editNote, incompleteNote } from './voiceNotes'
 import { DayPicker } from './DayPicker'
-import { VoiceLog, type VoiceMissing } from './VoiceLog'
+import { VoiceLog } from './VoiceLog'
 import { SaveFailBanner } from './SaveFailBanner'
 import { Segmented } from './Segmented'
 
@@ -23,6 +24,7 @@ type Props = {
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
+  prefill?: { draft: GymDraft; note: string } // viene de la voz en «Hoy»: se aplica al abrir
   voice: { ack: boolean; onAck: () => void; onInterpret: (text: string) => Promise<VoiceCommand>; onSave: (cmd: VoiceCommand, day: string) => { ids: string[]; auto: boolean }; onUndo: (ids: string[]) => { retracted: boolean } }
 }
 
@@ -35,7 +37,7 @@ const secondary = `${btnBase} border border-hero-border bg-transparent text-hero
 const int = (kg: number, u: WeightUnit) => `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: 'always' }).format(Math.round(fromKg(kg, u)))} ${u}`
 const num = (n: number) => String(n).replace('.', ',')
 
-export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onSaveRoutine, onDeleteRoutine, onBack, saveFailed, onExport, voice }: Props) {
+export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onSaveRoutine, onDeleteRoutine, onBack, saveFailed, onExport, voice, prefill: pre }: Props) {
   const unit = gym.unit ?? 'kg'
   const exercises = allExercises(gym.exercises)
   const active = exercises.filter(x => !x.archived)
@@ -44,14 +46,17 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
     const s = lastSet(gym.log, id)
     return s ? { w: num(convert(s.weight, s.unit, u)), r: String(s.reps) } : { w: kindOf(id) === 'bodyweight' ? '0' : '', r: '' }
   }
+  const preId = pre?.draft.exerciseId != null && active.some(x => x.id === pre.draft.exerciseId) ? pre.draft.exerciseId : null
+  const draftForm = (d: GymDraft, target: string) => ({ w: d.weight !== null ? num(convert(d.weight, d.unit, unit)) : prefill(target, unit).w, r: d.reps !== null ? String(d.reps) : '' })
   const [exerciseId, setExerciseId] = useState(() => {
+    if (preId) return preId
     const l = lastSet(gym.log)
     return l && active.some(x => x.id === l.exerciseId) ? l.exerciseId : DEFAULT_EXERCISE
   })
-  const [form, setForm] = useState(() => prefill(exerciseId, unit))
+  const [form, setForm] = useState(() => (pre ? draftForm(pre.draft, exerciseId) : prefill(exerciseId, unit)))
   const [day, setDay] = useState(today)
   const [errors, setErrors] = useState<{ weight?: string; reps?: string }>({})
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState(pre?.note ?? '')
   const headingRef = useRef<HTMLHeadingElement>(null)
   const selectRef = useRef<HTMLSelectElement>(null)
   const weightRef = useRef<HTMLInputElement>(null)
@@ -95,20 +100,24 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
 
   const changeExercise = (id: string) => { setExerciseId(id); setForm(prefill(id, unit)); setErrors({}) }
   const changeUnit = (u: WeightUnit) => { onSetUnit(u); setForm(prefill(sel, u)); setErrors({}) }
-  const MISSING_TEXT: Record<VoiceMissing, string> = { exercise: 'No se ha entendido el ejercicio.', reps: 'Faltan las repeticiones.', weight: 'Falta el peso.', sets: 'Indica entre 1 y 10 series.' }
+  const focusOf = (d: GymDraft, hasExercise: boolean) => (!hasExercise ? selectRef : d.weight === null ? weightRef : d.reps === null ? repsRef : weightRef)
   // Rellena el formulario con el borrador de voz y enfoca el primer dato que falte (si no falta nada, el peso).
   function applyDraft(d: GymDraft, note: string) {
     const id = d.exerciseId !== null && active.some(x => x.id === d.exerciseId) ? d.exerciseId : null
-    const target = id ?? sel
     if (id) setExerciseId(id)
-    const base = prefill(target, unit)
-    setForm({ w: d.weight !== null ? num(convert(d.weight, d.unit, unit)) : base.w, r: d.reps !== null ? String(d.reps) : '' })
+    setForm(draftForm(d, id ?? sel))
     setErrors({}); setStatus(note)
-    const el = id === null ? selectRef : d.weight === null ? weightRef : d.reps === null ? repsRef : weightRef
-    setTimeout(() => el.current?.focus(), 0) // como loadRoutine: los campos ya existen, pero el estado aún no se ha pintado
+    const el = focusOf(d, id !== null)
+    setTimeout(() => el.current?.focus(), 0) // como loadRoutine: el estado aún no se ha pintado
   }
-  const editNote = (d: GymDraft) => `Formulario rellenado con ${draftText(d, active, unit)}. Registra la serie${d.sets > 1 ? ' y usa «Repetir serie» para las demás' : ''}.`
-  const incompleteNote = (missing: VoiceMissing[]) => `${missing.map(m => MISSING_TEXT[m]).join(' ')} Completa el formulario.`
+  // Al abrir con un borrador de «Hoy»: el foco va al primer dato que falte. Solo al montar.
+  useEffect(() => {
+    if (!pre) return
+    const el = focusOf(pre.draft, preId !== null)
+    const id = setTimeout(() => el.current?.focus(), 0)
+    return () => clearTimeout(id)
+    // oxlint-disable-next-line react/exhaustive-deps -- solo al montar
+  }, [])
   const step = (dir: 1 | -1) => setForm(f => ({ ...f, w: num(stepWeight(parseWeight(f.w) ?? 0, unit, dir)) }))
 
   const register = (input: Omit<GymSet, 'id' | 'occurredAt'>) => {
@@ -231,7 +240,7 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
         <section aria-labelledby="gym-voice" className={card}>
           <h2 id="gym-voice" className="text-base font-semibold">Por voz</h2>
           <VoiceLog tone="hero" day={day} today={today} exercises={active} unit={unit} ack={voice.ack} onAck={voice.onAck} onInterpret={voice.onInterpret}
-            onSave={voice.onSave} onUndo={voice.onUndo} onEdit={d => applyDraft(d, editNote(d))} onIncomplete={(d, m) => applyDraft(d, incompleteNote(m))} />
+            onSave={voice.onSave} onUndo={voice.onUndo} onEdit={d => applyDraft(d, editNote(d, active, unit))} onIncomplete={(d, m) => applyDraft(d, incompleteNote(m))} />
         </section>
 
         <form onSubmit={submit} className={card} noValidate>

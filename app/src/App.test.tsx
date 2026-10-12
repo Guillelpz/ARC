@@ -451,7 +451,7 @@ test('U21 registrar desde la home', async () => {
   expect(btn(/^Gym 3 sesiones/)).toBeTruthy()
   expect(btn(/^Gym \+1 sesiones/)).toBeTruthy()
   fireEvent.click(btn('+1 sesión en Gym'))
-  expect(screen.getByRole('status').textContent).toMatch(/Gym Lv\. 2/)
+  expect(screen.getAllByRole('status').map(x => x.textContent).join(' ')).toMatch(/Gym Lv\. 2/) // en Inicio hay también el estado de VoiceLog
   fireEvent.click(btn(/^Gym 2 sesiones/))
   expect(screen.getByRole('heading', { name: 'Misiones HERO' })).toBeTruthy()
 })
@@ -970,6 +970,7 @@ test('U-V1 primera vez: privacidad, dictar, guardar con sesion en HERO', async (
   expect(screen.getByText('Serie 1 · 80 kg × 5')).toBeTruthy()
   expect(screen.getByText('Oído: «80 kilos press banca 5 repeticiones»')).toBeTruthy()
   expect(screen.getByText(/Sesión de Gym apuntada en HERO \(hoy\)\./)).toBeTruthy()
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
   expect(stored().some((e: { id: string; amount: number }) => e.id === 'gym-auto-2026-10-07' && e.amount === 1)).toBe(true)
   expect(JSON.parse(localStorage.getItem('life-rpg-voice-v1')!).privacyAck).toBeTruthy()
   // la segunda vez no sale el aviso
@@ -977,14 +978,14 @@ test('U-V1 primera vez: privacidad, dictar, guardar con sesion en HERO', async (
   dictate('sentadilla 100 5')
   expect(screen.queryByRole('heading', { name: 'Privacidad de la voz' })).toBeNull()
   expect(await screen.findByText(/^Registrado: Sentadilla · 100 kg × 5/)).toBeTruthy()
-  expect(liveGym()).toHaveLength(2)
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(2))
 })
 
 test('U-V2 3x5, Deshacer: 0 series, sesion retirada y foco en Dictar serie', async () => {
   ackVoice(); render(<App />); openGym()
   dictate('press banca 80 kg 3x5')
   expect(await screen.findByText(/^Registrado: Press banca · 3 series · 80 kg × 5/)).toBeTruthy()
-  expect(liveGym()).toHaveLength(3); expect(gymSum()).toBe(1)
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(3)); expect(gymSum()).toBe(1)
   fireEvent.click(btn('Deshacer'))
   expect(liveGym()).toHaveLength(0); expect(gymSum()).toBe(0)
   expect(screen.getByText('Deshecho: 3 series de Press banca. Sesión de Gym retirada.')).toBeTruthy()
@@ -1039,7 +1040,7 @@ test('U-V8 con clave y fallo de la IA: usa el parser; con 401, avisa', async () 
     expect(await screen.findByText(/^Registrado: Sentadilla/)).toBeTruthy()
     expect(screen.getByText(/La IA no está disponible \(clave rechazada o sin saldo\)/)).toBeTruthy()
     expect(f).toHaveBeenCalledTimes(2)
-    expect(liveGym()).toHaveLength(2)
+    await vi.waitFor(() => expect(liveGym()).toHaveLength(2))
   } finally { vi.unstubAllGlobals() }
 })
 
@@ -1072,6 +1073,7 @@ test('U-V13 dia pasado: 3 series ese dia', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Ayer' }))
   dictate('dominadas 3x8 con 10 kilos')
   expect(await screen.findByText(/^Registrado: Dominadas · 3 series · \+10 kg × 8/)).toBeTruthy()
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(3))
   const l = liveGym()
   expect(l).toHaveLength(3); expect(l.every(s => s.occurredAt.startsWith('2026-10-06') && s.weight === 10)).toBe(true)
   expect(stored().some((e: { id: string }) => e.id === 'gym-auto-2026-10-06')).toBe(true)
@@ -1081,6 +1083,7 @@ test('U-V14 libras dichas se guardan en lbs', async () => {
   ackVoice(); render(<App />); openGym()
   dictate('sentadilla 225 libras 5')
   await screen.findByText(/^Registrado:/)
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
   expect(liveGym()[0]).toMatchObject({ exerciseId: 'squat', weight: 225, unit: 'lbs', reps: 5 })
 })
 
@@ -1091,4 +1094,58 @@ test('Voz: una serie que bate el peso maximo muestra Nuevo record', async () => 
   fireEvent.click(btn('Cerrar'))
   dictate('press banca 105 5')
   expect(await screen.findByText('Nuevo récord')).toBeTruthy()
+})
+
+// ---- Voz en «Hoy» (T7) ----
+const aiReply = (o: unknown) => new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(o) }] }), { status: 200 })
+
+test('U-V6 desde Hoy: guarda hoy, Deshacer la quita y el incompleto abre Gym prerrellenado', async () => {
+  ackVoice(); render(<App />)
+  dictate('press banca 80 kg 5 reps')
+  expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
+  expect(screen.getByRole('button', { name: /^Gym.*1 serie · 1 ejercicio$/ })).toBeTruthy()
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
+  expect(liveGym()[0].occurredAt.startsWith('2026-10-07')).toBe(true)
+  fireEvent.click(btn('Deshacer'))
+  await vi.waitFor(() => expect(liveGym()).toHaveLength(0))
+  expect(liveGym()).toHaveLength(0)
+  expect(screen.queryByRole('button', { name: /^Gym.*serie/ })).toBeNull()
+  // incompleto: abre Gym con el formulario rellenado
+  dictate('press banca 80')
+  expect(await screen.findByRole('heading', { name: 'Gym', level: 1 })).toBeTruthy()
+  expect((screen.getByLabelText(/^Peso \(/) as HTMLInputElement).value).toBe('80')
+  expect(screen.getByText('Faltan las repeticiones. Completa el formulario.')).toBeTruthy()
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Repeticiones')))
+  fireEvent.click(btn('Volver'))
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Hoy' })))
+  expect(liveGym()).toHaveLength(0)
+})
+
+test('U-V6b Editar desde Hoy abre Gym con el formulario del comando deshecho', async () => {
+  ackVoice(); render(<App />)
+  dictate('press banca 80 kg 3x5')
+  await screen.findByText(/^Registrado:/)
+  fireEvent.click(btn('Editar'))
+  expect(liveGym()).toHaveLength(0)
+  expect(await screen.findByText('Formulario rellenado con Press banca · 3 series · 80 kg × 5. Registra la serie y usa «Repetir serie» para las demás.')).toBeTruthy()
+  expect((screen.getByLabelText('Repeticiones') as HTMLInputElement).value).toBe('5')
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/^Peso \(/)))
+})
+
+test('U-V7 con clave, la IA resuelve una frase rara desde Hoy', async () => {
+  ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn().mockResolvedValue(aiReply({ exerciseId: 'leg-press', weight: 100, unit: 'none', reps: 10, sets: 1 }))
+  vi.stubGlobal('fetch', f)
+  try {
+    render(<App />)
+    dictate('la máquina de piernas 100 10')
+    expect(await screen.findByText(/^Registrado: Prensa · 100 kg × 10/)).toBeTruthy()
+    expect(f).toHaveBeenCalledTimes(1)
+    const [url, init] = f.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.anthropic.com/v1/messages')
+    expect(init.headers).toMatchObject({ 'x-api-key': KEY2, 'anthropic-dangerous-direct-browser-access': 'true' })
+    expect(JSON.parse(init.body as string).messages[0].content).toContain('<frase>la máquina de piernas 100 10</frase>')
+    await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
+    expect(liveGym()[0]).toMatchObject({ exerciseId: 'leg-press', weight: 100, reps: 10 })
+  } finally { vi.unstubAllGlobals() }
 })
