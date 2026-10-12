@@ -46,13 +46,37 @@ export const ALIASES: Record<string, string[]> = {
   'leg-raise': ['elevaciones de piernas', 'elevacion de piernas', 'elevaciones de pierna', 'leg raise', 'leg raises', 'hanging leg raise'],
 }
 
-const WORDS: Record<string, number> = {
-  un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12, trece: 13, catorce: 14,
-  quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19, veinte: 20, veinticinco: 25, treinta: 30,
-  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14,
-  fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20, 'twenty five': 25, thirty: 30,
+const m = (o: Record<string, number>) => new Map(Object.entries(o))
+const UNITS_ES = m({ un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9 })
+const UNITS_EN = m({ one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 })
+const UNITS = new Map([...UNITS_ES, ...UNITS_EN])
+const SMALL = new Map([...UNITS, ...m({
+  diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17, dieciocho: 18, diecinueve: 19,
+  ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19,
+  veintiun: 21, veintiuno: 21, veintiuna: 21, veintidos: 22, veintitres: 23, veinticuatro: 24, veinticinco: 25, veintiseis: 26, veintisiete: 27, veintiocho: 28, veintinueve: 29,
+})])
+const TENS_EN = m({ twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 })
+const TENS = new Map([...TENS_EN, ...m({ veinte: 20, treinta: 30, cuarenta: 40, cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80, noventa: 90 })])
+const HUND = m({ cien: 100, ciento: 100, doscientos: 200, doscientas: 200, trescientos: 300, trescientas: 300, cuatrocientos: 400, cuatrocientas: 400, quinientos: 500, quinientas: 500,
+  seiscientos: 600, seiscientas: 600, setecientos: 700, setecientas: 700, ochocientos: 800, ochocientas: 800, novecientos: 900, novecientas: 900 })
+// Palabras-número que no se saben convertir: la frase queda incompleta (no se guarda un número inventado).
+const UNRESOLVED = /\b(mil|millon|millones|thousand|million|cero|zero|medio|media|half|docena|dozen|docenas|dozens)\b/
+
+// Un número en palabra desde la posición i: «treinta y cinco», «veinticinco», «thirty five», «ciento veinte», «one hundred twenty».
+function wordNumber(tk: string[], i: number): { v: number; next: number } | null {
+  let j = i, v = 0
+  const w = tk[j]
+  if (HUND.has(w)) { v = HUND.get(w)!; j++ }
+  else if (UNITS.has(w) && tk[j + 1] === 'hundred') { v = UNITS.get(w)! * 100; j += 2 }
+  else if (w === 'hundred') { v = 100; j++ }
+  const x = tk[j]
+  if (TENS.has(x)) {
+    v += TENS.get(x)!; j++
+    if (tk[j] === 'y' && UNITS.has(tk[j + 1])) { v += UNITS.get(tk[j + 1])!; j += 2 }
+    else if (TENS_EN.has(x) && UNITS_EN.has(tk[j])) { v += UNITS_EN.get(tk[j])!; j++ }
+  } else if (SMALL.has(x)) { v += SMALL.get(x)!; j++ }
+  return j > i ? { v, next: j } : null
 }
-const WORD_RE = new RegExp(`\\b(${Object.keys(WORDS).sort((a, b) => b.length - a.length).join('|')})\\b`, 'g')
 
 // Paso 0 del parser: minúsculas sin tildes, recortada, decimales con punto, signos fuera y números en palabra → dígitos.
 export function normalizeVoice(text: string): string {
@@ -63,7 +87,12 @@ export function normalizeVoice(text: string): string {
   t = t.replace(/[^a-z0-9. ]/g, ' ')
   t = t.replace(/(?<!\d)\.|\.(?!\d)/g, ' ') // un punto solo vale entre dígitos
   t = t.replace(/\s+/g, ' ').trim()
-  return t.replace(WORD_RE, w => String(WORDS[w]))
+  const tk = t.split(' '), out: string[] = []
+  for (let i = 0; i < tk.length;) {
+    const n = wordNumber(tk, i)
+    if (n) { out.push(String(n.v)); i = n.next } else out.push(tk[i++])
+  }
+  return out.join(' ')
 }
 
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -105,6 +134,7 @@ export function parseGym(text: string, exercises: Exercise[], defaultUnit: Weigh
   let t = normalizeVoice(text)
   const m = matchExercise(t, exercises)
   if (m) t = t.replace(aliasRe(m.alias), ' ') // el 45 de «Press 45 grados» no cuenta
+  const unresolved = UNRESOLVED.test(t)
   const ex = m ? exercises.find(e => e.id === m.id) : undefined
   const body = ex?.kind === 'bodyweight'
   let sets: number | null = null, reps: number | null = null, weight: number | null = null, unit: WeightUnit | null = null
@@ -149,6 +179,7 @@ export function parseGym(text: string, exercises: Exercise[], defaultUnit: Weigh
   if (weight !== null) weight = r2(weight)
   if (reps !== null && !(Number.isInteger(reps) && reps >= 1 && reps <= 999)) reps = null
   if (body && weight === null) weight = 0
+  if (unresolved) { weight = null; reps = null } // palabra-número sin resolver («mil»…): incompleto, no se guarda un dato inventado
   return { exerciseId: m?.id ?? null, weight, unit: unit ?? defaultUnit, reps, sets: sets ?? 1 }
 }
 

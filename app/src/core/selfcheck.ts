@@ -572,6 +572,14 @@ export function runSelfCheck() {
     ok(f(p('press 45 grados 40 kg 10')) === 'custom-x/40 kg/10/1' && f(p('hip thrust 100 10') /* el propio archivado no está en la lista activa */) === 'null/100 kg/10/1', 'VZ11 ejercicio propio, el 45 del nombre no cuenta; archivado fuera')
     const v12 = ['press banca 2500 kg 5', 'press banca 80 kg 1000 reps', 'press banca 80 kg 12 series de 5', 'press banca 0 kg 5'].map(t => p(t))
     ok(v12[0].weight === null && v12[1].reps === null && v12[2].sets === 12 && !isComplete(v12[2], EX) && v12[3].weight === null, 'VZ12 rangos')
+    // VZ17 — números en palabra: decenas, compuestos, centenas; palabra-número sin resolver = incompleto
+    ok(f(p('press banca treinta y cinco kilos 8')) === 'bench-press/35 kg/8/1' && f(p('press banca ochenta y cinco kilos cinco')) === 'bench-press/85 kg/5/1' &&
+      f(p('press banca ochenta kilos cinco')) === 'bench-press/80 kg/5/1' && f(p('press banca veinticinco kilos diez')) === 'bench-press/25 kg/10/1' &&
+      f(p('sentadilla ciento veinte kilos cinco')) === 'squat/120 kg/5/1' && f(p('sentadilla ciento treinta y cinco kilos cinco')) === 'squat/135 kg/5/1' &&
+      f(p('squat thirty-five kilos 8')) === 'squat/35 kg/8/1' && f(p('squat thirty five kilos 8')) === 'squat/35 kg/8/1' && f(p('squat one hundred twenty kilos 5')) === 'squat/120 kg/5/1' &&
+      f(p('bench ninety kilos 3 sets of five')) === 'bench-press/90 kg/5/3', 'VZ17 números en palabra')
+    ok(!isComplete(p('press banca mil kilos 5'), EX) && !isComplete(p('press banca cero kilos 5'), EX) && !isComplete(p('press banca medio kilo 5'), EX) &&
+      p('press banca mil kilos 5').exerciseId === 'bench-press', 'VZ17 palabra-número sin resolver: incompleto')
     const bd = (id: string, w: number, u: 'kg' | 'lbs', r: number, s: number): GymDraft => ({ exerciseId: id, weight: w, unit: u, reps: r, sets: s })
     ok(draftText(bd('bench-press', 80, 'kg', 5, 1), EX, 'kg') === 'Press banca · 80 kg × 5' && draftText(bd('bench-press', 80, 'kg', 5, 3), EX, 'kg') === 'Press banca · 3 series · 80 kg × 5' &&
       draftText(bd('pull-up', 0, 'kg', 12, 1), EX, 'kg') === 'Dominadas · 12 reps' && draftText({ ...bd('x', 1, 'kg', 1, 1), exerciseId: null }, EX, 'kg') === 'Ejercicio sin reconocer', 'VZ13 draftText')

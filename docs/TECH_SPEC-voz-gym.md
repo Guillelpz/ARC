@@ -132,7 +132,7 @@ Persistidos (fuera de `types.ts`, en `storage.ts`): la clave es un string sin JS
 2. `(\d),(\d)` y `(\d)\.(\d)` → `$1.$2` (coma o punto decimal solo entre dígitos: «80, 5» no es decimal).
 3. `×` → ` x `. Separar dígitos pegados a letras: `(\d)([a-z])` → `$1 $2` y `([a-z])(\d)` → `$1 $2` («80kg», «3x5»).
 4. El resto de la puntuación (`[^a-z0-9. ]`) → espacio, y espacios simples.
-5. Números en palabra → dígitos, por palabra completa: `un|uno|una`=1, `dos`=2 … `veinte`=20, `veinticinco`=25, `treinta`=30, `one`=1 … `twenty`=20, `twenty five`=25, `thirty`=30 (con `dieciseis`… ya sin tildes).
+5. Números en palabra → dígitos, por palabra completa (`wordNumber`): unidades y 10-19 (`un|uno|una`=1 … `diecinueve`; `one` … `nineteen`), `veinte`/`veinti…` (20-29), decenas 30-90 (ES y EN), compuestos «decena y unidad» (`treinta y cinco`, `thirty five`; `thirty-five` llega ya sin guion) y centenas (`cien|ciento`, `doscientos`…`novecientos`, `hundred`, `one hundred`; p. ej. `ciento veinte`=120). Red de seguridad: si tras quitar el ejercicio queda una palabra-número sin resolver (`mil`, `cero`, `medio`, `docena`, `thousand`…), el borrador es incompleto (`weight` y `reps` a `null`): no se guarda y se abre el formulario.
 
 **Paso 1 — ejercicio** (`matchExercise(norm, exercises)`): para cada ejercicio, sus alias son su nombre normalizado más `ALIASES[id]` (los propios solo tienen su nombre). Se buscan como palabras completas (`(^| )alias( |$)`). Gana el alias **más largo**; si empatan, gana el ejercicio propio y después el orden del catálogo. El tramo del alias **se borra del texto** antes de extraer números (así un propio como «Press 45 grados» no aporta el 45). Sin coincidencia → `exerciseId: null`.
 
