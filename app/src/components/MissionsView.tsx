@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import type { ActivityEvent, Branch, GameState, PartyState, Tracker } from '../core/types'
 import { countsIn, vote } from '../core/party'
-import { addDays, byRecent, dayLabel, dayTotal, history, weekly } from '../core/stats'
+import { byRecent, dayLabel, dayTotal, history, weekly } from '../core/stats'
 import { isDuplicateName, normalizeText } from '../core/classify'
+import { DayPicker } from './DayPicker'
 import { ProgressBar } from './ProgressBar'
 import { SaveFailBanner } from './SaveFailBanner'
 import { TrackerCard, type Gain } from './TrackerCard'
@@ -35,11 +36,6 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
     .filter(s => s.tracker.branch === branch && !s.tracker.archived && normalizeText(s.tracker.name).includes(q))
     .sort((a, b) => order.indexOf(a.tracker.id) - order.indexOf(b.tracker.id))
   const [day, setDay] = useState(today)
-  const yesterday = addDays(today, -1)
-  const SEG = hero
-    ? { ring: 'outline-hero', box: 'border-hero-border bg-hero-surface', opt: 'text-hero-muted', on: 'bg-hero text-hero-on-accent font-semibold', scheme: 'scheme-light' }
-    : { ring: 'outline-villain', box: 'border-villain-border bg-villain-surface', opt: 'text-villain-muted', on: 'bg-villain text-villain-on-accent font-semibold', scheme: 'scheme-dark' }
-  const optCls = (active: boolean) => `min-h-11 rounded-md text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${SEG.ring} ${active ? SEG.on : `font-medium ${SEG.opt}`}`
   const muted = hero ? 'text-hero-muted' : 'text-villain-muted'
   const has = (s: PartyState, id: string) => s.criteria.some(c => c.id === id)
   const isRejected = (s: PartyState, id: string) => s.rejected.some(r => r.tracker.id === id)
@@ -69,16 +65,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
             className={`min-h-11 w-full rounded-lg border bg-transparent pr-3 pl-9 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${hero ? 'border-hero-border placeholder:text-hero-muted outline-hero' : 'border-villain-border placeholder:text-villain-muted outline-villain'}`}
           />
         </label>
-        <div className="flex flex-col gap-1">
-          <span className={`text-xs leading-5 ${muted}`}>Registrar en</span>
-          <div className={`grid grid-flow-col auto-cols-fr gap-1 rounded-lg border p-1 ${SEG.box}`}>
-            <button type="button" aria-pressed={day === today} onClick={() => setDay(today)} className={optCls(day === today)}>Hoy</button>
-            <button type="button" aria-pressed={day === yesterday} onClick={() => setDay(yesterday)} className={optCls(day === yesterday)}>Ayer</button>
-            <input type="date" max={today} value={day} aria-label="Elegir día"
-              onChange={e => setDay(e.target.value && e.target.value <= today ? e.target.value : today)}
-              className={`${optCls(day !== today && day !== yesterday)} min-w-0 bg-transparent text-center ${SEG.scheme}`} />
-          </div>
-        </div>
+        <DayPicker day={day} today={today} onChange={setDay} tone={branch} />
         {shown.length === 0 && <p className={`text-sm ${muted}`}>Ninguna misión con «{query.trim()}».</p>}
         <div className="grid gap-3 sm:grid-cols-2">
           {shown.map((s, i) => (
