@@ -12,7 +12,9 @@ Aprobado directamente por el usuario el 2026-10-12 a partir de las pospuestas de
 
 No aprobadas en este ciclo: P24.6 (nivel Gym), P24.9 (sobrecarga), P24.11 (temporizador) siguen pospuestas; P3.5 y P13.4 sin cambios.
 
-**Paso actual:** 4 (tech-lead → `docs/TECH_SPEC-gym-2.md`).
+Decisiones de spec aprobadas (2026-10-12), todas las recomendadas: la sesión automática se recrea al deshacer/«−» con series vivas, también al importar y fusionar; «Recuperar» con copia sin gym conserva las series y recrea sesiones con aviso; las rutinas se fusionan (conflicto → local + aviso); «Hoy» muestra «Gym · N series · M ejercicios»; «Volver» desde Gym abierto desde «Hoy» → Inicio con foco en «Hoy».
+
+**Paso actual:** 5 (implementer en `cycle-25`, spec `docs/TECH_SPEC-gym-2.md`).
 
 ## Ciclo 24 — Módulo Gym (preparado)
 
