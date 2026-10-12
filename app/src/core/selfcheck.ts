@@ -1,4 +1,4 @@
-import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker, WeekRow } from './types'
+import type { ActivityEvent, GameState, GymSet, GymUndo, PartyMember, Proposal, Tracker, WeekRow } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, logGoal, setGoal, setLimit, TRACKERS, unitFor } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
@@ -7,6 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseCustom } from './storage'
 import { mergeBackup } from './merge'
+import { beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, recordText, records, stepWeight, toKg } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -356,6 +357,26 @@ export function runSelfCheck() {
       ok(l6a.conflicts.includes('Beer') && JSON.stringify(l6a.custom.limits) === '{"beer":2}' && !l6a.changed &&
         l6b.conflicts.includes('Beer') && !('limits' in l6b.custom) && l6c.conflicts.includes('Pizza'), 'L6 fusión de límites')
     }
+  }
+
+  // GY1–GY13 — módulo Gym
+  {
+    const gs = (id: string, weight: number, unit: 'kg' | 'lbs', reps: number, day = DEMO_DATE): GymSet => ({ id, exerciseId: 'bench-press', weight, unit, reps, occurredAt: `${day}T10:00:00` })
+    ok(Math.abs(toKg(100, 'lbs') - 45.359) < 0.001 && convert(100, 'kg', 'lbs') === 220.5 && convert(102.5, 'kg', 'kg') === 102.5 &&
+      fmtWeight(102.5, 'kg') === '102,5 kg' && parseWeight('102,5') === 102.5 && parseWeight('102.555') === 102.56 &&
+      parseWeight('-1') === null && parseWeight('abc') === null && parseWeight('2001') === null &&
+      stepWeight(100, 'kg', 1) === 102.5 && stepWeight(100, 'lbs', 1) === 105 && stepWeight(1, 'kg', -1) === 0, 'GY2 unidades')
+    ok(Math.abs((e1rm(100, 5) ?? 0) - 116.667) < 0.01 && e1rm(100, 1) === 100 && e1rm(100, 13) === null && e1rm(0, 5) === null, 'GY3 Epley')
+    const base = [gs('a', 100, 'kg', 5), gs('b', 225, 'lbs', 3), gs('c', 80, 'kg', 12), gs('d', 80, 'kg', 10)]
+    const r4 = records(liveSets(base))
+    const undoB: GymUndo = { id: 'u', undoes: 'b', occurredAt: base[1].occurredAt }
+    const r4b = records(liveSets([...base, undoB]))
+    ok(r4.maxWeight?.id === 'b' && r4.best1rm?.set.id === 'a' && r4.mostReps?.id === 'c' && r4b.maxWeight?.id === 'a', 'GY4 récords')
+    const nm = 'Press banca'
+    ok(beaten([], gs('x', 105, 'kg', 1)).length === 0 && beaten(base, gs('x', 105, 'kg', 1)).join() === 'weight' &&
+      beaten(base, gs('x', 80, 'kg', 13)).join() === 'reps' && beaten(base, gs('x', 100, 'kg', 6)).join() === '1rm,reps' &&
+      beaten(base, gs('x', 100, 'kg', 5)).length === 0 &&
+      recordText(['weight'], gs('x', 105, 'kg', 1), nm, 'kg', 'load') === 'Nuevo récord en Press banca: peso máximo 105 kg', 'GY5 récord batido')
   }
 
   console.info('[selfcheck] done')
