@@ -580,6 +580,9 @@ export function runSelfCheck() {
       f(p('bench ninety kilos 3 sets of five')) === 'bench-press/90 kg/5/3', 'VZ17 números en palabra')
     ok(!isComplete(p('press banca mil kilos 5'), EX) && !isComplete(p('press banca cero kilos 5'), EX) && !isComplete(p('press banca medio kilo 5'), EX) &&
       p('press banca mil kilos 5').exerciseId === 'bench-press', 'VZ17 palabra-número sin resolver: incompleto')
+    ok(f(p('dominadas 2500 kg 5')) === 'pull-up/null kg/5/1' && !isComplete(p('dominadas 2500 kg 5'), EX) && f(p('dominadas 5')) === 'pull-up/0 kg/5/1' && isComplete(p('dominadas 5'), EX) &&
+      fromAI({ exerciseId: 'pull-up', weight: 2500, unit: 'none', reps: 5, sets: 1 }, EX, 'kg')?.weight === null && fromAI({ exerciseId: 'pull-up', weight: null, unit: 'none', reps: 5, sets: 1 }, EX, 'kg')?.weight === 0,
+      'VZ18 peso corporal: no dicho = 0, dicho fuera de rango = incompleto')
     const bd = (id: string, w: number, u: 'kg' | 'lbs', r: number, s: number): GymDraft => ({ exerciseId: id, weight: w, unit: u, reps: r, sets: s })
     ok(draftText(bd('bench-press', 80, 'kg', 5, 1), EX, 'kg') === 'Press banca · 80 kg × 5' && draftText(bd('bench-press', 80, 'kg', 5, 3), EX, 'kg') === 'Press banca · 3 series · 80 kg × 5' &&
       draftText(bd('pull-up', 0, 'kg', 12, 1), EX, 'kg') === 'Dominadas · 12 reps' && draftText({ ...bd('x', 1, 'kg', 1, 1), exerciseId: null }, EX, 'kg') === 'Ejercicio sin reconocer', 'VZ13 draftText')

@@ -156,7 +156,7 @@ Persistidos (fuera de `types.ts`, en `storage.ts`): la clave es un string sin JS
 - Queda 1 resto → peso corporal: `reps`; con carga: `weight` (faltan repeticiones → incompleto).
 - Los demás restos se ignoran.
 
-**Paso 3 — validar y completar:** `weight` fuera de `[0, MAX_WEIGHT]` → `null`; con carga y `weight === 0` → `null`; se redondea con `r2`. `reps` no entero o fuera de 1..999 → `null`. Peso corporal y `weight === null` → `0`. `unit` = la dicha o `defaultUnit`. `sets` = 1 si no se dijo (se conserva el valor dicho aunque esté fuera de rango; `isComplete` lo rechaza).
+**Paso 3 — validar y completar:** `weight` fuera de `[0, MAX_WEIGHT]` → `null`; con carga y `weight === 0` → `null`; se redondea con `r2`. `reps` no entero o fuera de 1..999 → `null`. Peso corporal y peso **no dicho** → `0` (sin lastre); si se dijo pero estaba fuera de rango, queda `null` (incompleto: no se guarda y se abre el formulario). `unit` = la dicha o `defaultUnit`. `sets` = 1 si no se dijo (se conserva el valor dicho aunque esté fuera de rango; `isComplete` lo rechaza).
 
 `isComplete(d, exercises)`: `exerciseId` está en `exercises`, `reps !== null`, `1 ≤ sets ≤ 10` y `weight !== null` (con carga, además, `> 0`).
 
@@ -262,7 +262,7 @@ Los rangos (`minimum`/`maximum`) no se ponen en el esquema; se validan en el cli
 
 Se toma el **primer bloque `type === 'text'`**, no `content[0]` a ciegas.
 
-`fromAI(o, exercises, defaultUnit): GymDraft | null` (puro, en `voice.ts`) devuelve `null` si `o` no es un objeto, si `exerciseId` no es string o no es `'none'` ni un id de `exercises`, si `unit` no es `kg`/`lbs`/`none`, o si `sets` no es un entero de 1 a 10. `weight`/`reps` de tipo o rango incorrecto pasan a `null` campo a campo. Después aplica las mismas reglas del paso 3 del parser: `unit: 'none'` → `defaultUnit`; peso corporal con `weight` null → 0; con carga y 0 → null.
+`fromAI(o, exercises, defaultUnit): GymDraft | null` (puro, en `voice.ts`) devuelve `null` si `o` no es un objeto, si `exerciseId` no es string o no es `'none'` ni un id de `exercises`, si `unit` no es `kg`/`lbs`/`none`, o si `sets` no es un entero de 1 a 10. `weight`/`reps` de tipo o rango incorrecto pasan a `null` campo a campo. Después aplica las mismas reglas del paso 3 del parser: `unit: 'none'` → `defaultUnit`; peso corporal con `weight` `null` (no dicho) → 0, pero un número inválido o fuera de rango se queda en `null` (incompleto); con carga y 0 → null.
 
 **Orquestación** (`interpretGym(text, exercises, defaultUnit, key, online, fetchImpl?) : Promise<VoiceCommand>`):
 

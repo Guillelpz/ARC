@@ -174,11 +174,12 @@ export function parseGym(text: string, exercises: Exercise[], defaultUnit: Weigh
   }
 
   // paso 3 — validar y completar
+  const said = weight !== null
   if (weight !== null && (weight < 0 || weight > MAX_WEIGHT)) weight = null
   if (weight !== null && !body && weight === 0) weight = null
   if (weight !== null) weight = r2(weight)
   if (reps !== null && !(Number.isInteger(reps) && reps >= 1 && reps <= 999)) reps = null
-  if (body && weight === null) weight = 0
+  if (body && weight === null && !said) weight = 0 // «no dicho» = sin lastre; «dicho pero fuera de rango» queda null (incompleto)
   if (unresolved) { weight = null; reps = null } // palabra-número sin resolver («mil»…): incompleto, no se guarda un dato inventado
   return { exerciseId: m?.id ?? null, weight, unit: unit ?? defaultUnit, reps, sets: sets ?? 1 }
 }
@@ -207,7 +208,7 @@ export function fromAI(o: unknown, exercises: Exercise[], defaultUnit: WeightUni
   const e = exercises.find(y => y.id === x.exerciseId)
   let weight = typeof x.weight === 'number' && Number.isFinite(x.weight) && x.weight >= 0 && x.weight <= MAX_WEIGHT ? r2(x.weight) : null
   const reps = typeof x.reps === 'number' && Number.isInteger(x.reps) && x.reps >= 1 && x.reps <= 999 ? x.reps : null
-  if (e?.kind === 'bodyweight' && weight === null) weight = 0
+  if (e?.kind === 'bodyweight' && weight === null && x.weight === null) weight = 0 // null = no dicho; un número inválido queda null (incompleto)
   if (e && e.kind === 'load' && weight === 0) weight = null
   return { exerciseId: e?.id ?? null, weight, unit: x.unit === 'none' ? defaultUnit : x.unit, reps, sets: x.sets }
 }
