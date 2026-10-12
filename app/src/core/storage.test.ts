@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { EMPTY_CUSTOM, EMPTY_GYM, GYM_KEY, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -60,7 +60,7 @@ describe('loadAll', () => {
   beforeEach(unlockStorage)
   test('store vacío', () => {
     const s = fakeStore()
-    expect(loadAll(s, D)).toEqual({ events: [], custom: EMPTY_CUSTOM, problems: [] })
+    expect(loadAll(s, D)).toEqual({ events: [], custom: EMPTY_CUSTOM, gym: EMPTY_GYM, problems: [] })
     expect(s.writes()).toBe(0)
   })
   test('datos válidos', () => {
@@ -117,7 +117,7 @@ describe('exportBackup / parseBackup', () => {
   const exp = (o: object = {}) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: EMPTY_CUSTOM, ...o })
   test('roundtrip', () => {
     const r = parseBackup(exportBackup(SEED_EVENTS, custom as never, '2026-10-08T00:00:00Z'))
-    expect(r).toEqual({ events: SEED_EVENTS, custom, dropped: 0, fixed: 0 })
+    expect(r).toEqual({ events: SEED_EVENTS, custom, gym: null, dropped: 0, fixed: 0 })
   })
   test('rechaza ajenos', () => {
     expect(parseBackup(exp({ app: 'otro' }))).toBeNull()
@@ -196,7 +196,7 @@ describe('restaurar copia', () => {
   beforeEach(unlockStorage)
   test('R1 readLast', () => {
     expect(readLast(fakeStore())).toBe('none')
-    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, dropped: 0, fixed: 0 })
+    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, gym: null, dropped: 0, fixed: 0 })
     expect(readLast(fakeStore({ [L(EV)]: '{roto' }))).toBe('unreadable')
     expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good, null]) }))).toMatchObject({ dropped: 1 })
   })
@@ -362,4 +362,56 @@ describe('readCustom: límite VILLAIN', () => {
     const r = readLast(s)
     expect(r !== 'none' && r !== 'unreadable' && r.custom).toEqual(custom)
   })
+})
+
+describe('módulo Gym', () => {
+  const GY = GYM_KEY
+  const set = { id: 's1', exerciseId: 'bench-press', weight: 100, unit: 'kg', reps: 5, occurredAt: '2026-10-07T10:00:00' }
+  const undo = { id: 'u1', undoes: 's1', occurredAt: '2026-10-07T10:00:00' }
+  const ex = { id: 'custom-1', name: 'Remo Pendlay', group: 'back', kind: 'load' }
+  beforeEach(unlockStorage)
+  test('GS1 readGym: roundtrip, inválidos, archived y claves desconocidas', () => {
+    const data = { log: [set, undo, { ...set, id: 's2', extra: 1 }], exercises: [{ ...ex, archived: true }], unit: 'lbs', futuro: { a: 1 } }
+    expect(readGym(JSON.parse(JSON.stringify(data)))).toEqual({ data, dropped: 0, fixed: 0 })
+    const bad = [{ ...set, id: 'a', weight: -1 }, { ...set, id: 'b', reps: 1.5 }, { ...set, id: 'c', unit: 'st' }, { id: 'd', exerciseId: 'x', weight: 1, unit: 'kg', reps: 1 }]
+    const r = readGym({ log: [set, ...bad], exercises: [{ ...ex, archived: 'si' }, { ...ex, id: 'otro' }], unit: 'st' })!
+    expect(r.data.log).toEqual([set]); expect(r.dropped).toBe(5)
+    expect(r.fixed).toBe(2); expect(r.data.exercises).toEqual([ex]); expect(r.data).not.toHaveProperty('unit')
+    expect(readGym({ log: 'x' })).toBeNull(); expect(readGym([])).toBeNull()
+    expect(readGym({ log: [{ ...set, exerciseId: 'desconocido' }] })?.dropped).toBe(0)
+  })
+  test('GS2 loadAll con gym corrupto: backup y lo demás intacto', () => {
+    const s = fakeStore({ [EV]: JSON.stringify([good]), [CU]: JSON.stringify(EMPTY_CUSTOM), [GY]: '{roto' })
+    const r = loadAll(s, D)
+    expect(r.gym).toEqual(EMPTY_GYM); expect(r.events).toEqual([good]); expect(r.custom).toEqual(EMPTY_CUSTOM)
+    expect(r.problems).toEqual([{ key: GY, dropped: null, fixed: 0, backupKey: BK(GY) }])
+    expect(s.m.get(BK(GY))).toBe('{roto')
+  })
+  test('GS3 si falla el backup, saveGym devuelve null', () => {
+    const s = fakeStore({ [GY]: '{roto' }, true)
+    expect(loadAll(s, D).problems[0].backupKey).toBeNull()
+    expect(saveGym(EMPTY_GYM, s)).toBeNull()
+    unlockStorage(); expect(saveGym(EMPTY_GYM, fakeStore())).toBe(true)
+  })
+  test('GS4 backupCurrent / readLast / restoreLast incluyen gym', () => {
+    const g1 = { log: [set], exercises: [] }
+    const s = fakeStore({ [GY]: JSON.stringify(g1), [`${GY}.backup.last`]: 'viejo' })
+    expect(backupCurrent(s)).toBe(true)
+    expect(s.m.get(`${GY}.backup.last`)).toBe(JSON.stringify(g1)); expect(s.m.get(`${GY}.backup.prev`)).toBe('viejo')
+    expect(hasLastBackup(fakeStore({ [`${GY}.backup.last`]: 'x' }))).toBe(true)
+    s.m.set(GY, JSON.stringify(EMPTY_GYM))
+    const r = readLast(s)
+    expect(r).toMatchObject({ events: null, custom: null, gym: g1 })
+    expect(restoreLast(r as never, s)).toBe(true)
+    expect(s.m.get(GY)).toBe(JSON.stringify(g1)); expect(s.m.get(`${GY}.backup.last`)).toBe(JSON.stringify(EMPTY_GYM))
+  })
+  test('GS5 export/parse de gym', () => {
+    const g1 = { log: [set, undo], exercises: [ex], unit: 'lbs' }
+    expect(parseBackup(exportBackup([], EMPTY_CUSTOM, 'x', g1 as never))?.gym).toEqual(g1)
+    expect(parseBackup(exportBackup([], EMPTY_CUSTOM, 'x'))?.gym).toBeNull()
+    const raw = (gym: unknown) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: EMPTY_CUSTOM, gym })
+    expect(parseBackup(raw('roto'))).toBeNull()
+    expect(parseBackup(raw({ log: [null] }))?.dropped).toBe(1)
+  })
+  test('GS6 isDataKey', () => { expect(isDataKey(GYM_KEY)).toBe(true); expect(isDataKey('otra')).toBe(false) })
 })

@@ -5,7 +5,7 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { parseCustom } from './storage'
+import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
 import { beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, recordText, records, stepWeight, toKg } from './gym'
 
@@ -377,6 +377,12 @@ export function runSelfCheck() {
       beaten(base, gs('x', 80, 'kg', 13)).join() === 'reps' && beaten(base, gs('x', 100, 'kg', 6)).join() === '1rm,reps' &&
       beaten(base, gs('x', 100, 'kg', 5)).length === 0 &&
       recordText(['weight'], gs('x', 105, 'kg', 1), nm, 'kg', 'load') === 'Nuevo récord en Press banca: peso máximo 105 kg', 'GY5 récord batido')
+  }
+
+  // GY11 (parte de importar) — copia sin `gym`
+  {
+    const old = parseBackup(JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: SEED_EVENTS, custom: { trackers: [], proposals: [] } }))
+    ok(old !== null && old.gym === null && old.events.length === SEED_EVENTS.length, 'GY11 copia sin gym → gym null y eventos leídos')
   }
 
   console.info('[selfcheck] done')

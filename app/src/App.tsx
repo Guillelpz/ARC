@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, Tracker } from './core/types'
+import type { ActivityEvent, CustomData, GymData, Tracker } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { liveSets } from './core/gym'
+import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -38,6 +39,7 @@ export default function App() {
   useEffect(() => registerSW(() => setUpdate(true)), [])
   const [events, setEvents] = useState<ActivityEvent[]>(loaded.events)
   const [custom, setCustom] = useState<CustomData>(loaded.custom)
+  const [gym, setGym] = useState<GymData>(loaded.gym)
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
   const [partyId, setPartyId] = useState(PARTIES[0].id)
@@ -57,16 +59,18 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
-  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0
+  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0 || gym.log.length > 0 || gym.exercises.length > 0
   const copy = backupDue(lastExport, now, hasData)
 
-  const [unsaved, setUnsaved] = useState({ events: false, custom: false }) // false en cada clave con su siguiente guardado correcto
+  const [unsaved, setUnsaved] = useState({ events: false, custom: false, gym: false }) // false en cada clave con su siguiente guardado correcto
   // ponytail: setState dentro del efecto de guardado (aviso de lint aceptado); guardar en cada handler evitaría el render extra, a costa de tocar todos los setEvents/setCustom
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
-  const saveFailed = unsaved.events || unsaved.custom
+  // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
+  useEffect(() => { const ok = saveGym(gym); if (ok !== null) setUnsaved(u => (u.gym === !ok ? u : { ...u, gym: !ok })) }, [gym])
+  const saveFailed = unsaved.events || unsaved.custom || unsaved.gym
   // ponytail: si dos pestañas escriben en menos tiempo del que tarda en llegar el evento `storage`, la última escritura pisa a la otra.
   // Cerrarlo de verdad exige fusionar eventos o Web Locks.
   useEffect(() => {
@@ -77,7 +81,7 @@ export default function App() {
       setCanRestore(hasLastBackup()); setLastExport(loadLastExport())
       if (r.problems.length) { lockStorage(); return setStale(true) } // no pisar lo de la otra pestaña: recargar lo lee (original en .backup.<stamp>)
       unlockStorage(); setStale(false) // lo guardado se ha leído entero: guardar ya no destruye nada
-      setEvents(r.events); setCustom(r.custom)
+      setEvents(r.events); setCustom(r.custom); setGym(r.gym)
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -189,12 +193,12 @@ export default function App() {
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
-    setEvents([]); setCustom(EMPTY_CUSTOM); setToast(null); setGain(null); setOvertake(null)
+    setEvents([]); setCustom(EMPTY_CUSTOM); setGym(EMPTY_GYM); setToast(null); setGain(null); setOvertake(null)
   }
 
   async function exportData(): Promise<boolean> {
     const stamp = new Date().toISOString(), name = `rpg-life-tracker-${stamp.slice(0, 10)}.json`
-    const text = exportBackup(events, custom, stamp)
+    const text = exportBackup(events, custom, stamp, gym)
     const done = () => { saveLastExport(stamp); setLastExport(stamp); requestPersist(); return true } // requestPersist en el primer gesto (no al arrancar: Firefox muestra un diálogo)
     const file = new File([text], name, { type: 'application/json' })
     // ponytail: Chrome Android no comparte application/json (canShare = false) → descarga. Solo en la app instalada en táctil:
@@ -216,11 +220,14 @@ export default function App() {
     const b = parseBackup(text)
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
     const n = b.events.length, m = b.custom.trackers.length
-    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''} Exporta antes si quieres conservar lo actual.`)) return
+    const kLocal = liveSets(gym.log).length, kCopia = b.gym ? liveSets(b.gym.log).length : 0
+    const gymText = b.gym === null && kLocal > 0 ? ` Esta copia es anterior al módulo Gym: tus ${kLocal} series de gym también se reemplazan (quedan 0).`
+      : kLocal + kCopia > 0 ? ` Series de gym: ${kLocal} → ${kCopia}.` : ''
+    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''}${gymText} Exporta antes si quieres conservar lo actual.`)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
     unlockStorage()
-    setEvents(b.events); setCustom(b.custom); setToast(null); setGain(null); setOvertake(null)
+    setEvents(b.events); setCustom(b.custom); setGym(b.gym ?? EMPTY_GYM); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
   }
 
@@ -250,7 +257,7 @@ export default function App() {
     const ev = r.events ?? events, cu = r.custom ?? custom
     if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
     if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
-    setEvents(ev); setCustom(cu); setToast(null); setGain(null); setOvertake(null)
+    setEvents(ev); setCustom(cu); setGym(r.gym ?? gym); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)
   }
 
