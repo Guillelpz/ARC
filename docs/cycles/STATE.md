@@ -26,7 +26,14 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 
 **Ejecución:** strategist → evaluator → **okay del usuario** (resumen ≤15 líneas) → tech-lead (`docs/TECH_SPEC-gym.md`, asserts nuevos en selfcheck: 1RM/récords, kg/lbs, sesión automática sin duplicados, deshacer, fusión; tests UI/a11y) → implementer en `cycle-24` → reviewer (máx. 2 vueltas, después se pregunta) → merge `--no-ff`, build/lint/test/e2e, push → cycle-analyst (actualiza `ESTADO-ACTUAL.md` con Gym y «Yo»; CLAUDE.md/AGENTS.md si cambia core/storage).
 
-**Paso actual:** 1 (proponer).
+**Aprobado por el usuario (2026-10-12, paso 3):** P24.1, P24.2, P24.3, P24.4 y P24.5 con los cambios de `cycle-24/evaluation.md`; orden P24.1 → P24.2 → P24.4 → P24.3 (recorte de P24.5 si hace falta). Decisiones:
+- BottomNav con **6 pestañas** («Yo» como sexta), con e2e a 320 px sin etiquetas truncadas.
+- Sesión automática como **evento real** con id y hora fijos por día (`gym-auto-<día>`), deduplicada por `merge.ts`; cuenta como una sesión manual (XP, racha, ranking, votación).
+- Manual en un dispositivo + series en otro el mismo día → al fusionar se **aceptan 2 sesiones**.
+- Salto −/+ de **2,5 kg / 5 lbs**; catálogo de 21 ejercicios **sin plancha**.
+- P24.6-P24.12 pospuestas.
+
+**Paso actual:** 4 (tech-lead → `docs/TECH_SPEC-gym.md`).
 
 ## Decisiones vigentes del usuario
 
