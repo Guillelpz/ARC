@@ -34,3 +34,10 @@ test('U19 liveText de banners', () => {
   expect(liveText(null, o)).toBe('Adelantamiento: Superas a Alex · 2.º en X')
   expect(liveText(null, { ...o, lost: 'hero' })).toBe('Te adelantan: Alex te supera en HERO · 2.º en X')
 })
+
+test('A7 VILLAIN con límite superado', async () => {
+  localStorage.setItem('life-rpg-custom-v1', JSON.stringify({ trackers: [], proposals: [], limits: { beer: 1 } }))
+  render(<App />); example(); go('VILLAIN')
+  expect(screen.getByText(/Te has pasado de tu límite semanal/)).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

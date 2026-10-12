@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Archive, BookOpen, Beer, Check, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, Users, type LucideIcon } from 'lucide-react'
+import { Archive, BookOpen, Beer, Check, CircleAlert, Dumbbell, Flame, Footprints, Minus, Pencil, Sandwich, Sparkles, Swords, Users, type LucideIcon } from 'lucide-react'
 import type { HistoryRow, Party, Tracker, TrackerStats, VoteResult, WeekRow } from '../core/types'
 import { defaultGoal, unitFor } from '../core/trackers'
 import { editTracker, isValidName } from '../core/classify'
@@ -51,15 +51,20 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
   const [eName, setEName] = useState(t.name)
   const [eInc, setEInc] = useState(String(t.increment))
   const [eGoal, setEGoal] = useState(t.weeklyGoal ? String(t.weeklyGoal) : '')
+  const [eLimit, setELimit] = useState(t.weeklyLimit ? String(t.weeklyLimit) : '')
   const nameErr = !isValidName(eName) ? '2–40 caracteres' : nameTaken?.(eName) ? 'Ya tienes una misión con ese nombre' : null
   const incOk = Math.round(Number(eInc)) >= 1
   const goalOk = eGoal.trim() === '' || Math.round(Number(eGoal)) >= 1
-  const canSave = fixed ? goalOk : !nameErr && incOk && goalOk
+  const limitOk = eLimit.trim() === '' || Math.round(Number(eLimit)) >= 1
+  const canSave = fixed ? goalOk && limitOk : !nameErr && incOk && goalOk && limitOk
   const field = `min-h-11 w-full rounded-lg border bg-transparent px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`
-  const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setProposing(false); setEditing(true) }
-  const nextT = () => editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal) })
+  const open = () => { setEName(t.name); setEInc(String(t.increment)); setEGoal(t.weeklyGoal ? String(t.weeklyGoal) : ''); setELimit(t.weeklyLimit ? String(t.weeklyLimit) : ''); setProposing(false); setEditing(true) }
+  const nextT = () => editTracker(t, { name: eName, increment: Number(eInc), weeklyGoal: eGoal.trim() === '' ? null : Number(eGoal), weeklyLimit: eLimit.trim() === '' ? null : Number(eLimit) })
   const save = () => {
-    if (fixed) { onSave?.({ ...t, weeklyGoal: eGoal.trim() === '' ? undefined : Number(eGoal) }); setEditing(false); return }
+    if (fixed) {
+      onSave?.(t.branch === 'villain' ? { ...t, weeklyLimit: eLimit.trim() === '' ? undefined : Number(eLimit) } : { ...t, weeklyGoal: eGoal.trim() === '' ? undefined : Number(eGoal) })
+      setEditing(false); return
+    }
     const next = nextT()
     onSave?.(next); setQty(String(next.increment)); setEditing(false)
   }
@@ -80,7 +85,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
           <div className="flex shrink-0 items-center gap-2">
             <span key={gain?.trackerId === t.id ? gain.key : undefined} className={`text-sm font-semibold tabular-nums ${gain?.trackerId === t.id ? 'bump' : ''}`}>{xp.xp} XP</span>
             {onSave && (
-              <button type="button" onClick={open} aria-label={fixed ? `Editar objetivo de ${t.name}` : `Editar ${t.name}`}
+              <button type="button" onClick={open} aria-label={!fixed ? `Editar ${t.name}` : t.branch === 'hero' ? `Editar objetivo de ${t.name}` : `Editar límite de ${t.name}`}
                 className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg border focus-visible:outline-2 focus-visible:outline-offset-2 ${c.chip}`}>
                 <Pencil className="size-4" aria-hidden />
               </button>
@@ -92,7 +97,7 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
 
       <div className="text-sm leading-6">
         <span key={gain?.trackerId === t.id ? gain.key : undefined} className={`text-3xl font-semibold tabular-nums ${gain?.trackerId === t.id ? 'bump' : ''}`}>{week}</span>
-        {t.weeklyGoal ? ` / ${t.weeklyGoal} ${t.unit} esta semana` : ` ${t.unit} esta semana`}
+        {t.weeklyGoal ? ` / ${t.weeklyGoal} ${t.unit} esta semana` : t.weeklyLimit ? ` ${t.unit} esta semana · límite ${t.weeklyLimit}` : ` ${t.unit} esta semana`}
         {goalPct !== null && goalPct >= 100 && (
           <span className={`pop ml-2 inline-flex items-center gap-1 rounded-md border px-2 py-0.5 align-middle text-xs font-medium ${c.chip}`}>
             <Check className="size-4" aria-hidden /> Objetivo cumplido
@@ -104,6 +109,11 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
           </span>
         )}
       </div>
+      {t.weeklyLimit ? (
+        <p aria-live="polite" className={stats.over ? 'flex items-center gap-2 text-sm font-medium leading-6' : 'sr-only'}>
+          {stats.over ? <><CircleAlert className="size-4 shrink-0" aria-hidden /> Te has pasado de tu límite semanal en {stats.over} {unitFor(stats.over, t.unit)}.</> : null}
+        </p>
+      ) : null}
       {goalPct !== null && <ProgressBar value={goalPct / 100} tone={t.branch} label={`Objetivo semanal ${t.name}`} />}
 
       <div className={`flex flex-col text-xs leading-5 ${c.muted}`}>
@@ -131,6 +141,12 @@ export function TrackerCard({ stats, gain, dayTotal, dayNote, today, history, we
             <label className="flex flex-col gap-1 text-xs font-medium">Objetivo semanal ({t.unit})
               <input type="number" min={1} step={1} value={eGoal} onChange={e => setEGoal(e.target.value)} placeholder={fixed ? String(defaultGoal(t.id)) : undefined} className={field} />
               {fixed && <span className={`text-xs ${c.muted}`}>Déjalo vacío para volver a {defaultGoal(t.id)} {t.unit}.</span>}
+            </label>
+          )}
+          {t.branch === 'villain' && (
+            <label className="flex flex-col gap-1 text-xs font-medium">Límite semanal ({t.unit})
+              <input type="number" min={1} step={1} value={eLimit} onChange={e => setELimit(e.target.value)} placeholder="Sin límite" className={field} />
+              <span className={`text-xs ${c.muted}`}>Déjalo vacío para no tener límite. Pasarte no cambia tu XP.</span>
             </label>
           )}
           <div className="flex gap-2">

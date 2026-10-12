@@ -559,3 +559,52 @@ test('U-pestañas-bloqueo no pisa datos de otra pestaña', async () => {
     if (bad === EV) { localStorage.setItem(EV, one); fire(EV); await vi.waitFor(() => expect(gym()).toMatch(/^1 \//)) }
   }
 })
+
+test('U23 límite de fija', () => {
+  render(<App />); go('VILLAIN')
+  fireEvent.click(btn('Editar límite de Beer'))
+  expect(screen.queryByText('Nombre')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Archivar' })).toBeNull()
+  fireEvent.change(card('Beer').getByRole('spinbutton'), { target: { value: '2' } })
+  fireEvent.click(btn('Guardar'))
+  expect(custom().limits).toEqual({ beer: 2 })
+  expect(card('Beer').getByText(/· límite 2/)).toBeTruthy()
+  for (let i = 0; i < 3; i++) fireEvent.click(card('Beer').getByRole('button', { name: '+1 unidades' }))
+  expect(stored()).toHaveLength(3)
+  expect(card('Beer').getByText('Te has pasado de tu límite semanal en 1 unidad.')).toBeTruthy()
+  expect(screen.getByText(/^Lv\. \d+ · \d+ XP$/).textContent).toBe('Lv. 1 · 45 XP')
+  fireEvent.click(card('Beer').getByRole('button', { name: 'Restar 1 unidades a Beer' }))
+  expect(card('Beer').queryByText(/Te has pasado/)).toBeNull()
+  fireEvent.click(btn('Editar límite de Beer'))
+  fireEvent.change(card('Beer').getByRole('spinbutton'), { target: { value: '' } })
+  fireEvent.click(btn('Guardar'))
+  expect(custom()).not.toHaveProperty('limits')
+})
+
+test('U24 límite de propia', () => {
+  const pizza = { ...base, id: 'custom-pizza', name: 'Pizza', branch: 'villain', unit: 'porciones', xpPerUnit: 15, weeklyLimit: 1 }
+  localStorage.setItem(CU, JSON.stringify({ trackers: [pizza], proposals: [] }))
+  localStorage.setItem(EV, JSON.stringify(['p1', 'p2'].map(id => ({ id, trackerId: 'custom-pizza', amount: 1, occurredAt: '2026-10-06T09:00:00' }))))
+  render(<App />); go('VILLAIN')
+  const msg = card('Pizza').getByText(/Te has pasado de tu límite semanal/)
+  expect(msg.closest('p')!.getAttribute('aria-live')).toBe('polite')
+  fireEvent.click(btn('Editar Pizza'))
+  fireEvent.change(card('Pizza').getByLabelText(/^Límite semanal/), { target: { value: '5' } })
+  fireEvent.click(btn('Guardar'))
+  expect(custom().trackers[0].weeklyLimit).toBe(5)
+  expect(card('Pizza').queryByText(/Te has pasado/)).toBeNull()
+  expect(custom()).not.toHaveProperty('goalLog')
+})
+
+test('U25 campos por rama', () => {
+  const pizza = { ...base, id: 'custom-pizza', name: 'Pizza', branch: 'villain', unit: 'porciones', xpPerUnit: 15 }
+  localStorage.setItem(CU, JSON.stringify({ trackers: [pizza], proposals: [] }))
+  render(<App />); go('HERO')
+  fireEvent.click(btn('Editar objetivo de Gym'))
+  expect(card('Gym').queryByLabelText(/^Límite semanal/)).toBeNull()
+  go('VILLAIN')
+  fireEvent.click(btn('Editar Pizza'))
+  expect(card('Pizza').queryByLabelText(/^Objetivo semanal/)).toBeNull()
+  expect(card('Beer').queryByText(/· límite/)).toBeNull()
+  expect(card('Beer').queryByText(/Te has pasado/)).toBeNull()
+})
