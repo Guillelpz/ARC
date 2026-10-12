@@ -335,3 +335,31 @@ describe('readCustom: claves desconocidas', () => {
     expect(r).toEqual(EMPTY_CUSTOM)
   })
 })
+
+describe('readCustom: límite VILLAIN', () => {
+  test('C15 limits válidos', () => {
+    const r = readCustom({ limits: { beer: 2, burgers: 5 } })
+    expect(r?.data.limits).toEqual({ beer: 2, burgers: 5 }); expect(r?.dropped).toBe(0)
+    expect(readCustom({})!.data).not.toHaveProperty('limits')
+  })
+  test('C16 inválidos', () => {
+    expect(readCustom({ limits: 'x' })?.dropped).toBe(1)
+    const a = readCustom({ limits: { beer: 0, burgers: 2.5, gym: 3, 'custom-x': 2, nope: 1 } })
+    expect(a!.data).not.toHaveProperty('limits'); expect(a!.dropped).toBe(5)
+    const t = { id: 'x', name: 'X', increment: 1, xpPerUnit: 1 }
+    const r = readCustom({ trackers: [
+      { ...t, id: 'a', branch: 'villain', weeklyLimit: 3 }, { ...t, id: 'b', branch: 'hero', weeklyLimit: 3 },
+      { ...t, id: 'c', branch: 'villain', weeklyLimit: -1 }, { ...t, id: 'd', branch: 'villain', weeklyLimit: 'x' },
+    ] })!
+    expect(r.data.trackers.map(x => x.weeklyLimit)).toEqual([3, undefined, undefined, undefined])
+    expect(r.data.trackers.slice(1).every(x => !('weeklyLimit' in x))).toBe(true); expect(r.fixed).toBe(3)
+  })
+  test('C17 round-trip', () => {
+    const custom = { trackers: [{ id: 'c1', name: 'P', branch: 'villain' as const, type: 'count' as const, unit: 'unidades', increment: 1, buttonLabel: '+1', xpPerUnit: 2, weeklyLimit: 3 }], proposals: [], limits: { beer: 2 } }
+    expect(parseBackup(exportBackup([], custom, 'x'))?.custom).toEqual(custom)
+    const s = fakeStore({ [CU]: JSON.stringify(custom) })
+    backupCurrent(s)
+    const r = readLast(s)
+    expect(r !== 'none' && r !== 'unreadable' && r.custom).toEqual(custom)
+  })
+})

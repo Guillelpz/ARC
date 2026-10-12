@@ -1,5 +1,5 @@
-import type { ActivityEvent, CustomData, GoalLogEntry, Goals, Proposal, Tracker } from './types'
-import { defaultGoal } from './trackers'
+import type { ActivityEvent, CustomData, GoalLogEntry, Goals, Limits, Proposal, Tracker } from './types'
+import { defaultGoal, isFixedVillain } from './trackers'
 import { mondayOf } from './stats'
 
 const KEY = 'life-rpg-demo-v1'
@@ -30,7 +30,7 @@ export function readEvents(v: unknown): Parsed<ActivityEvent[]> {
 }
 
 // '__proto__' no es un campo: está para que el bucle de claves desconocidas no haga data['__proto__'] = x, que cambiaría el prototipo.
-const KNOWN = new Set(['trackers', 'proposals', 'goals', 'goalLog', '__proto__'])
+const KNOWN = new Set(['trackers', 'proposals', 'goals', 'goalLog', 'limits', '__proto__'])
 
 export function readCustom(v: unknown): Parsed<CustomData> {
   if (!isObj(v)) return null
@@ -45,6 +45,7 @@ export function readCustom(v: unknown): Parsed<CustomData> {
     const fixed = { ...t } as Tracker
     let bad = false
     if (t.weeklyGoal !== undefined && !(t.branch === 'hero' && typeof t.weeklyGoal === 'number' && Number.isFinite(t.weeklyGoal) && t.weeklyGoal > 0)) { delete fixed.weeklyGoal; bad = true }
+    if (t.weeklyLimit !== undefined && !(t.branch === 'villain' && typeof t.weeklyLimit === 'number' && Number.isFinite(t.weeklyLimit) && t.weeklyLimit > 0)) { delete fixed.weeklyLimit; bad = true }
     if (t.archived !== undefined && typeof t.archived !== 'boolean') { delete fixed.archived; bad = true }
     if (bad) fixedN++
     trackers.push(fixed)
@@ -57,6 +58,14 @@ export function readCustom(v: unknown): Parsed<CustomData> {
     if (!isObj(v.goals)) gDropped = 1
     else for (const [id, g] of Object.entries(v.goals)) {
       if (defaultGoal(id) !== undefined && typeof g === 'number' && Number.isInteger(g) && g >= 1) goals[id] = g
+      else gDropped++
+    }
+  }
+  const limits: Limits = {}
+  if (v.limits !== undefined) {
+    if (!isObj(v.limits)) gDropped++
+    else for (const [id, l] of Object.entries(v.limits)) {
+      if (isFixedVillain(id) && typeof l === 'number' && Number.isInteger(l) && l >= 1) limits[id] = l
       else gDropped++
     }
   }
@@ -77,6 +86,7 @@ export function readCustom(v: unknown): Parsed<CustomData> {
   for (const [k, x] of Object.entries(v)) if (!KNOWN.has(k)) (data as Record<string, unknown>)[k] = x
   if (Object.keys(goals).length > 0) data.goals = goals
   if (goalLog.length > 0) data.goalLog = goalLog
+  if (Object.keys(limits).length > 0) data.limits = limits
   return { data, dropped: rawT.length - trackers.length + rawP.length - proposals.length + gDropped, fixed: fixedN }
 }
 
