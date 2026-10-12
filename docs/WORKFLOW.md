@@ -23,7 +23,8 @@ La sesión principal de Claude Code orquesta. Los agentes de `.claude/agents/` h
 - **Al usuario solo le llegan** las propuestas evaluadas (paso 3), las decisiones de spec no cubiertas (paso 4), los bloqueos sin salida y el aviso de fin de ciclo.
 - **Mientras se espera un okay:** se sigue solo con lo ya aprobado; si no queda nada aprobado, el workflow se para.
 - Las dependencias de desarrollo están permitidas. Las de runtime, el backend, las cuentas y los cambios de reglas de juego necesitan okay.
-- Git: `main` es estable; cada ciclo trabaja en `cycle-N`. Sin remoto ni push.
+- Git: `main` es estable; cada ciclo trabaja en `cycle-N`. Push de `main` tras cada ciclo cerrado (ver `STATE.md`).
+- Limpieza: cuando el `product-strategist` del ciclo N+1 ya ha leído `cycle-N/analysis.md`, se eliminan la spec del ciclo N y `docs/cycles/cycle-N/`; lo vigente queda en `ESTADO-ACTUAL.md` y `STATE.md`.
 - El usuario para el workflow cuando quiera; el estado queda en `STATE.md` para retomarlo.
 
 ## Economía de tokens

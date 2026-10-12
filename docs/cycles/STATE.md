@@ -1,95 +1,31 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`.
+Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y documentos de ciclo se eliminaron el 2026-10-12 (están en el historial de git).
 
 ## En curso
 
-- Ciclos 1–13, 15, 16 y 17 — cerrados (hashes en `docs/cycles/cycle-N/`, anteriores a la reescritura; ver Nota).
-- Ciclo 14 — cerrado. Desbloqueado: el usuario confirma que https://guillelpz.github.io/ARC/ carga (2026-10-09).
-- Ciclo 18: el proponedor recomienda no abrir más ciclos locales hasta tener el despliegue (P18.1). No hay más propuestas pendientes.
-- Ciclo 19 — cerrado; primer despliegue automático OK (2026-10-09). Desde aquí, cada push a main que toque app/ despliega a producción.
-- Ciclo 20 — cerrado. El usuario hace en paralelo los pasos de GitHub de P20.1.
-- Ciclo 21 — cerrado.
-- Ciclo 22 (P22.1) — hecho: `.gitattributes` LF (sin cambios de contenido); humo verificado en el deploy del 21; el usuario limitó el entorno `github-pages` a `main` (2026-10-12). **PAUSA del workflow** (decisión del usuario 2026-10-10) hasta que el usuario lo reactive con datos de uso real.
+- Ciclo 23 (P23.1, límite semanal VILLAIN) — **paso 4 (tech-lead)**. Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos (decisión directa del usuario). Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
 
-## Nota
+### P23.1 — Límite semanal opcional en VILLAIN
 
-El 2026-10-09 se reescribió el historial (email noreply) antes del primer push: los hashes citados en este archivo y en `docs/cycles/` son anteriores y ya no existen.
+- Regla (usuario, 2026-10-12): límite semanal opcional que se puede sobrepasar; pasarse **solo avisa**: no cambia XP, niveles ni rachas.
+- Notas técnicas de la evaluación anterior (P11.2): no reutilizar `weeklyGoal`/`goals` tal cual para VILLAIN, porque cambia la semántica de `todaySummary.missing` (VILLAIN saldría en «Te faltan»), `goalPct` y `streak`, y hoy se descarta por diseño en `readCustom`, `setGoal`, `allTrackers` y `editTracker`. Propuesta: campo propio `weeklyLimit` (solo VILLAIN); para Beer y Burgers, override validado por rama; «sin valor» = sin límite. Asserts/tests afectados si se reutiliza `goals`: G2 (`setGoal({}, 'beer', 5)`), el test de `storage.test.ts` que descarta `beer: 3` y U13 (Beer sin lápiz); «villain sin objetivo», E3 y C3 se mantienen con un campo propio.
 
-## Decisiones del usuario (2026-10-08)
+## Decisiones vigentes del usuario
 
-- Onboarding: si entra en un ciclo, el usuario nuevo arranca **vacío** con un botón «Cargar ejemplo» que carga los datos semilla.
 - Se puede proponer backend, cuentas y PARTY real; no se implementan sin okay.
 - Dependencias de desarrollo libres; las de runtime necesitan okay.
-- Claves de localStorage `*-demo-v1`: no se renombran.
-- P4.2: campo opcional `undoes?` en `ActivityEvent` aprobado.
-- P7.1 rachas: semanal por actividad, sin XP, la semana en curso no la rompe, objetivo actual también hacia atrás; `pop` en tarjeta + mejor racha en «Hoy».
-- P9.3: prorrateo lineal de la XP semanal de los amigos simulados por día transcurrido; asserts de ranking actuales se mueven al domingo 2026-10-11 + asserts nuevos de miércoles y lunes.
-- P11.1 (2026-10-09): `goalLog?` en life-rpg-custom-v1; racha con el objetivo vigente cada semana; antes del primer apunte, el objetivo vigente justo antes de ese cambio (aclarado 2026-10-09: bajar el objetivo nunca alarga la racha pasada); sin apuntes, objetivo de hoy; varios cambios en una semana → el primero; de «sin objetivo» a objetivo → la racha empieza en la semana del cambio.
-- P13.2 (2026-10-09): hosting sin decidir → se deja el despliegue preparado (build + workflow) sin activar; sin IA en producción.
-- P16.3 (2026-10-09): la IA solo funciona en `npm run dev` (`__AI_PROXY__ = command === 'serve' && !!key`); preview usa la heurística.
-- Push de `main` a origin tras cada ciclo cerrado (aprobado 2026-10-09); nunca force-push ni otras ramas.
-- Sincronización (2026-10-10): opción A, sin servidor — «Importar y fusionar» (unión por id + backup) + compartir copia (P15.2). Worker/servidor descartado por ahora (RGPD art. 9).
-- Despliegue (2026-10-09): GitHub Pages (repo público). El usuario crea el repo vacío en la web y pasa la URL; el orquestador añade el remoto y hace push. Commits nuevos con el email noreply de GitHub (el usuario lo facilita); reescribir el historial solo con su okay.
+- Claves de localStorage `*-demo-v1` y textos «demo»: no se renombran de momento.
+- Push de `main` a origin tras cada ciclo cerrado; nunca force-push ni otras ramas. Commits con el email noreply de GitHub; reescribir el historial solo con okay del usuario.
+- Despliegue: GitHub Pages (repo público); entorno `github-pages` limitado a `main` (2026-10-12).
+- Sincronización: opción A, sin servidor («Importar y fusionar» + compartir copia). Worker/servidor descartado por ahora (RGPD art. 9).
+- IA: solo heurística en producción, sin endpoint; el proxy solo en `npm run dev`.
+- Balance de XP: se deja como está. PARTY: sigue simulada (2026-10-12).
 
-## Decisiones del usuario (2026-10-12)
+## Propuestas no implementadas
 
-- Balance de XP: se deja como está.
-- PARTY: sigue simulada.
-- IA: solo heurística en producción, sin endpoint.
-- Sincronización: se sigue con la opción A (sin servidor).
-- Límite VILLAIN: **sí**, límite semanal opcional que se puede sobrepasar (aviso, no bloqueo). Retoma P11.2; pendiente de abrir ciclo.
-- Herencia «demo» (claves, textos): se queda de momento.
-
-## Propuestas
-
-| id | título | estado | ciclo |
-|---|---|---|---|
-| P1.1 | Fecha real (con cambios de evaluation.md) | aprobada | 2 |
-| P1.2 | Onboarding vacío + «Cargar ejemplo» (con cambios, sin renombrar claves) | aprobada | 2 |
-| P1.3 | No perder datos: validar al leer + exportar/importar (con cambios) | aprobada | 1 |
-| P1.4 | Tests ejecutables `npm test` (con cambios) | aprobada | 1 |
-| P3.1 | CI build+lint+test (GitHub Actions, push + PR; sin remoto todavía) | hecha | 2 |
-| P3.2 | Almacenamiento persistente + aviso de copia → dentro de P3.3 | aprobada | 3 |
-| P3.3 | Bloque «Tus datos» en la home (después de P1.1/P1.2) | aprobada | 3 |
-| P3.4 | Despliegue + endpoint de IA | pospuesta (decisión del usuario: hosting, key, KV) | — |
-| P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta | — |
-| P4.1 | Registrar en otro día (con cambios de evaluation.md) | aprobada | 4 |
-| P4.2 | Historial + deshacer concreto (`undoes?`) | aprobada | 4 |
-| P4.3 | Editar/archivar actividades propias | aprobada | 6+ |
-| P4.4 | Restaurar `.backup.last` desde la app (rehecha por el evaluador) | aprobada | 5 |
-| P4.5 | Tests de componentes (RTL + jsdom) | aprobada | 6+ |
-| P7.1 | Rachas semanales (regla aprobada tal cual) | aprobada | 7 |
-| P7.2a | Límite semanal opcional en VILLAIN | pendiente (no aprobada) | — |
-| P7.2b | Objetivos editables en las 6 fijas | aprobada | 8 |
-| P7.3 | Bloque «Hoy» en la home | aprobada | 7 |
-| P7.4 | Cerrar menores del ciclo 4 (deshacer) | aprobada | 7 |
-| P9.1 | Cerrar menores del ciclo 6 (después del ciclo 8) | aprobada | 10 |
-| P9.2 | Proponer a una party una actividad existente | aprobada | 9 |
-| P9.3 | Ranking prorrateado (regla aprobada) | aprobada | 9 |
-| P9.4 | Avisos accesibles + axe | aprobada | 10 |
-| P11.1 | Objetivo vigente por semana (`goalLog`), absorbe P11.5 | aprobada | 11 |
-| P11.2 | Límite semanal VILLAIN (`weeklyLimit`, sustituye a P7.2a) | no aprobada | — |
-| P11.3 | No perder registros en silencio si falla el guardado | aprobada | 11 |
-| P11.4 | Registrar desde «Te faltan» en la home | aprobada | 12 |
-| P11.5 | Menores de objetivos → dentro de P11.1 | aprobada | 11 |
-| P13.1 | Guardar sin borrar claves desconocidas de `custom` | aprobada | 13 |
-| P13.2 | Sitio estático sin IA (despliegue preparado, sin activar; hosting por decidir) | aprobada | 13 |
-| P13.3 | PWA instalable/offline (sw.js generado en build, kill switch) | aprobada | 14 |
-| P13.4 | Endpoint de IA en servidor | no aprobada | — |
-| P13.5 | e2e en Chromium real en la CI (Playwright) | aprobada | 14 |
-| P15.1 | Deshacer desde «Hoy» (con cambios) | aprobada | 15 |
-| P15.2 | Exportar con Web Share en móvil instalado | aprobada (dentro de la opción A) | 21 |
-| P15.3 | Lint `--deny-warnings` (reducida: silenciar los 3 warnings aceptados con su ponytail) | aprobada | 15 |
-| P16.1 | Tendencia 8 semanas por actividad (barras CSS accesibles) | aprobada | 16 |
-| P16.2 | HERO vs VILLAIN semana a semana en la home | aprobada | 17 |
-| P16.3 | Menores del ciclo 13 (IA solo en dev) | aprobada | 16 |
-| P18.1 | Activar despliegue en GitHub Pages | hecha (2026-10-09; despliegue manual con «Run workflow») | — |
-| P18.2 | Plural en aria-label de «Deshacer» | aprobada (dentro del ciclo 17) | 17 |
-| P19.1 | Despliegue automático a Pages en push a main (paths app/**, e2e como gate, salvo sw_kill) | aprobada | 19 |
-| P19.2 | No perder registros con dos pestañas (evento `storage`) | aprobada | 19 |
-| P19.3 | Vista previa del enlace (meta + Open Graph) | aprobada | 19 |
-| P20.1 | Proteger producción: humo post-deploy (JS publicado = dist), rollback con git revert; pasos de GitHub los hace el usuario | aprobada | 20 |
-| P20.2 | No pisar datos de otra pestaña tras aviso de datos dañados | aprobada | 20 |
-| P20.3 | Sincronización | opción A aprobada (ciclo 21); Worker descartado por ahora | 21 |
-| P22.1 | Riesgos operativos: humo del deploy 21, `.gitattributes` LF, entorno github-pages solo main | hecha | 22 |
+| id | título | estado |
+|---|---|---|
+| P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta |
+| P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |
+| P23.1 | Límite semanal opcional en VILLAIN (sustituye a P7.2a/P11.2) | aprobada, ciclo 23 en curso |

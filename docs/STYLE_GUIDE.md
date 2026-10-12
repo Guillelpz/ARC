@@ -1,6 +1,6 @@
 # Style Guide — RPG Life Tracker (V2)
 
-> Fuente de referencia del diseño. La skill `frontend-stylist` compara cada cambio con esta guía. Basada en `.claude/skills/frontend-stylist/references/style-guide-template.md`; estado del producto en `docs/ESTADO-ACTUAL.md`. Las pantallas se definen en `docs/DESIGN-V2.md`.
+> Fuente de referencia del diseño. La skill `frontend-stylist` compara cada cambio con esta guía. Basada en `.claude/skills/frontend-stylist/references/style-guide-template.md`; pantallas y estado del producto en `docs/ESTADO-ACTUAL.md`.
 > Stack: Tailwind CSS v4 (sin `tailwind.config`); los tokens se declaran con `@theme` en `app/src/index.css` y se usan como clases (`bg-hero-bg`, `text-villain-muted`…). En componentes no se usan colores hex ni la escala `slate-*`.
 
 ## Feel

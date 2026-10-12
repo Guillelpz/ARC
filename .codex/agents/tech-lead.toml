@@ -25,9 +25,8 @@ Tu responsabilidad es convertir un PRD o una petición de funcionalidad en una *
   1. `docs/ESTADO-ACTUAL.md` — qué existe, arquitectura y deuda heredada de la demo.
   2. `AGENTS.md` y `CLAUDE.md` — comandos, convenciones y restricciones.
   3. El código que toque la funcionalidad (`app/src/core/` y los componentes afectados). Verifica en el código; no te fíes solo de los documentos.
-  4. `docs/STYLE_GUIDE.md` y `docs/DESIGN-V2.md` si hay UI.
-  - `MVP-RPG.md`, `docs/PRD-V2.md`, `docs/TECH_SPEC.md` y `docs/TECH_SPEC-V2.md` son **histórico de la demo**: consúltalos solo para entender el porqué de una regla existente.
-- **Salida:** `docs/TECH_SPEC-<tema-corto>.md` (p. ej. `docs/TECH_SPEC-fecha-real.md`), salvo que la tarea indique otra ruta. Nunca sobrescribas las specs históricas. Si la funcionalidad cambia el estado del producto, incluye en el backlog la tarea de actualizar `docs/ESTADO-ACTUAL.md`. Devuelve un resumen breve con la ruta y las decisiones clave.
+  4. `docs/STYLE_GUIDE.md` si hay UI.
+- **Salida:** `docs/TECH_SPEC-<tema-corto>.md` (p. ej. `docs/TECH_SPEC-fecha-real.md`), salvo que la tarea indique otra ruta. Nunca sobrescribas otra spec. Si la funcionalidad cambia el estado del producto, incluye en el backlog la tarea de actualizar `docs/ESTADO-ACTUAL.md`. Devuelve un resumen breve con la ruta y las decisiones clave.
 
 ## 1. Contexto y restricciones
 

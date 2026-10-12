@@ -11,12 +11,12 @@ RPG Life Tracker: app que convierte hábitos (HERO) y vicios (VILLAIN) en XP y n
 - `npm run lint` — oxlint (`.oxlintrc.json`) con `--deny-warnings`: cualquier warning rompe la CI.
 - `npm test` — Vitest: ejecuta `selfcheck.ts` (falla si algún `console.assert` es falso) los tests de `core/` y los de UI (`src/App.test.tsx`, Testing Library + happy-dom) y el chequeo axe (`src/a11y.test.tsx`).
 - `npm run e2e` — Playwright + Chromium sobre un build con `BASE_PATH=/ARC/` (archivos `app/e2e/*.e2e.ts`); `npm test` no lo incluye. Corre en su propio job de la CI.
-- `selfcheck.ts` es el oráculo de dominio (TECH_SPEC §5/§10 y §4.6 de V2): si falla, se arregla el motor, nunca los asserts. Para cambios de código, pasar `build`, `lint` y `test`; si cambia `core/`, revisar los asserts afectados.
+- `selfcheck.ts` es el oráculo de dominio: si falla, se arregla el motor, nunca los asserts. Para cambios de código, pasar `build`, `lint` y `test`; si cambia `core/`, revisar los asserts afectados.
 
 ## Documentos
 
-- **Vigente:** `docs/ESTADO-ACTUAL.md` (qué hay, arquitectura, lo que falta para producción), `docs/DEPLOY.md` (despliegue a Pages), `docs/STYLE_GUIDE.md` (tokens, tipografía, botones, tono) y `docs/DESIGN-V2.md` (pantallas).
-- **Histórico (demo):** `MVP-RPG.md`, `docs/PRD-V2.md`, `docs/TECH_SPEC.md`, `docs/TECH_SPEC-V2.md`. Explican el porqué de las reglas implementadas; no fijan el alcance futuro.
+- `docs/ESTADO-ACTUAL.md` (pantallas, detalles de implementación, lo que falta para producción), `docs/DEPLOY.md` (despliegue a Pages), `docs/STYLE_GUIDE.md` (tokens, tipografía, botones, tono) y `docs/cycles/STATE.md` (ciclo en curso y decisiones vigentes del usuario).
+- Las specs y documentos de ciclos ya implementados se eliminan; el porqué de las reglas antiguas queda en el historial de git.
 - Las instrucciones recientes del usuario prevalecen sobre cualquier documento.
 
 ## Arquitectura

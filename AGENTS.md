@@ -2,7 +2,7 @@
 
 ## Proyecto
 
-- Estado actual (vigente): `docs/ESTADO-ACTUAL.md` (despliegue a Pages: `docs/DEPLOY.md`). El proyecto nació como demo de hackathon y ahora está en desarrollo real. `MVP-RPG.md`, `docs/PRD-V2.md`, `docs/TECH_SPEC.md` y `docs/TECH_SPEC-V2.md` son histórico de la demo.
+- Estado actual (vigente): `docs/ESTADO-ACTUAL.md` (despliegue a Pages: `docs/DEPLOY.md`). El proyecto nació como demo de hackathon y ahora está en desarrollo real. Ciclo en curso y decisiones vigentes del usuario: `docs/cycles/STATE.md`.
 - Aplicación en `app/`: React, TypeScript, Vite, Tailwind CSS y Lucide. Las versiones instaladas se consultan en `app/package.json` y su lockfile.
 - `ActivityEvent[]` es la fuente de verdad; estadísticas, XP y niveles son derivados. Persistencia aislada en `app/src/core/storage.ts` y cálculos puros en `app/src/core/` (incl. `merge.ts`: fusión de copias, «Importar y fusionar»; compartir copia con `navigator.share` y respaldo a descarga).
 - Hoy no hay backend ni autenticación y la PARTY es simulada; cambiarlo o añadir dependencias requiere decisión explícita del usuario. No añadir funcionalidades fuera del encargo.

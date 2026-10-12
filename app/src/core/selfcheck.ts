@@ -8,7 +8,7 @@ import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDupli
 import { parseCustom } from './storage'
 import { mergeBackup } from './merge'
 
-// Oráculo: §5 y §10 de TECH_SPEC. Si falla, se arregla el motor, nunca los asserts.
+// Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
   const ok = (cond: boolean, msg: string) => console.assert(cond, msg)
   const tap = (events: ActivityEvent[], id: string): ActivityEvent[] => {
@@ -72,7 +72,7 @@ export function runSelfCheck() {
   ok(sl.length === 16 && sl.every(e => e.occurredAt.slice(0, 10) <= '2026-10-12'), 'seedFor: sin eventos futuros')
 
 
-  // ---- V2 (PRD-V2 §8) ----
+  // ---- V2: parties, nuevo y ranking ----
   const [gymP, ofi] = PARTIES
   const NOW = `${DEMO_DATE}T12:00:00`
   const ids = (ts: { id: string }[]) => ts.map(t => t.id).join()
