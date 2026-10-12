@@ -763,3 +763,18 @@ test('U34 recuperar una copia sin gym conserva las series y recrea las sesiones'
   await vi.waitFor(() => expect(gymEvents().map((e: { id: string }) => e.id)).toEqual(['old', 'gym-auto-2026-10-06', 'gym-auto-2026-10-07']))
   expect(gymStored().log).toHaveLength(2)
 })
+
+test('U35 progreso del 1RM: lista accesible, estado vacío y unidad preferida', async () => {
+  render(<App />); openGym()
+  expect(screen.getByText(/^Aún no hay datos para el progreso/)).toBeTruthy()
+  logSet('100', '5')
+  const items = () => within(screen.getByRole('region', { name: /^Progreso/ })).getAllByRole('listitem').map(l => l.textContent)
+  expect(items()).toHaveLength(8)
+  expect(items()[7]).toBe('Semana del 5 oct (en curso): ≈ 116,7 kg')
+  expect(items()[6]).toMatch(/: sin datos$/)
+  expect(screen.getByText('Mejor del periodo: ≈ 116,7 kg')).toBeTruthy()
+  fireEvent.click(within(screen.getByRole('group', { name: 'Unidad de peso' })).getByRole('button', { name: 'lbs' }))
+  expect(items()[7]).toBe('Semana del 5 oct (en curso): ≈ 257,2 lbs')
+  fireEvent.click(screen.getByRole('button', { name: 'Deshacer serie 1 de Press banca: 220,5 lbs × 5' }))
+  expect(screen.getByText(/^Aún no hay datos para el progreso/)).toBeTruthy()
+})

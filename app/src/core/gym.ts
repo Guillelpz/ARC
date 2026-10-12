@@ -1,5 +1,5 @@
-import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeightUnit } from './types'
-import { clampAmount, dayTotal, undoneIds } from './stats'
+import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeekBest, WeightUnit } from './types'
+import { addDays, clampAmount, dayTotal, mondayOf, undoneIds } from './stats'
 
 export const EMPTY_GYM: GymData = { log: [], exercises: [] }
 export const GYM_TRACKER = 'gym'
@@ -156,3 +156,19 @@ export function ensureAuto(events: ActivityEvent[], log: GymEntry[], days: strin
 }
 // Días con series vivas, ordenados
 export const setDays = (log: GymEntry[]): string[] => [...new Set(liveSets(log).map(s => s.occurredAt.slice(0, 10)))].sort()
+
+// Mejor 1RM estimado por semana (n semanas, la última es la en curso); solo series vivas del ejercicio; sin dato → null
+export function weeklyBest1rm(log: GymEntry[], exerciseId: string, today: string, n = 8): WeekBest[] {
+  const cur = mondayOf(today), mine = liveSets(log).filter(s => s.exerciseId === exerciseId)
+  return Array.from({ length: n }, (_, i) => {
+    const monday = addDays(cur, -7 * (n - 1 - i)), end = addDays(monday, 7)
+    let kg: number | null = null
+    for (const s of mine) {
+      const d = s.occurredAt.slice(0, 10)
+      if (d < monday || d >= end) continue
+      const e = e1rm(toKg(s.weight, s.unit), s.reps)
+      if (e !== null && (kg === null || e > kg)) kg = e
+    }
+    return { monday, kg, current: i === n - 1 }
+  })
+}

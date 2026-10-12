@@ -7,7 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
-import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, setDays, stepWeight, toKg } from './gym'
+import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -454,6 +454,16 @@ export function runSelfCheck() {
         ensureAuto([man('m')], log1, [D]).length === 0 && ensureAuto([], [gsx('s1'), un('x1', 's1')], [D]).length === 0 &&
         e14c.map(e => e.id).join() === `gym-auto-${D},gym-auto-${P2}` && ensureAuto(e14c, two14, [D, P2]).length === 0 &&
         setDays([gsx('a', P2), gsx('b'), gsx('c', P2), un('u', 'b')]).join() === P2, 'GY14 ensureAuto')
+    }
+    // GY15 — weeklyBest1rm
+    {
+      const D15 = D, mon = mondayOf(D15)
+      const mk = (id: string, w: number, u: 'kg' | 'lbs', r: number, day: string): GymSet => ({ id, exerciseId: 'bench-press', weight: w, unit: u, reps: r, occurredAt: `${day}T10:00:00` })
+      const wb = weeklyBest1rm([mk('a', 100, 'kg', 5, D15), mk('b', 220, 'lbs', 3, D15), mk('c', 200, 'kg', 5, D15), un('uc', 'c'), mk('d', 80, 'kg', 13, addDays(mon, -7)),
+        mk('e', 60, 'kg', 5, addDays(D15, -63)), { ...mk('f', 90, 'kg', 5, D15), exerciseId: 'squat' }], 'bench-press', D15)
+      ok(wb.length === 8 && wb.filter(w => w.current).length === 1 && wb[7].current && wb[7].monday === mon && Math.abs((wb[7].kg ?? 0) - 116.667) < 0.01 &&
+        wb[6].kg === null && wb[0].kg === null && wb.slice(0, 7).every(w => w.kg === null) &&
+        Math.abs((weeklyBest1rm([mk('b', 220, 'lbs', 3, D15)], 'bench-press', D15)[7].kg ?? 0) - 109.77) < 0.01, 'GY15 weeklyBest1rm')
     }
   }
 

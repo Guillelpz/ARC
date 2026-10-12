@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { ArrowLeft, CircleAlert, Minus, Plus } from 'lucide-react'
 import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, WeightUnit } from '../core/types'
-import { GROUPS, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, lastSet, liveSets, parseReps, parseWeight, recordText, records, stepWeight } from '../core/gym'
-import { dayLabel } from '../core/stats'
+import { GROUPS, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, lastSet, liveSets, parseReps, parseWeight, recordText, records, stepWeight, weeklyBest1rm } from '../core/gym'
+import { dayLabel, shortDate } from '../core/stats'
 import { isValidName, normalizeText, trackerName } from '../core/classify'
 import { DayPicker } from './DayPicker'
 import { SaveFailBanner } from './SaveFailBanner'
@@ -58,6 +58,17 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
   const last = lastSet(gym.log, sel)
   const recs = records(liveSets(gym.log).filter(s => s.exerciseId === sel))
   const sessionSets = daySets(gym.log, day)
+  const progress = useMemo(() => weeklyBest1rm(gym.log, sel, today), [gym.log, sel, today])
+  const withData = progress.flatMap(w => (w.kg === null ? [] : [w.kg]))
+  const pMin = Math.min(...withData), pMax = Math.max(...withData)
+  const px = (i: number) => 6 + i * (88 / (progress.length - 1))
+  const py = (kg: number) => (pMax === pMin ? 20 : 34 - ((kg - pMin) / (pMax - pMin)) * 28)
+  const runs: string[] = [] // tramos de semanas consecutivas con dato; los huecos cortan la línea
+  progress.forEach((w, i) => {
+    if (w.kg === null) return
+    const pt = `${px(i).toFixed(1)},${py(w.kg).toFixed(1)}`
+    if (i > 0 && progress[i - 1].kg !== null) runs[runs.length - 1] += ` ${pt}`; else runs.push(pt)
+  })
   const groups: { id: string; label: string; items: Exercise[] }[] = GROUPS.map(g => ({ ...g, items: active.filter(x => x.group === g.id) }))
   const dayWord = dayLabel(day, today).toLowerCase()
   const sessionNote = (auto: boolean) => (auto ? ` Sesión de Gym apuntada en HERO (${dayWord}).` : '')
@@ -180,6 +191,24 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
               )}
               <div className="flex justify-between gap-3"><dt>Más repeticiones</dt><dd className="font-semibold tabular-nums">{fmtSet(recs.mostReps, unit, kind)}</dd></div>
             </dl>
+          )}
+        </section>
+
+        <section aria-labelledby="gym-progress" className={card}>
+          <h2 id="gym-progress" className="text-base font-semibold">Progreso · {name}</h2>
+          {withData.length === 0 ? <p className="text-sm text-hero-muted">Aún no hay datos para el progreso: cuenta el 1RM estimado de series con peso y de hasta 12 repeticiones.</p> : (
+            <>
+              <svg viewBox="0 0 100 40" className="h-24 w-full text-hero" aria-hidden>
+                {runs.filter(r => r.includes(' ')).map(r => <polyline key={r} points={r} fill="none" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />)}
+                {progress.map((w, i) => w.kg === null ? null
+                  : <circle key={w.monday} cx={px(i)} cy={py(w.kg)} r="1.6" stroke="currentColor" strokeWidth="1" fill={w.current ? 'none' : 'currentColor'} />)}
+              </svg>
+              <p className="text-sm font-semibold tabular-nums">Mejor del periodo: ≈ {fmtWeight(fromKg(pMax, unit), unit)}</p>
+              <p className="text-xs text-hero-muted">Mejor 1RM estimado por semana (Epley)</p>
+              <ul className="sr-only">
+                {progress.map(w => <li key={w.monday}>{`Semana del ${shortDate(w.monday)}${w.current ? ' (en curso)' : ''}: ${w.kg === null ? 'sin datos' : `≈ ${fmtWeight(fromKg(w.kg, unit), unit)}`}`}</li>)}
+              </ul>
+            </>
           )}
         </section>
 

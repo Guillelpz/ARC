@@ -145,3 +145,6 @@ export type GymEntry = GymSet | GymUndo
 export type GymData = { log: GymEntry[]; exercises: Exercise[]; unit?: WeightUnit } // exercises: solo los propios; unit ausente = 'kg'
 export type RecordKind = 'weight' | '1rm' | 'reps'
 export type GymRecords = { maxWeight: GymSet | null; best1rm: { set: GymSet; kg: number } | null; mostReps: GymSet | null }
+export type WeekBest = { monday: string; kg: number | null; current: boolean } // kg: mejor 1RM estimado de la semana, en kg; null = sin dato
+export type GroupVolume = { group: MuscleGroup; label: string; sets: number; kg: number; prevSets: number; prevKg: number }
+export type GymDay = { sets: number; exercises: number } // series vivas de un día y ejercicios distintos
