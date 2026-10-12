@@ -4,7 +4,7 @@ import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, Rec
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { GYM_TRACKER, allExercises, autoSession, beaten, exerciseName, recordText, retractAuto, liveSets } from './core/gym'
+import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
@@ -134,6 +134,7 @@ export default function App() {
   function push(evs: ActivityEvent[], t: Tracker) {
     const next = [...events, ...evs]
     const amount = evs.reduce((n, e) => n + e.amount, 0), key = evs[evs.length - 1].id
+    if (amount === 0) return setEvents(next) // neto 0 (deshacer la sesión de un día con series + sesión automática): sin XP, toast ni animación
     const after = deriveGame(next, today, trackers)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
     setEvents(next) // evento creado fuera del updater (StrictMode)
@@ -163,8 +164,10 @@ export default function App() {
     if (!amount || (undo && amount !== -undo.amount)) return 0
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,
       occurredAt: undo ? undo.occurredAt : nowStamp(day), ...(undo && { undoes: undo.id }) }
-    push([ev], t)
-    return amount
+    // Regla: día con series vivas ⇒ al menos 1 sesión de Gym. Si el deshacer o el «−» la rompe, se repone en el mismo guardado (neto 0).
+    const extra = t.id === GYM_TRACKER && amount < 0 ? ensureAuto([...events, ev], gym.log, [day]) : []
+    push([ev, ...extra], t)
+    return amount + extra.length
   }
 
   const r2 = (x: number) => Math.round(x * 100) / 100
@@ -174,7 +177,7 @@ export default function App() {
     const set: GymSet = { id: crypto.randomUUID(), ...input, weight: r2(input.weight), occurredAt: nowStamp(day) }
     const kinds = beaten(liveSets(gym.log).filter(s => s.exerciseId === set.exerciseId), set)
     setGym({ ...gym, log: [...gym.log, set] })
-    // ponytail: si el día tenía una sesión manual y se deshace con series vivas, el día queda con series y 0 sesiones; solo reaparece al registrar otra serie.
+    // la regla «series vivas ⇒ ≥ 1 sesión» la cumple también `add` (deshacer o «−» de la sesión): ver ensureAuto
     const ev = autoSession(events, day)
     if (ev) push([ev], gymTracker())
     if (kinds.length) {
