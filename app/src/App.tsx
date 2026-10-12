@@ -4,8 +4,9 @@ import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, Rec
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay } from './core/gym'
-import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay } from './core/gym'
+import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { askHaiku, type HaikuError } from './core/haiku'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -55,6 +56,20 @@ export default function App() {
   const [canRestore, setCanRestore] = useState(hasLastBackup)
   const [lastExport, setLastExport] = useState(loadLastExport)
   const [voiceAck, setVoiceAck] = useState(() => loadVoicePrefs().privacyAck !== undefined)
+  const keyState = () => { const k = loadAiKey(); return { hint: k ? k.slice(-4) : null, invalid: !k && hasAiKeyEntry() } }
+  const [aiKey, setAiKey] = useState(keyState) // solo los últimos 4 caracteres: la clave entera se lee con loadAiKey() dentro de los manejadores
+  const saveKey = (key: string): 'ok' | 'format' | 'save' => {
+    if (!readAiKey(key)) return 'format'
+    if (!saveAiKey(key)) return 'save'
+    setAiKey(keyState()); return 'ok'
+  }
+  const clearKey = () => { clearAiKey(); setAiKey(keyState()) }
+  async function testKey(): Promise<HaikuError | 'ok'> {
+    const key = loadAiKey()
+    if (!key) return 'auth'
+    const r = await askHaiku('press banca 80 kg 5 repeticiones', EXERCISES, 'kg', key)
+    return r.ok ? (r.draft.exerciseId === 'bench-press' ? 'ok' : 'invalid') : r.error
+  }
   const ackVoice = () => { saveVoicePrefs({ privacyAck: new Date().toISOString() }); setVoiceAck(true) }
 
   const [, refresh] = useReducer((n: number) => n + 1, 0)
@@ -359,7 +374,7 @@ export default function App() {
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
-      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} />}
+      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}

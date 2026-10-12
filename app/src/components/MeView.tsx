@@ -1,8 +1,12 @@
 import { useEffect, useRef } from 'react'
 import { ChevronRight, Dumbbell } from 'lucide-react'
 import { VoiceCheck } from './VoiceCheck'
+import { AiKeySettings, type KeySave } from './AiKeySettings'
+import type { HaikuError } from '../core/haiku'
 
-export function MeView({ onOpenGym, focusGym, voiceAck, onVoiceAck }: { onOpenGym: () => void; focusGym: boolean; voiceAck: boolean; onVoiceAck: () => void }) {
+export type AiKeyProps = { hint: string | null; invalid: boolean; onSave: (key: string) => KeySave; onClear: () => void; onTest: () => Promise<HaikuError | 'ok'> }
+
+export function MeView({ onOpenGym, focusGym, voiceAck, onVoiceAck, aiKey }: { onOpenGym: () => void; focusGym: boolean; voiceAck: boolean; onVoiceAck: () => void; aiKey: AiKeyProps }) {
   const ref = useRef<HTMLButtonElement>(null)
   useEffect(() => { if (focusGym) ref.current?.focus() }, [focusGym])
   return (
@@ -27,6 +31,10 @@ export function MeView({ onOpenGym, focusGym, voiceAck, onVoiceAck }: { onOpenGy
             <h3 className="text-sm font-semibold">Voz</h3>
             <p className="text-sm leading-6 text-app-muted">Comprueba si este dispositivo puede transcribir lo que dices. No guarda nada.</p>
             <VoiceCheck ack={voiceAck} onAck={onVoiceAck} />
+          </div>
+          <div className="flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5">
+            <h3 className="text-sm font-semibold">Clave de Anthropic</h3>
+            <AiKeySettings {...aiKey} />
           </div>
         </section>
       </main>

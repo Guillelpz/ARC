@@ -77,3 +77,10 @@ test('A12 Yo con Ajustes y el diagnóstico de voz', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Probar voz' }))
   expect(await serious()).toEqual([])
 })
+
+test('A12b Yo con la clave guardada', async () => {
+  localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
+  render(<App />); go('Yo')
+  expect(screen.getByText('Clave guardada: termina en 0000')).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

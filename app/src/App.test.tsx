@@ -891,3 +891,59 @@ test('U-V0b Probar voz sin API: no disponible', async () => {
   expect(await screen.findByText('no disponible')).toBeTruthy()
   expect(screen.getAllByText('Error: not-supported').length).toBeGreaterThan(0)
 })
+
+const AIK = 'life-rpg-ai-key-v1', KEY = 'sk-ant-test-0000000000000000'
+const typeKey = (v: string) => fireEvent.change(screen.getByLabelText('Clave'), { target: { value: v } })
+
+test('U-V9 clave: formato, guardada, fuera de las copias y de Borrar todo', async () => {
+  const { container } = render(<App />); go('Yo')
+  typeKey('abc'); fireEvent.click(btn('Guardar clave'))
+  expect(screen.getByText('La clave debe empezar por sk-ant-.')).toBeTruthy()
+  expect(screen.getByLabelText('Clave').getAttribute('aria-invalid')).toBe('true')
+  expect(localStorage.getItem(AIK)).toBeNull()
+  typeKey(KEY); fireEvent.click(btn('Guardar clave'))
+  expect(screen.getByText('Clave guardada: termina en 0000')).toBeTruthy()
+  expect(localStorage.getItem(AIK)).toBe(KEY)
+  expect(screen.queryByLabelText('Clave')).toBeNull() // el campo vuelve vacío y oculto
+  expect(document.body.innerHTML).not.toContain(KEY)
+  // exportar: la copia no lleva la clave
+  go('Inicio'); fireEvent.click(btn('Exportar copia'))
+  const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
+  expect(await blob.text()).not.toContain(KEY)
+  // «Borrar todo» no la toca
+  window.confirm = vi.fn(() => true)
+  fireEvent.click(btn('Borrar todo'))
+  expect(localStorage.getItem(AIK)).toBe(KEY)
+  // importar una copia no la toca
+  importFile(container, exportBackup([], { trackers: [], proposals: [] }, '2026-10-07T10:00:00.000Z'))
+  await vi.waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(2))
+  expect(localStorage.getItem(AIK)).toBe(KEY)
+  // borrar la clave
+  go('Yo'); fireEvent.click(btn('Borrar clave'))
+  expect(localStorage.getItem(AIK)).toBeNull()
+  expect(screen.getByLabelText('Clave')).toBeTruthy()
+})
+
+test('U-V9b clave guardada pero no válida: aviso y Borrar clave', () => {
+  localStorage.setItem(AIK, 'basura'); window.confirm = vi.fn(() => true)
+  render(<App />); go('Yo')
+  expect(screen.getByText(/La clave guardada no es válida/)).toBeTruthy()
+  fireEvent.click(btn('Borrar clave'))
+  expect(localStorage.getItem(AIK)).toBeNull()
+})
+
+test('U-V12 Probar clave: ok y 401', async () => {
+  localStorage.setItem(AIK, KEY)
+  const bench = { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ exerciseId: 'bench-press', weight: 80, unit: 'kg', reps: 5, sets: 1 }) }] }
+  const f = vi.fn().mockResolvedValueOnce(new Response(JSON.stringify(bench), { status: 200 })).mockResolvedValueOnce(new Response('{}', { status: 401 }))
+  vi.stubGlobal('fetch', f)
+  try {
+    render(<App />); go('Yo')
+    fireEvent.click(btn('Probar clave'))
+    expect(await screen.findByText('La clave funciona.')).toBeTruthy()
+    expect(f).toHaveBeenCalledTimes(1)
+    expect((f.mock.calls[0][1] as RequestInit).headers).toMatchObject({ 'x-api-key': KEY })
+    fireEvent.click(btn('Probar clave'))
+    expect(await screen.findByText('Anthropic rechaza la clave. Comprueba que la has copiado entera.')).toBeTruthy()
+  } finally { vi.unstubAllGlobals() }
+})
