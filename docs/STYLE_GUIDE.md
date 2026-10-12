@@ -7,7 +7,7 @@
 Una ficha de personaje RPG sobria y contemporánea: datos legibles, jerarquía clara y contraste entre luz (HERO) y oscuridad (VILLAIN). El carácter de juego viene de niveles, XP y progreso; nada de neón, confeti, degradados ni fuentes de fantasía.
 
 ## Language & tone
-- Interfaz en español. Vocabulario fijo, escrito siempre igual: `YOU`, `HERO`, `VILLAIN`, `PLAYER`, `XP`, `Lv.`, `PARTY` (como marca de sección) y `Party` en la navegación y en «Party de ejemplo». `IA` solo en la pantalla Desconocido.
+- Interfaz en español. Vocabulario fijo, escrito siempre igual: `YOU`, `HERO`, `VILLAIN`, `PLAYER`, `XP`, `Lv.`, `PARTY` (como marca de sección) y `Party` en la navegación y en «Party de ejemplo». `IA` solo en la pantalla Desconocido y en Ajustes (clave de Anthropic).
 - Formatos: `Lv. 3`, `120 XP`, `+15 VILLAIN XP`, `3 / 4 sesiones esta semana`, `Aceptada 2/3`, `Rechazada 1/3`, `Cuenta en: Los del Gym · La Oficina`. Separador: ` · `.
 - Tono: directo, breve, sereno, en segunda persona. Sin exclamaciones en cadena ni bromas. La IA **propone**, no juzga: `La IA propone: VILLAIN`, nunca «mal hábito».
 - HERO/VILLAIN son ramas, no valoraciones. Sin verde/rojo; los votos se expresan con ✓/✕ más texto.
@@ -93,6 +93,7 @@ Fuente del sistema (sans). Sin `font-black` ni `tracking-[0.3em]` (V1): usar la 
 - Solo `lucide-react`, trazo por defecto. `size-4` junto a texto, `size-5` en controles independientes y navegación. Siempre acompañan a una etiqueta; si un control es solo icono, lleva `aria-label`.
 - Navegación: `House` Inicio, `Shield` HERO, `Moon` VILLAIN, `Sparkles` Nuevo, `Users` Party, `User` Yo.
 - Gym: `Dumbbell` (Gym en «Yo»), `Trophy` (aviso de récord).
+- Voz: `Mic` («Dictar serie», «Probar voz»), `Keyboard` («Escribir»), `KeyRound` (clave de Anthropic en Ajustes).
 - Trackers: los de V1 (`Dumbbell`, `Swords`, `Footprints`, `BookOpen`, `Beer`, `Sandwich`); personalizados `Sparkles`.
 - Otros: `Check` / `X` en votos, `CircleAlert` en avisos, `ChevronRight` en filas navegables, `Trash2` en «Borrar todo».
 
@@ -112,7 +113,7 @@ Base común (todas las variantes):
 
 - `/90` en hover solo opaca el acento sobre su propio fondo; no mezcla paletas.
 - El selector de rama en Desconocido usa segmento con opción activa de su rama: HERO activa `bg-hero text-hero-on-accent`, VILLAIN activa `bg-villain-bg text-villain-text` (el panel de la propuesta ya cambia de paleta entera).
-- Operaciones nunca bloquean: no hay estado «cargando» en V2 (todo es local y síncrono).
+- Operaciones nunca bloquean: no hay estado «cargando» en V2 (todo es local y síncrono). Única excepción: la voz, que muestra «Procesando…» con los botones deshabilitados mientras Haiku responde (máx. 8 s).
 
 ## Navigation
 Barra inferior fija, neutral, 6 destinos: `Inicio`, `HERO`, `VILLAIN`, `Nuevo`, `Party`, `Yo`. La pantalla Gym cuelga de «Yo» y la deja marcada como activa.
