@@ -324,6 +324,28 @@ export function saveVoicePrefs(p: VoicePrefs, store: Pick<Storage, 'setItem'> = 
   try { store.setItem(VOICE_KEY, JSON.stringify(p)); return true } catch { return false }
 }
 
+// Clave de Anthropic del usuario (texto sin JSON), solo de este dispositivo: fuera de copias, fusión, `backupCurrent` y «Borrar todo».
+// Nunca se escribe en consola ni se muestra entera. `isDataKey` la ignora (se lee en el momento de usarla).
+export const AI_KEY = 'life-rpg-ai-key-v1'
+export function readAiKey(raw: string | null): string | null {
+  if (raw === null) return null
+  const k = raw.trim()
+  return k.startsWith('sk-ant-') && k.length >= 20 && k.length <= 300 && !/\s/.test(k) ? k : null
+}
+export function loadAiKey(store: Pick<Storage, 'getItem'> = localStorage): string | null {
+  try { return readAiKey(store.getItem(AI_KEY)) } catch { return null }
+}
+// ¿hay algo guardado aunque no sea una clave válida? (Ajustes ofrece «Borrar clave»)
+export function hasAiKeyEntry(store: Pick<Storage, 'getItem'> = localStorage): boolean {
+  try { return store.getItem(AI_KEY) !== null } catch { return false }
+}
+export function saveAiKey(key: string, store: Pick<Storage, 'setItem'> = localStorage): boolean {
+  try { store.setItem(AI_KEY, key.trim()); return true } catch { return false }
+}
+export function clearAiKey(store: Pick<Storage, 'removeItem'> = localStorage): boolean {
+  try { store.removeItem(AI_KEY); return true } catch { return false }
+}
+
 // ponytail: persist() es una petición; el navegador puede ignorarla (Safari borra tras 7 días sin uso). La garantía real es exportar.
 export function requestPersist(): void {
   navigator.storage?.persisted?.().then(p => p || navigator.storage.persist()).catch(() => {})

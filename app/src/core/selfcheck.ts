@@ -8,7 +8,7 @@ import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDupli
 import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, isComplete, matchExercise, normalizeVoice, parseGym, type GymDraft } from './voice'
-import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
+import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -528,6 +528,19 @@ export function runSelfCheck() {
     {
       const m21 = man('m'), u21 = { id: 'um', trackerId: 'gym', amount: -1, occurredAt: m21.occurredAt, undoes: 'm' }
       ok(get(deriveGame([m21, u21, a1], D), 'gym').xp.xp === get(deriveGame([m21], D), 'gym').xp.xp, 'GY21 XP neta 0 al reponer la sesión')
+    }
+    // GY22 — undoMany (deshacer un comando de voz de varias series)
+    {
+      const D22 = DEMO_DATE, ids22 = () => `u${Math.random()}`
+      const g22 = (id: string): GymSet => ({ id, exerciseId: 'bench-press', weight: 80, unit: 'kg', reps: 5, occurredAt: `${D22}T10:00:00` })
+      const auto22 = autoSession([], D22)!
+      const prev = g22('p'), three = [g22('c1'), g22('c2'), g22('c3')]
+      const log22 = [prev, ...three]
+      const us = undoMany(log22, ['c1', 'c2', 'c3'], ids22)
+      const only = [...three], us2 = undoMany(only, ['c1', 'c2', 'c3'], ids22)
+      const dup = undoMany([...log22, { id: 'x', undoes: 'c1', occurredAt: `${D22}T10:00:00` }], ['c1', 'c2', 'c2', 'ghost'], ids22)
+      ok(us.length === 3 && us.every(u => u.occurredAt === `${D22}T10:00:00`) && retractAuto([auto22], [...log22, ...us], D22, ids22).length === 0 &&
+        retractAuto([auto22], [...only, ...us2], D22, ids22).length === 1 && dup.length === 1 && dup[0].undoes === 'c2', 'GY22 undoMany: solo series vivas, una vez; la sesión se retira solo sin series vivas')
     }
   }
 
