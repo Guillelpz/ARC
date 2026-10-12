@@ -507,6 +507,22 @@ export function runSelfCheck() {
         g2.fixed === 1 && g2.data.routines?.[0].items.length === 1 && g3.dropped === 1 && !('routines' in g3.data) && g4.dropped === 1 && !('routines' in g4.data) &&
         old !== null && old.gym?.unit === 'lbs' && !('routines' in (old.gym ?? {})), 'GY19 readGym con rutinas')
     }
+    // GY20 — fusión de rutinas
+    {
+      const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }
+      const ra = { id: 'routine-a', name: 'Push', items: [{ exerciseId: 'bench-press', sets: 3 }] }
+      const rb = { id: 'routine-b', name: 'Pull', items: [{ exerciseId: 'pull-up', sets: 4 }] }
+      const L = { events: [] as ActivityEvent[], custom: cu, gym: { log: [], exercises: [], routines: [ra] } }
+      const inc = { events: [], custom: cu, gym: { log: [], exercises: [], routines: [{ ...ra, items: [{ exerciseId: 'squat', sets: 1 }] }, rb] } }
+      const before = JSON.stringify([L, inc])
+      const m = mergeBackup(L, inc)
+      const again = mergeBackup({ events: [], custom: cu, gym: m.gym }, inc)
+      const none = mergeBackup(L, { events: [], custom: cu, gym: { log: [], exercises: [] } })
+      const nog = mergeBackup({ events: [], custom: cu, gym: { log: [], exercises: [] } }, { events: [], custom: cu })
+      ok(m.gym.routines?.map(r => r.id).join() === 'routine-a,routine-b' && m.routinesAdded === 1 && m.changed && m.conflicts.join() === 'Push' && JSON.stringify(m.gym.routines?.[0]) === JSON.stringify(ra) &&
+        again.routinesAdded === 0 && !again.changed && JSON.stringify([L, inc]) === before &&
+        !none.changed && JSON.stringify(none.gym.routines) === JSON.stringify([ra]) && !('routines' in nog.gym), 'GY20 fusión de rutinas')
+    }
   }
 
   console.info('[selfcheck] done')

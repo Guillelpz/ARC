@@ -283,13 +283,16 @@ export default function App() {
     const kLocal = liveSets(gym.log).length, kCopia = b.gym ? liveSets(b.gym.log).length : 0
     const gymText = b.gym === null && kLocal > 0 ? ` Esta copia es anterior al módulo Gym: tus ${kLocal} series de gym también se reemplazan (quedan 0).`
       : kLocal + kCopia > 0 ? ` Series de gym: ${kLocal} → ${kCopia}.` : ''
-    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''}${gymText} Exporta antes si quieres conservar lo actual.`)) return
+    const rLocal = gym.routines?.length ?? 0, rCopia = b.gym?.routines?.length ?? 0
+    const routinesText = rLocal + rCopia > 0 ? ` Rutinas: ${rLocal} → ${rCopia}.` : ''
+    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''}${gymText}${routinesText} Exporta antes si quieres conservar lo actual.`)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
     unlockStorage()
     const g = b.gym ?? EMPTY_GYM // la regla de sesiones también rige al importar (normalmente no añade nada)
     setEvents([...b.events, ...ensureAuto(b.events, g.log, setDays(g.log))]); setCustom(b.custom); setGym(g); setToast(null); setGain(null); setOvertake(null)
-    setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas.`)
+    const nr = b.gym?.routines?.length ?? 0
+    setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas${nr > 0 ? ` y ${nr} rutinas` : ''}.`)
   }
 
   function mergeData(text: string) {
@@ -299,7 +302,7 @@ export default function App() {
     const r = mergeBackup({ events, custom, gym }, { ...b, gym: b.gym ?? undefined })
     if (!r.changed) return setNotice(`Esa copia no trae nada nuevo: ya tienes todos sus registros.${r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios; se mantiene lo de este dispositivo.` : ''}`)
     const gymAdded = r.setsAdded + r.exercisesAdded
-    const gymText = gymAdded > 0 ? ` y ${gymAdded} entradas de gym` : ''
+    const gymText = (gymAdded > 0 ? ` y ${gymAdded} entradas de gym` : '') + (r.routinesAdded > 0 ? ` y ${r.routinesAdded} rutinas` : '')
     const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas${gymText}.`
       + (r.renamed > 0 ? ` ${r.renamed} registros coinciden en identificador con uno tuyo pero son distintos (p. ej. del ejemplo): se añaden aparte.` : '')
       + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo, límite o archivado): se mantiene lo de este dispositivo.` : '')
