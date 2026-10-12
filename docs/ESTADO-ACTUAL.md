@@ -1,6 +1,6 @@
 # Estado actual — RPG Life Tracker
 
-> Fecha de corte: 2026-10-12 (tras ciclo 24). Describe lo que hay en el código que no está ya en `CLAUDE.md` (comandos, arquitectura de `core/`, restricciones) y lo que lo separa de un producto en producción.
+> Fecha de corte: 2026-10-12 (tras ciclo 25). Describe lo que hay en el código que no está ya en `CLAUDE.md` (comandos, arquitectura de `core/`, restricciones) y lo que lo separa de un producto en producción.
 
 ## 1. Qué es
 
@@ -46,7 +46,7 @@ Feedback: avisos anunciados por regiones `role="status"` (`liveText` en `compone
 |---|---|---|
 | Party | Amigos, parties y votos son ficticios y deterministas (`PARTIES`, `stance`). | Requiere backend, cuentas e invitaciones para ser real. |
 | Usuarios | Un único usuario local, sin cuenta. | Sin auth ni sincronización entre dispositivos (solo «Importar y fusionar»). |
-| Gym | Sin nivel/XP propio, sin sobrecarga progresiva, edición de rutinas ni temporizador; sin ejemplo cargable. | Pendiente: P24.6, P24.9 y P24.11. |
+| Gym | Sin nivel/XP propio, sobrecarga progresiva, edición de rutinas ni temporizador; sin ejemplo cargable. `readGym` no deduplica ids de rutina; «−»/deshacer que repone la sesión automática no avisa; `GymView.tsx` ronda las 380 líneas. | Pendiente: P24.6, P24.9 y P24.11; menores del review del ciclo 25. |
 | Persistencia | Solo localStorage, con exportar/importar manual. Las claves llevan «demo» en el nombre. | Pérdida de datos al borrar el navegador (persist es solo petición); recordatorio fijo de 14 días, sin copias automáticas ni migraciones de esquema. |
 | IA | Proxy de Vite solo en local; sin reintentos, caché ni límite de uso. | En producción solo heurística. |
 | Progresión | Umbrales lineales y XP/unidad fijos; sin límite de registros por día. | Balance de juego sin validar con usuarios. |
