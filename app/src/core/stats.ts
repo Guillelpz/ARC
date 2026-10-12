@@ -82,6 +82,7 @@ export function trackerStats(t: Tracker, events: ActivityEvent[], today: string)
     week, prev, diff: week - prev, allTime,
     goalPct: t.weeklyGoal ? (week / t.weeklyGoal) * 100 : null,
     streak: streak(events, t, today),
+    over: t.weeklyLimit ? Math.max(0, week - t.weeklyLimit) : null,
   }
 }
 

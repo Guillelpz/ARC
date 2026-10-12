@@ -88,7 +88,7 @@ export function MissionsView({ branch, game, partyStates, gain, events, today, o
               proposable={s.tracker.custom ? proposable(s.tracker) : undefined}
               proposals={s.tracker.custom ? proposals(s.tracker) : undefined}
               onPropose={s.tracker.custom ? ids => onPropose(s.tracker.id, ids) : undefined}
-              onSave={s.tracker.custom || s.tracker.weeklyGoal ? onSave : undefined}
+              onSave={onSave}
               nameTaken={n => isDuplicateName(n, game.trackers.map(x => x.tracker).filter(x => x.id !== s.tracker.id))} />
             </div>
           ))}

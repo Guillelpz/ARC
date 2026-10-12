@@ -6,7 +6,7 @@ import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EMPTY_CUSTOM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
-import { allTrackers, defaultGoal, logGoal, setGoal } from './core/trackers'
+import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
 import { BottomNav, type Screen } from './components/BottomNav'
 import { HomeView } from './components/HomeView'
@@ -57,7 +57,7 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
-  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0
+  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0
   const copy = backupDue(lastExport, now, hasData)
 
   const [unsaved, setUnsaved] = useState({ events: false, custom: false }) // false en cada clave con su siguiente guardado correcto
@@ -99,7 +99,7 @@ export default function App() {
     return () => clearTimeout(id)
   }, [overtake, toast])
 
-  const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals, custom.goalLog), [custom.trackers, custom.goals, custom.goalLog])
+  const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals, custom.goalLog, custom.limits), [custom.trackers, custom.goals, custom.goalLog, custom.limits])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const weeks = useMemo(() => branchWeekly(events, trackers, today), [events, trackers, today])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
@@ -148,6 +148,14 @@ export default function App() {
 
   const saveTracker = (input: Tracker) => {
     const { pastGoals: _, ...t } = input // derivado: no se persiste
+    if (!t.custom && t.branch === 'villain') {
+      setCustom(c => {
+        const { limits: _l, ...rest } = c
+        const limits = setLimit(c.limits, t.id, t.weeklyLimit ?? null)
+        return Object.keys(limits).length ? { ...rest, limits } : rest
+      })
+      return
+    }
     setCustom(c => {
       const old = t.custom ? c.trackers.find(x => x.id === t.id)?.weeklyGoal : (c.goals?.[t.id] ?? defaultGoal(t.id))
       let next: CustomData, now: number | undefined
@@ -224,7 +232,7 @@ export default function App() {
     if (!r.changed) return setNotice(`Esa copia no trae nada nuevo: ya tienes todos sus registros.${r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios; se mantiene lo de este dispositivo.` : ''}`)
     const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas.`
       + (r.renamed > 0 ? ` ${r.renamed} registros coinciden en identificador con uno tuyo pero son distintos (p. ej. del ejemplo): se añaden aparte.` : '')
-      + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo o archivado): se mantiene lo de este dispositivo.` : '')
+      + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo, límite o archivado): se mantiene lo de este dispositivo.` : '')
       + (b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : '') + (b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : '')
       + ' No se borra nada. Lo que hayas borrado aquí y siga en la copia volverá a aparecer. Si no te convence, «Recuperar copia anterior» lo deshace.'
     if (!window.confirm(msg)) return

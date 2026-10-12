@@ -1,6 +1,6 @@
 import type { ActivityEvent, CustomData, GoalLogEntry, Proposal, Tracker } from './types'
 import { undoneIds } from './stats'
-import { defaultGoal, TRACKERS } from './trackers'
+import { defaultGoal, isFixedVillain, TRACKERS } from './trackers'
 
 export type MergeResult = {
   events: ActivityEvent[] // local + nuevos (locales primero, luego los entrantes añadidos en el orden del archivo)
@@ -15,7 +15,7 @@ export type MergeResult = {
 type Side = { events: ActivityEvent[]; custom: CustomData }
 
 const same = (a: ActivityEvent, b: ActivityEvent) => a.trackerId === b.trackerId && a.amount === b.amount && a.occurredAt === b.occurredAt
-const sig = (t: Tracker) => JSON.stringify([t.name, t.increment, t.weeklyGoal ?? null, !!t.archived, t.branch, t.type, t.unit, t.xpPerUnit])
+const sig = (t: Tracker) => JSON.stringify([t.name, t.increment, t.weeklyGoal ?? null, t.weeklyLimit ?? null, !!t.archived, t.branch, t.type, t.unit, t.xpPerUnit])
 
 // ponytail: (1) lo borrado con «Borrar todo», importar o restoreLast y que sigue en la copia vuelve: sin servidor ni fecha de
 // creación por evento no se distingue; hace falta `createdAt` por evento o un servidor.
@@ -62,6 +62,7 @@ export function mergeBackup(local: Side, incoming: Side): MergeResult {
     const def = defaultGoal(t.id)
     if (def !== undefined && (lc.goals?.[t.id] ?? def) !== (ic.goals?.[t.id] ?? def)) conflicts.push(t.name)
   }
+  for (const t of TRACKERS) if (isFixedVillain(t.id) && (lc.limits?.[t.id] ?? null) !== (ic.limits?.[t.id] ?? null)) conflicts.push(t.name)
   const addedIds = new Set(newTrackers.map(t => t.id))
   const newLog: GoalLogEntry[] = (ic.goalLog ?? []).filter(e => addedIds.has(e.trackerId))
   const goalLog = [...(lc.goalLog ?? []), ...newLog]
@@ -75,6 +76,7 @@ export function mergeBackup(local: Side, incoming: Side): MergeResult {
   if (goalLog.length > 0) custom.goalLog = goalLog
   else delete custom.goalLog
   if (custom.goals && Object.keys(custom.goals).length === 0) delete custom.goals
+  if (custom.limits && Object.keys(custom.limits).length === 0) delete custom.limits
   return {
     events, custom, added, existing, renamed, trackersAdded: newTrackers.length, conflicts,
     changed: added > 0 || newTrackers.length > 0 || newProps.length > 0 || newLog.length > 0,
