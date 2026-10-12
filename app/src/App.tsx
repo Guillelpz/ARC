@@ -4,7 +4,7 @@ import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, Rec
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays } from './core/gym'
+import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
@@ -45,6 +45,8 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
   const [focusGym, setFocusGym] = useState(false) // true al volver de Gym: el foco va a su tarjeta en «Yo»
+  const [focusHoy, setFocusHoy] = useState(false) // true al volver de Gym abierto desde «Hoy»: el foco va al encabezado «Hoy»
+  const [gymFrom, setGymFrom] = useState<'me' | 'home'>('me')
   const [partyId, setPartyId] = useState(PARTIES[0].id)
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
@@ -116,6 +118,7 @@ export default function App() {
   const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals, custom.goalLog, custom.limits), [custom.trackers, custom.goals, custom.goalLog, custom.limits])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const weeks = useMemo(() => branchWeekly(events, trackers, today), [events, trackers, today])
+  const gymToday = useMemo(() => gymDay(gym.log, today), [gym.log, today])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
     () => PARTIES.map(p => derivePartyState(p, events, today, trackers, custom.proposals)),
@@ -127,8 +130,9 @@ export default function App() {
     transition(() => { setScreen(s); window.scrollTo(0, 0) }, 'screen')
   }
 
-  const goTo = (s: Screen) => { setFocusGym(false); go(s) }
-  const backFromGym = () => { setFocusGym(true); go('me') }
+  const goTo = (s: Screen) => { setFocusGym(false); setFocusHoy(false); go(s) }
+  const openGym = (from: 'me' | 'home') => { setGymFrom(from); goTo('gym') }
+  const backFromGym = () => { if (gymFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusGym(true); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
   function push(evs: ActivityEvent[], t: Tracker) {
@@ -329,7 +333,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} focusHoy={focusHoy} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
@@ -343,7 +347,7 @@ export default function App() {
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
-      {screen === 'me' && <MeView onOpenGym={() => goTo('gym')} focusGym={focusGym} />}
+      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} />}
       {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}

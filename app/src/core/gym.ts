@@ -1,4 +1,4 @@
-import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, GroupVolume, MuscleGroup, RecordKind, WeekBest, WeightUnit } from './types'
+import type { ActivityEvent, Exercise, GymData, GymDay, GymEntry, GymRecords, GymSet, GymUndo, GroupVolume, MuscleGroup, RecordKind, WeekBest, WeightUnit } from './types'
 import { addDays, clampAmount, dayTotal, mondayOf, undoneIds } from './stats'
 
 export const EMPTY_GYM: GymData = { log: [], exercises: [] }
@@ -187,4 +187,9 @@ export function groupVolume(log: GymEntry[], custom: Exercise[], today: string):
     if (cur) { row.sets++; row.kg += kg } else { row.prevSets++; row.prevKg += kg }
   }
   return out
+}
+
+export function gymDay(log: GymEntry[], day: string): GymDay {
+  const sets = daySets(log, day)
+  return { sets: sets.length, exercises: new Set(sets.map(s => s.exerciseId)).size }
 }

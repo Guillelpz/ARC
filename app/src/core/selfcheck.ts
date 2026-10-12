@@ -7,7 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
-import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
+import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, gymDay, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -477,6 +477,13 @@ export function runSelfCheck() {
       ok(v.map(r => r.group).join() === GROUPS.map(g => g.id).join() && chest.sets === 3 && Math.abs(chest.kg - (500 + 220 * LB_KG * 5 + 1000)) < 0.01 &&
         Math.abs(fromKg(500 + 220 * LB_KG * 5, 'lbs') - 2202.3) < 0.1 && back.sets === 2 && Math.abs(back.kg - 500) < 0.01 &&
         chest.prevSets === 2 && Math.abs(chest.prevKg - 800) < 0.01 && v.slice(2).every(r => r.sets === 0 && r.prevSets === 0), 'GY16 groupVolume')
+    }
+    // GY17 — gymDay
+    {
+      const mk = (id: string, ex: string): GymSet => ({ id, exerciseId: ex, weight: 50, unit: 'kg', reps: 5, occurredAt: `${D}T10:00:00` })
+      const g17 = gymDay([mk('a', 'bench-press'), mk('b', 'bench-press'), mk('c', 'squat'), un('uc', 'c')], D)
+      const g17b = gymDay([mk('a', 'bench-press'), mk('b', 'bench-press'), mk('c', 'squat')], D)
+      ok(g17.sets === 2 && g17.exercises === 1 && g17b.sets === 3 && g17b.exercises === 2 && gymDay([mk('a', 'squat')], P).sets === 0 && gymDay([], D).exercises === 0, 'GY17 gymDay')
     }
   }
 

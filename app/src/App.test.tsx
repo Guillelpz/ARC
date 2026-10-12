@@ -791,3 +791,18 @@ test('U36 volumen semanal: kg y lbs mezclados y comparación con la semana anter
   expect(vol().getByText('Pecho · 2 series · 2.202 lbs')).toBeTruthy()
   expect(vol().getByText('semana anterior hasta hoy: 1 serie · 882 lbs')).toBeTruthy()
 })
+
+test('U37 fila Gym en «Hoy»: solo con series, abre Gym y Volver deja el foco en «Hoy»', () => {
+  render(<App />)
+  expect(screen.queryByRole('button', { name: /^Gym.* serie/ })).toBeNull()
+  openGym(); logSet('100', '5'); logSet('60', '8')
+  go('Inicio')
+  fireEvent.click(screen.getByRole('button', { name: /^Gym.*2 series · 1 ejercicio$/ }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Gym' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  expect(screen.getByRole('heading', { level: 1, name: /^PLAYER Lv./ })).toBeTruthy()
+  expect(document.activeElement).toBe(screen.getByRole('heading', { level: 2, name: 'Hoy' }))
+  openGym() // desde «Yo» sigue volviendo a «Yo»
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Yo' })).toBeTruthy()
+})
