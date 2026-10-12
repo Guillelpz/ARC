@@ -608,3 +608,15 @@ test('U25 campos por rama', () => {
   expect(card('Beer').queryByText(/· límite/)).toBeNull()
   expect(card('Beer').queryByText(/Te has pasado/)).toBeNull()
 })
+
+test('U26 Yo → Gym → Volver devuelve el foco a la tarjeta Gym', () => {
+  render(<App />); go('Yo')
+  const nav = within(screen.getByRole('navigation', { name: 'Principal' }))
+  expect(nav.getByRole('button', { name: 'Yo' }).getAttribute('aria-current')).toBe('page')
+  fireEvent.click(screen.getByRole('button', { name: /^Gym/ }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Gym' })).toBeTruthy()
+  expect(nav.getByRole('button', { name: 'Yo' }).getAttribute('aria-current')).toBe('page')
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Yo' })).toBeTruthy()
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Gym/ }))
+})

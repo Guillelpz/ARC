@@ -14,6 +14,8 @@ import { HomeView } from './components/HomeView'
 import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
 import { PartyView } from './components/PartyView'
+import { MeView } from './components/MeView'
+import { GymView } from './components/GymView'
 import type { Gain } from './components/TrackerCard'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT, UpdateBanner } from './components/UpdateBanner'
@@ -42,6 +44,7 @@ export default function App() {
   const [gym, setGym] = useState<GymData>(loaded.gym)
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
+  const [focusGym, setFocusGym] = useState(false) // true al volver de Gym: el foco va a su tarjeta en «Yo»
   const [partyId, setPartyId] = useState(PARTIES[0].id)
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
@@ -116,6 +119,9 @@ export default function App() {
     if (s === screen) return window.scrollTo(0, 0)
     transition(() => { setScreen(s); window.scrollTo(0, 0) }, 'screen')
   }
+
+  const goTo = (s: Screen) => { setFocusGym(false); go(s) }
+  const backFromGym = () => { setFocusGym(true); go('me') }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
   function push(evs: ActivityEvent[], t: Tracker) {
@@ -294,7 +300,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={go} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView game={game} summary={summary} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
@@ -308,13 +314,15 @@ export default function App() {
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
+      {screen === 'me' && <MeView onOpenGym={() => goTo('gym')} focusGym={focusGym} />}
+      {screen === 'gym' && <GymView onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
       <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
-      <BottomNav screen={screen} onChange={go} />
-      {stale ? <UpdateBanner tone={screen === 'hero' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
-        : update && <UpdateBanner tone={screen === 'hero' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
+      <BottomNav screen={screen} onChange={goTo} />
+      {stale ? <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
+        : update && <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
     </>
   )
 }

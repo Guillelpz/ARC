@@ -91,7 +91,8 @@ Fuente del sistema (sans). Sin `font-black` ni `tracking-[0.3em]` (V1): usar la 
 
 ## Icons
 - Solo `lucide-react`, trazo por defecto. `size-4` junto a texto, `size-5` en controles independientes y navegación. Siempre acompañan a una etiqueta; si un control es solo icono, lleva `aria-label`.
-- Navegación: `House` Inicio, `Shield` HERO, `Moon` VILLAIN, `Sparkles` Nuevo, `Users` Party.
+- Navegación: `House` Inicio, `Shield` HERO, `Moon` VILLAIN, `Sparkles` Nuevo, `Users` Party, `User` Yo.
+- Gym: `Dumbbell` (Gym en «Yo»), `Trophy` (aviso de récord).
 - Trackers: los de V1 (`Dumbbell`, `Swords`, `Footprints`, `BookOpen`, `Beer`, `Sandwich`); personalizados `Sparkles`.
 - Otros: `Check` / `X` en votos, `CircleAlert` en avisos, `ChevronRight` en filas navegables, `Trash2` en «Borrar todo».
 
@@ -114,9 +115,9 @@ Base común (todas las variantes):
 - Operaciones nunca bloquean: no hay estado «cargando» en V2 (todo es local y síncrono).
 
 ## Navigation
-Barra inferior fija, neutral, 5 destinos: `Inicio`, `HERO`, `VILLAIN`, `Nuevo`, `Party`.
+Barra inferior fija, neutral, 6 destinos: `Inicio`, `HERO`, `VILLAIN`, `Nuevo`, `Party`, `Yo`. La pantalla Gym cuelga de «Yo» y la deja marcada como activa.
 - `<nav aria-label="Principal" className="fixed inset-x-0 bottom-0 z-40 border-t border-app-border bg-app-surface pb-[env(safe-area-inset-bottom)]">`
-- Lista: `mx-auto grid max-w-md grid-cols-5`.
+- Lista: `mx-auto grid max-w-md grid-cols-6`.
 - Botón: `flex min-h-14 flex-col items-center justify-center gap-0.5 border-t-2 text-xs transition-colors duration-150 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text`.
   - Inactivo: `border-transparent text-app-muted hover:text-app-text`.
   - Activo: `border-app-text font-semibold text-app-text` + `aria-current="page"`.

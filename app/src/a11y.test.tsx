@@ -41,3 +41,5 @@ test('A7 VILLAIN con límite superado', async () => {
   expect(screen.getByText(/Te has pasado de tu límite semanal/)).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A8 Yo', async () => { render(<App />); go('Yo'); expect(await serious()).toEqual([]) })

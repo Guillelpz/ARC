@@ -54,3 +54,18 @@ test('E2 recarga sin red tras la primera visita', async ({ page, context, reques
   await nav(page, 'HERO')
   await expect(page.getByRole('group', { name: 'Gym' })).toBeVisible()
 })
+
+test('E5 la barra de 6 pestañas cabe a 320 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.goto('./')
+  const buttons = page.getByRole('navigation', { name: 'Principal' }).getByRole('button')
+  await expect(buttons).toHaveCount(6)
+  for (let i = 0; i < 6; i++) {
+    const b = buttons.nth(i)
+    const m = await b.evaluate(el => {
+      const l = el.querySelector('[data-label]')!, lr = l.getBoundingClientRect(), br = el.getBoundingClientRect()
+      return { fits: l.scrollWidth <= l.clientWidth, inside: lr.left >= br.left - 0.5 && lr.right <= br.right + 0.5, text: l.textContent }
+    })
+    expect(m, `etiqueta ${m.text}`).toMatchObject({ fits: true, inside: true })
+  }
+})
