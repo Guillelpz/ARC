@@ -1,6 +1,5 @@
 import type { ActivityEvent, CustomData, GoalLogEntry, GymData, GymEntry, Proposal, Tracker } from './types'
-import { isUndo as isGymUndo } from './gym'
-import { EMPTY_GYM } from './storage'
+import { EMPTY_GYM, isUndo as isGymUndo } from './gym'
 import { defaultGoal, isFixedVillain, TRACKERS } from './trackers'
 
 export type MergeResult = {

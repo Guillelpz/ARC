@@ -174,6 +174,7 @@ export default function App() {
     const set: GymSet = { id: crypto.randomUUID(), ...input, weight: r2(input.weight), occurredAt: nowStamp(day) }
     const kinds = beaten(liveSets(gym.log).filter(s => s.exerciseId === set.exerciseId), set)
     setGym({ ...gym, log: [...gym.log, set] })
+    // ponytail: si el día tenía una sesión manual y se deshace con series vivas, el día queda con series y 0 sesiones; solo reaparece al registrar otra serie.
     const ev = autoSession(events, day)
     if (ev) push([ev], gymTracker())
     if (kinds.length) {
@@ -309,7 +310,9 @@ export default function App() {
     if (r === 'none') { setCanRestore(false); return setNotice('No hay ninguna copia interna que recuperar.') }
     if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
     const ev = r.events ?? events, cu = r.custom ?? custom
-    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
+    // ponytail: una copia anterior al módulo Gym (r.gym null) conserva el gym actual mientras cambian los eventos: pueden quedar series sin su sesión automática. Se arregla con «+1» o importando una copia con gym.
+    const gymText = r.gym ? ` Series de gym: ${liveSets(gym.log).length} → ${liveSets(r.gym.log).length}.` : ''
+    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''}${gymText} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
     if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
     setEvents(ev); setCustom(cu); setGym(r.gym ?? gym); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)

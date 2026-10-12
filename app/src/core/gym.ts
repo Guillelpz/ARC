@@ -1,6 +1,7 @@
-import type { ActivityEvent, Exercise, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeightUnit } from './types'
+import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeightUnit } from './types'
 import { clampAmount, dayTotal, undoneIds } from './stats'
 
+export const EMPTY_GYM: GymData = { log: [], exercises: [] }
 export const GYM_TRACKER = 'gym'
 export const MAX_WEIGHT = 2000
 export const STEP: Record<WeightUnit, number> = { kg: 2.5, lbs: 5 }

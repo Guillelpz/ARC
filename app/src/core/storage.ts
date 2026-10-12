@@ -1,12 +1,13 @@
 import type { ActivityEvent, CustomData, Exercise, GoalLogEntry, Goals, GymData, GymEntry, Limits, Proposal, Tracker } from './types'
 import { defaultGoal, isFixedVillain } from './trackers'
 import { mondayOf } from './stats'
+import { EMPTY_GYM } from './gym'
 
 const KEY = 'life-rpg-demo-v1'
 const CUSTOM_KEY = 'life-rpg-custom-v1'
 export const GYM_KEY = 'life-rpg-gym-v1'
 export const EMPTY_CUSTOM: CustomData = { trackers: [], proposals: [] }
-export const EMPTY_GYM: GymData = { log: [], exercises: [] }
+export { EMPTY_GYM }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
