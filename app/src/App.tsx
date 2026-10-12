@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, RecordKind, Tracker, WeightUnit } from './core/types'
+import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
@@ -65,7 +65,7 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
-  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0 || gym.log.length > 0 || gym.exercises.length > 0
+  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0 || gym.log.length > 0 || gym.exercises.length > 0 || (gym.routines?.length ?? 0) > 0
   const copy = backupDue(lastExport, now, hasData)
 
   const [unsaved, setUnsaved] = useState({ events: false, custom: false, gym: false }) // false en cada clave con su siguiente guardado correcto
@@ -200,6 +200,13 @@ export default function App() {
     return { retracted: evs.length > 0 }
   }
   const setUnit = (u: WeightUnit) => setGym(g => { const { unit: _, ...rest } = g; return u === 'lbs' ? { ...rest, unit: u } : rest })
+
+  const saveRoutine = (r: Routine) => setGym(g => ({ ...g, routines: [...(g.routines ?? []), r] }))
+  const deleteRoutine = (id: string) => setGym(g => {
+    const { routines: _, ...rest } = g
+    const left = (g.routines ?? []).filter(r => r.id !== id)
+    return left.length ? { ...rest, routines: left } : rest // sin rutinas: se omite el campo
+  })
 
   const createExercise = (e: Exercise) => setGym(g => ({ ...g, exercises: [...g.exercises, e] }))
   const setExerciseArchived = (id: string, archived: boolean) => setGym(g => ({ ...g, exercises: g.exercises.map(x => {
@@ -351,7 +358,7 @@ export default function App() {
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} />}
-      {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
