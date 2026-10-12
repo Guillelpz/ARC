@@ -7,7 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
-import { autoSession, beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, stepWeight, toKg } from './gym'
+import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, stepWeight, toKg } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -362,6 +362,8 @@ export function runSelfCheck() {
   // GY1–GY13 — módulo Gym
   {
     const gs = (id: string, weight: number, unit: 'kg' | 'lbs', reps: number, day = DEMO_DATE): GymSet => ({ id, exerciseId: 'bench-press', weight, unit, reps, occurredAt: `${day}T10:00:00` })
+    ok(EXERCISES.length === 21 && new Set(EXERCISES.map(x => x.id)).size === 21 && GROUPS.length === 6 && GROUPS.every(g => EXERCISES.some(x => x.group === g.id)) &&
+      !EXERCISES.some(x => x.id === 'plank') && EXERCISES.filter(x => x.kind === 'bodyweight').map(x => x.id).sort().join() === 'dips,leg-raise,pull-up', 'GY1 catálogo')
     ok(Math.abs(toKg(100, 'lbs') - 45.359) < 0.001 && convert(100, 'kg', 'lbs') === 220.5 && convert(102.5, 'kg', 'kg') === 102.5 &&
       fmtWeight(102.5, 'kg') === '102,5 kg' && parseWeight('102,5') === 102.5 && parseWeight('102.555') === 102.56 &&
       parseWeight('-1') === null && parseWeight('abc') === null && parseWeight('2001') === null &&

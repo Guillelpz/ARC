@@ -5,8 +5,38 @@ export const GYM_TRACKER = 'gym'
 export const MAX_WEIGHT = 2000
 export const STEP: Record<WeightUnit, number> = { kg: 2.5, lbs: 5 }
 export const LB_KG = 0.45359237
-export const GROUPS: { id: MuscleGroup; label: string }[] = []
-export const EXERCISES: Exercise[] = []
+export const GROUPS: { id: MuscleGroup; label: string }[] = [
+  { id: 'chest', label: 'Pecho' },
+  { id: 'back', label: 'Espalda' },
+  { id: 'legs', label: 'Piernas' },
+  { id: 'shoulders', label: 'Hombros' },
+  { id: 'arms', label: 'Brazos' },
+  { id: 'core', label: 'Core' },
+]
+// Los ids son estables: no se renombran nunca (las series los guardan).
+export const EXERCISES: Exercise[] = [
+  { id: 'bench-press', name: 'Press banca', group: 'chest', kind: 'load' },
+  { id: 'incline-db-press', name: 'Press inclinado con mancuernas', group: 'chest', kind: 'load' },
+  { id: 'dips', name: 'Fondos', group: 'chest', kind: 'bodyweight' },
+  { id: 'pull-up', name: 'Dominadas', group: 'back', kind: 'bodyweight' },
+  { id: 'barbell-row', name: 'Remo con barra', group: 'back', kind: 'load' },
+  { id: 'lat-pulldown', name: 'Jalón al pecho', group: 'back', kind: 'load' },
+  { id: 'deadlift', name: 'Peso muerto', group: 'back', kind: 'load' },
+  { id: 'squat', name: 'Sentadilla', group: 'legs', kind: 'load' },
+  { id: 'leg-press', name: 'Prensa', group: 'legs', kind: 'load' },
+  { id: 'lunge', name: 'Zancadas', group: 'legs', kind: 'load' },
+  { id: 'romanian-deadlift', name: 'Peso muerto rumano', group: 'legs', kind: 'load' },
+  { id: 'leg-curl', name: 'Curl femoral', group: 'legs', kind: 'load' },
+  { id: 'calf-raise', name: 'Elevación de gemelos', group: 'legs', kind: 'load' },
+  { id: 'overhead-press', name: 'Press militar', group: 'shoulders', kind: 'load' },
+  { id: 'lateral-raise', name: 'Elevaciones laterales', group: 'shoulders', kind: 'load' },
+  { id: 'face-pull', name: 'Face pull', group: 'shoulders', kind: 'load' },
+  { id: 'barbell-curl', name: 'Curl de bíceps con barra', group: 'arms', kind: 'load' },
+  { id: 'hammer-curl', name: 'Curl martillo', group: 'arms', kind: 'load' },
+  { id: 'triceps-pushdown', name: 'Extensión de tríceps en polea', group: 'arms', kind: 'load' },
+  { id: 'skull-crusher', name: 'Press francés', group: 'arms', kind: 'load' },
+  { id: 'leg-raise', name: 'Elevaciones de piernas', group: 'core', kind: 'bodyweight' },
+]
 export const allExercises = (custom: Exercise[]) => [...EXERCISES, ...custom]
 export const exerciseName = (id: string, custom: Exercise[]) => allExercises(custom).find(x => x.id === id)?.name ?? 'Ejercicio desconocido'
 
