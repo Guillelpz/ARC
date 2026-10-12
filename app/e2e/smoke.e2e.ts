@@ -26,8 +26,9 @@ test('E1 flujo principal y persistencia', async ({ page }) => {
 test('E3 axe con contraste', async ({ page }) => {
   await loadExample(page)
   const path = createRequire(import.meta.url).resolve('axe-core/axe.min.js')
-  for (const [screen, heading] of [['Inicio', /PLAYER/], ['HERO', /Misiones/], ['VILLAIN', /Misiones/]] as const) {
-    await nav(page, screen)
+  for (const [screen, heading] of [['Inicio', /PLAYER/], ['HERO', /Misiones/], ['VILLAIN', /Misiones/], ['Yo', /^Yo$/], ['Gym', /^Gym$/]] as const) {
+    if (screen === 'Gym') await page.getByRole('button', { name: /^Gym/ }).click()
+    else await nav(page, screen)
     await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible()
     await page.addScriptTag({ path })
     const bad = await page.evaluate(async () => {
@@ -53,4 +54,43 @@ test('E2 recarga sin red tras la primera visita', async ({ page, context, reques
   await expect(page.getByText('Empieza tu historial')).toBeHidden()
   await nav(page, 'HERO')
   await expect(page.getByRole('group', { name: 'Gym' })).toBeVisible()
+})
+
+test('E5 la barra de 6 pestañas cabe a 320 px', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.goto('./')
+  const buttons = page.getByRole('navigation', { name: 'Principal' }).getByRole('button')
+  await expect(buttons).toHaveCount(6)
+  for (let i = 0; i < 6; i++) {
+    const b = buttons.nth(i)
+    const m = await b.evaluate(el => {
+      const l = el.querySelector('[data-label]')!, lr = l.getBoundingClientRect(), br = el.getBoundingClientRect()
+      return { fits: l.scrollWidth <= l.clientWidth, inside: lr.left >= br.left - 0.5 && lr.right <= br.right + 0.5, text: l.textContent }
+    })
+    expect(m, `etiqueta ${m.text}`).toMatchObject({ fits: true, inside: true })
+  }
+})
+
+test('E4 registrar una serie a 320 px y recargar', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await page.goto('./') // sin ejemplo: el de hoy ya trae una sesión de Gym y no se apuntaría otra
+  const xp = async () => {
+    await nav(page, 'HERO')
+    const t = await page.getByRole('group', { name: 'Gym' }).getByText(/^\d+ XP$/).textContent()
+    return Number(t!.match(/\d+/)![0])
+  }
+  const before = await xp()
+  await nav(page, 'Yo')
+  await expect(page.getByRole('heading', { level: 1, name: 'Yo' })).toBeVisible()
+  await page.getByRole('button', { name: /^Gym/ }).click()
+  await page.getByLabel(/^Peso \(/).fill('60')
+  await page.getByLabel('Repeticiones').fill('8')
+  await page.getByRole('button', { name: 'Registrar serie' }).click()
+  await expect(page.getByText('Serie 1 · 60 kg × 8')).toBeVisible()
+  expect(await xp()).toBe(before + 30)
+  await page.reload()
+  await nav(page, 'Yo')
+  await expect(page.getByRole('heading', { level: 1, name: 'Yo' })).toBeVisible()
+  await page.getByRole('button', { name: /^Gym/ }).click()
+  await expect(page.getByText('Serie 1 · 60 kg × 8')).toBeVisible()
 })

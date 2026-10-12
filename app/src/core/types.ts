@@ -134,3 +134,14 @@ export type BranchWeek = {
   villain: number
   current: boolean  // solo la última
 }
+
+export type WeightUnit = 'kg' | 'lbs'
+export type MuscleGroup = 'chest' | 'back' | 'legs' | 'shoulders' | 'arms' | 'core'
+export type Exercise = { id: string; name: string; group: MuscleGroup; kind: 'load' | 'bodyweight'; archived?: boolean }
+// weight: kg o lbs según unit, ≥ 0, ≤ 2000, 2 decimales máx.; en 'bodyweight' es el lastre (0 = sin lastre). reps: entero 1..999
+export type GymSet = { id: string; exerciseId: string; weight: number; unit: WeightUnit; reps: number; occurredAt: string }
+export type GymUndo = { id: string; undoes: string; occurredAt: string } // occurredAt = el de la serie anulada
+export type GymEntry = GymSet | GymUndo
+export type GymData = { log: GymEntry[]; exercises: Exercise[]; unit?: WeightUnit } // exercises: solo los propios; unit ausente = 'kg'
+export type RecordKind = 'weight' | '1rm' | 'reps'
+export type GymRecords = { maxWeight: GymSet | null; best1rm: { set: GymSet; kg: number } | null; mostReps: GymSet | null }

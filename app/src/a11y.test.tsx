@@ -41,3 +41,16 @@ test('A7 VILLAIN con límite superado', async () => {
   expect(screen.getByText(/Te has pasado de tu límite semanal/)).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A8 Yo', async () => { render(<App />); go('Yo'); expect(await serious()).toEqual([]) })
+
+test('A9 Gym con series y récords', async () => {
+  render(<App />); go('Yo'); fireEvent.click(screen.getByRole('button', { name: /^Gym/ }))
+  for (const w of ['100', '105']) {
+    fireEvent.change(screen.getByLabelText(/^Peso \(/), { target: { value: w } })
+    fireEvent.change(screen.getByLabelText('Repeticiones'), { target: { value: '5' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar serie' }))
+  }
+  expect(screen.getByText(/Peso máximo/)).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

@@ -1,9 +1,10 @@
 import type { CSSProperties } from 'react'
-import { Crown, Sparkles, TrendingDown, TrendingUp } from 'lucide-react'
+import { Crown, Sparkles, TrendingDown, TrendingUp, Trophy } from 'lucide-react'
 import type { RankMetric } from '../core/types'
 import { PASSED, RANK_NAME } from './liveText'
 
 export type Toast = { title: string; detail: string; key: string; tone: 'hero' | 'villain' | 'neutral'; down?: boolean }
+export type RecordNotice = { key: string; text: string }
 export type Overtake = { key: string; party: string; names: string[]; position: number; lost?: RankMetric }
 
 const THEME: Record<Toast['tone'], { glow: string; text: string; detail: string }> = {
@@ -73,6 +74,21 @@ export function OvertakeBanner({ o }: { o: Overtake }) {
         <span className="flex flex-col">
           <span className="text-xs font-semibold uppercase tracking-wider text-gold">{lead ? 'Líder de la party' : 'Adelantamiento'}</span>
           <span className="text-sm font-semibold">Superas a {o.names.join(', ')} · {o.position}.º en {o.party}</span>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// El anuncio para lectores de pantalla ya lo hace el role="status" de GymView, de ahí aria-hidden.
+export function RecordBanner({ r }: { r: RecordNotice }) {
+  return (
+    <div key={r.key} aria-hidden className="banner-out vt-banner pointer-events-none fixed inset-x-0 top-4 z-50 flex justify-center px-4">
+      <div className="slide-down shine flex items-center gap-3 rounded-xl border-2 border-hero bg-hero-surface px-5 py-3 text-hero-text shadow-xl">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-hero text-hero-on-accent"><Trophy className="size-5" aria-hidden /></span>
+        <span className="flex flex-col">
+          <span className="text-xs font-semibold uppercase tracking-wider text-hero">Nuevo récord</span>
+          <span className="text-sm font-semibold">{r.text.replace(/^Nuevo récord en /, '')}</span>
         </span>
       </div>
     </div>

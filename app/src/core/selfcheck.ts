@@ -1,12 +1,13 @@
-import type { ActivityEvent, GameState, PartyMember, Proposal, Tracker, WeekRow } from './types'
+import type { ActivityEvent, GameState, GymSet, GymUndo, PartyMember, Proposal, Tracker, WeekRow } from './types'
 import { DEMO_DATE, SEED_EVENTS, seedFor } from './seed'
 import { allTrackers, logGoal, setGoal, setLimit, TRACKERS, unitFor } from './trackers'
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { parseCustom } from './storage'
+import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
+import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, stepWeight, toKg } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -356,6 +357,91 @@ export function runSelfCheck() {
       ok(l6a.conflicts.includes('Beer') && JSON.stringify(l6a.custom.limits) === '{"beer":2}' && !l6a.changed &&
         l6b.conflicts.includes('Beer') && !('limits' in l6b.custom) && l6c.conflicts.includes('Pizza'), 'L6 fusión de límites')
     }
+  }
+
+  // GY1–GY13 — módulo Gym
+  {
+    const gs = (id: string, weight: number, unit: 'kg' | 'lbs', reps: number, day = DEMO_DATE): GymSet => ({ id, exerciseId: 'bench-press', weight, unit, reps, occurredAt: `${day}T10:00:00` })
+    ok(EXERCISES.length === 21 && new Set(EXERCISES.map(x => x.id)).size === 21 && GROUPS.length === 6 && GROUPS.every(g => EXERCISES.some(x => x.group === g.id)) &&
+      !EXERCISES.some(x => x.id === 'plank') && EXERCISES.filter(x => x.kind === 'bodyweight').map(x => x.id).sort().join() === 'dips,leg-raise,pull-up', 'GY1 catálogo')
+    ok(Math.abs(toKg(100, 'lbs') - 45.359) < 0.001 && convert(100, 'kg', 'lbs') === 220.5 && convert(102.5, 'kg', 'kg') === 102.5 &&
+      fmtWeight(102.5, 'kg') === '102,5 kg' && parseWeight('102,5') === 102.5 && parseWeight('102.555') === 102.56 &&
+      parseWeight('-1') === null && parseWeight('abc') === null && parseWeight('2001') === null &&
+      stepWeight(100, 'kg', 1) === 102.5 && stepWeight(100, 'lbs', 1) === 105 && stepWeight(1, 'kg', -1) === 0, 'GY2 unidades')
+    ok(Math.abs((e1rm(100, 5) ?? 0) - 116.667) < 0.01 && e1rm(100, 1) === 100 && e1rm(100, 13) === null && e1rm(0, 5) === null, 'GY3 Epley')
+    const base = [gs('a', 100, 'kg', 5), gs('b', 225, 'lbs', 3), gs('c', 80, 'kg', 12), gs('d', 80, 'kg', 10)]
+    const r4 = records(liveSets(base))
+    const undoB: GymUndo = { id: 'u', undoes: 'b', occurredAt: base[1].occurredAt }
+    const r4b = records(liveSets([...base, undoB]))
+    ok(r4.maxWeight?.id === 'b' && r4.best1rm?.set.id === 'a' && r4.mostReps?.id === 'c' && r4b.maxWeight?.id === 'a', 'GY4 récords')
+    const nm = 'Press banca'
+    ok(beaten([], gs('x', 105, 'kg', 1)).length === 0 && beaten(base, gs('x', 105, 'kg', 1)).join() === 'weight' &&
+      beaten(base, gs('x', 80, 'kg', 13)).join() === 'reps' && beaten(base, gs('x', 100, 'kg', 6)).join() === '1rm,reps' &&
+      beaten(base, gs('x', 100, 'kg', 5)).length === 0 &&
+      recordText(['weight'], gs('x', 105, 'kg', 1), nm, 'kg', 'load') === 'Nuevo récord en Press banca: peso máximo 105 kg', 'GY5 récord batido')
+  }
+
+  // GY11 (parte de importar) — copia sin `gym`
+  {
+    const old = parseBackup(JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: SEED_EVENTS, custom: { trackers: [], proposals: [] } }))
+    ok(old !== null && old.gym === null && old.events.length === SEED_EVENTS.length, 'GY11 copia sin gym → gym null y eventos leídos')
+  }
+
+  // GY11 (fusión) y GY12 — gym en la fusión
+  {
+    const gsx = (id: string, weight: number): GymSet => ({ id, exerciseId: 'bench-press', weight, unit: 'kg', reps: 5, occurredAt: `${DEMO_DATE}T10:00:00` })
+    const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }
+    const lg = { log: [gsx('s1', 100)], exercises: [], unit: 'lbs' as const }
+    const L = { events: [] as ActivityEvent[], custom: cu, gym: lg }
+    const g11 = mergeBackup(L, { events: [], custom: cu })
+    ok(JSON.stringify(g11.gym) === JSON.stringify(lg) && g11.setsAdded === 0 && !g11.changed, 'GY11 fusión con copia sin gym: gym local igual')
+    const inc = { events: [], custom: cu, gym: { log: [gsx('s1', 110), { id: 'u1', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }, gsx('s9', 50)], exercises: [{ id: 'custom-1', name: 'Remo', group: 'back' as const, kind: 'load' as const }] } }
+    const before = JSON.stringify([L, inc])
+    const g12 = mergeBackup(L, inc)
+    ok(g12.gym.log.map(x => x.id).join() === 's1,s1~2,u1,s9' && (g12.gym.log[2] as GymUndo).undoes === 's1~2' && g12.setsAdded === 3 && g12.exercisesAdded === 1 &&
+      g12.gym.unit === 'lbs' && JSON.stringify([L, inc]) === before, 'GY12 colisión: id~2, undoes reasignado, sin mutar')
+    const again = mergeBackup({ events: [], custom: cu, gym: g12.gym }, inc)
+    ok(again.setsAdded === 0 && again.exercisesAdded === 0 && !again.changed, 'GY12 idempotente')
+    const L2 = { ...L, gym: { ...lg, log: [gsx('s1', 100), { id: 'u0', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }] } }
+    const dup = mergeBackup(L2, { events: [], custom: cu, gym: { log: [gsx('s1', 100), { id: 'u7', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }], exercises: [] } })
+    ok(dup.setsAdded === 0 && dup.gym.log.length === 2, 'GY12 deshacer duplicado = ya estaba')
+  }
+
+  // GY6–GY10, GY13 — sesión automática
+  {
+    const D = DEMO_DATE, P = '2026-10-05'
+    const man = (id: string, amount = 1, day = D): ActivityEvent => ({ id, trackerId: 'gym', amount, occurredAt: `${day}T09:00:00` })
+    const gsx = (id: string, day = D): GymSet => ({ id, exerciseId: 'bench-press', weight: 60, unit: 'kg', reps: 8, occurredAt: `${day}T10:00:00` })
+    const un = (id: string, of: string, day = D): GymUndo => ({ id, undoes: of, occurredAt: `${day}T10:00:00` })
+    const a1 = autoSession([], D)!
+    ok(a1.id === `gym-auto-${D}` && a1.occurredAt === `${D}T12:00:00` && a1.amount === 1 && autoSession([a1], D) === null && autoSession([man('m')], D) === null &&
+      autoSession([], P)!.occurredAt.startsWith(P), 'GY6 sesión automática')
+    const ids = () => `u${Math.random()}`
+    const two = [gsx('s1'), gsx('s2')]
+    const evA = [a1]
+    const r1 = retractAuto(evA, [...two, un('x1', 's1')], D, ids)
+    const r2 = retractAuto(evA, [...two, un('x1', 's1'), un('x2', 's2')], D, ids)
+    const after = [...evA, ...r2]
+    const manMinus = [man('m'), man('m2', -1)]
+    const withMan = [man('m'), a1]
+    const rm = retractAuto(withMan, [], D, ids)
+    ok(r1.length === 0 && r2.length === 1 && r2[0].amount === -1 && r2[0].undoes === a1.id && r2[0].occurredAt === `${D}T12:00:00` &&
+      dayTotal(after, 'gym', D) === 0 && autoSession(after, D)!.id === `gym-auto-${D}-2` &&
+      retractAuto(manMinus, [], D, ids).length === 0 && rm.length === 1 && dayTotal([...withMan, ...rm], 'gym', D) === 1, 'GY7 deshacer')
+    const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }
+    const A = { events: [a1], custom: cu, gym: { log: [gsx('a1'), gsx('a2')], exercises: [] } }
+    const B = { events: [{ ...a1 }], custom: cu, gym: { log: [gsx('b1'), gsx('b2')], exercises: [] } }
+    const m8 = mergeBackup(A, B)
+    const m8b = mergeBackup({ events: m8.events, custom: cu, gym: m8.gym }, B)
+    ok(m8.events.filter(e => e.id === a1.id).length === 1 && dayTotal(m8.events, 'gym', D) === 1 && liveSets(m8.gym.log).length === 4 && m8b.added === 0 && m8b.setsAdded === 0, 'GY8 dos dispositivos')
+    const m9 = mergeBackup({ events: [man('rand')], custom: cu }, { events: [a1], custom: cu })
+    ok(dayTotal(m9.events, 'gym', D) === 2, 'GY9 manual + automática')
+    const ua = { id: 'ua', trackerId: 'gym', amount: -1, occurredAt: a1.occurredAt, undoes: a1.id }, ub = { ...ua, id: 'ub' }
+    const m10 = mergeBackup({ events: [a1, ua], custom: cu }, { events: [a1, ub], custom: cu })
+    const a2 = { id: `gym-auto-${D}-2`, trackerId: 'gym', amount: 1, occurredAt: a1.occurredAt }
+    const m10b = mergeBackup({ events: [a1, ua, a2], custom: cu }, { events: [a1, ub], custom: cu })
+    ok(dayTotal(m10.events, 'gym', D) === 0 && m10.existing === 2 && m10.added === 0 && dayTotal(m10b.events, 'gym', D) === 1, 'GY10 deshacer entre dispositivos')
+    ok(get(deriveGame([a1], D), 'gym').xp.xp === 30 && get(deriveGame([man('m')], D), 'gym').xp.xp === 30, 'GY13 XP de la sesión automática = manual')
   }
 
   console.info('[selfcheck] done')

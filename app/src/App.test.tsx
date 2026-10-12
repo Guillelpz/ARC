@@ -608,3 +608,129 @@ test('U25 campos por rama', () => {
   expect(card('Beer').queryByText(/· límite/)).toBeNull()
   expect(card('Beer').queryByText(/Te has pasado/)).toBeNull()
 })
+
+test('U26 Yo → Gym → Volver devuelve el foco a la tarjeta Gym', () => {
+  render(<App />); go('Yo')
+  const nav = within(screen.getByRole('navigation', { name: 'Principal' }))
+  expect(nav.getByRole('button', { name: 'Yo' }).getAttribute('aria-current')).toBe('page')
+  fireEvent.click(screen.getByRole('button', { name: /^Gym/ }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Gym' })).toBeTruthy()
+  expect(nav.getByRole('button', { name: 'Yo' }).getAttribute('aria-current')).toBe('page')
+  fireEvent.click(screen.getByRole('button', { name: 'Volver' }))
+  expect(screen.getByRole('heading', { level: 1, name: 'Yo' })).toBeTruthy()
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: /^Gym/ }))
+})
+
+const GY = 'life-rpg-gym-v1'
+const gymStored = () => JSON.parse(localStorage.getItem(GY) ?? '{"log":[]}')
+const openGym = () => { go('Yo'); fireEvent.click(screen.getByRole('button', { name: /^Gym/ })) }
+const logSet = (w: string, r: string) => {
+  fireEvent.change(screen.getByLabelText(/^(Peso|Lastre) \(/), { target: { value: w } })
+  fireEvent.change(screen.getByLabelText('Repeticiones'), { target: { value: r } })
+  fireEvent.click(screen.getByRole('button', { name: 'Registrar serie' }))
+}
+const statusText = () => screen.getAllByRole('status').map(s => s.textContent).join(' ')
+const gymEvents = () => stored().filter((e: { trackerId: string }) => e.trackerId === 'gym')
+const sessions = () => { go('HERO'); const t = card('Gym').getByText(/ sesiones esta semana/).textContent!; openGym(); return t }
+
+test('U27 series, sesión automática y deshacer', async () => {
+  render(<App />); openGym()
+  logSet('100', '5')
+  expect(screen.getByText('Serie 1 · 100 kg × 5')).toBeTruthy()
+  await vi.waitFor(() => expect(gymStored().log).toHaveLength(1))
+  expect(sessions()).toMatch(/^1 \/ 4 sesiones/)
+  logSet('100', '5')
+  expect(gymEvents()).toHaveLength(1)
+  expect(screen.getByText('Serie 2 · 100 kg × 5')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Deshacer serie 1 de Press banca: 100 kg × 5' }))
+  expect(statusText()).toContain('Serie deshecha.')
+  expect(statusText()).not.toContain('Sesión de Gym retirada')
+  fireEvent.click(screen.getByRole('button', { name: 'Deshacer serie 1 de Press banca: 100 kg × 5' }))
+  expect(statusText()).toContain('Sesión de Gym retirada')
+  expect(screen.getByText('No hay series este día.')).toBeTruthy()
+  expect(sessions()).toMatch(/^0 \/ 4 sesiones/)
+})
+
+test('U28 aviso de récord', () => {
+  render(<App />); openGym()
+  logSet('100', '5')
+  expect(statusText()).not.toContain('Nuevo récord')
+  logSet('105', '5')
+  expect(statusText()).toContain('Nuevo récord en Press banca')
+  expect(screen.getByText('Nuevo récord')).toBeTruthy() // RecordBanner
+  fireEvent.click(screen.getByRole('button', { name: 'Deshacer serie 2 de Press banca: 105 kg × 5' }))
+  expect(statusText()).not.toContain('Nuevo récord')
+})
+
+test('U29 unidades: el log no cambia', async () => {
+  render(<App />); openGym()
+  logSet('100', '5')
+  await vi.waitFor(() => expect(gymStored().log).toHaveLength(1))
+  const before = JSON.stringify(gymStored().log)
+  fireEvent.click(within(screen.getByRole('group', { name: 'Unidad de peso' })).getByRole('button', { name: 'lbs' }))
+  expect(screen.getByText('Serie 1 · 220,5 lbs × 5')).toBeTruthy()
+  await vi.waitFor(() => expect(gymStored().unit).toBe('lbs'))
+  expect(JSON.stringify(gymStored().log)).toBe(before)
+  const w = screen.getByLabelText(/^Peso \(lbs\)/) as HTMLInputElement
+  expect(w.value).toBe('220,5')
+  fireEvent.click(screen.getByRole('button', { name: 'Subir 5 lbs' }))
+  expect(w.value).toBe('225,5')
+  fireEvent.click(screen.getByRole('button', { name: 'Bajar 5 lbs' })); fireEvent.click(screen.getByRole('button', { name: 'Bajar 5 lbs' }))
+  expect(w.value).toBe('215,5')
+})
+
+test('U31 ayer, repetir serie y borrar todo', async () => {
+  render(<App />); openGym()
+  fireEvent.click(screen.getByRole('button', { name: 'Ayer' }))
+  logSet('60', '8')
+  expect(statusText()).toContain('Sesión de Gym apuntada en HERO (ayer).')
+  await vi.waitFor(() => expect(gymStored().log).toHaveLength(1))
+  expect(gymStored().log[0].occurredAt.startsWith('2026-10-06')).toBe(true)
+  expect(gymEvents().map((e: { id: string }) => e.id)).toEqual(['gym-auto-2026-10-06'])
+  fireEvent.click(screen.getByRole('button', { name: 'Repetir serie: 60 kg × 8' }))
+  await vi.waitFor(() => expect(gymStored().log).toHaveLength(2))
+  expect(gymStored().log[1]).toMatchObject({ exerciseId: 'bench-press', weight: 60, unit: 'kg', reps: 8 })
+  go('Inicio')
+  vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar todo'))
+  await vi.waitFor(() => expect(gymStored().log).toEqual([]))
+})
+
+test('U30 ejercicios propios: crear, duplicado, archivar y reactivar', async () => {
+  render(<App />); openGym()
+  const select = () => screen.getByLabelText('Ejercicio') as HTMLSelectElement
+  const create = (name: string) => {
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: name } })
+    fireEvent.click(screen.getByRole('button', { name: 'Crear ejercicio' }))
+  }
+  create('remo pendlay')
+  expect(select().selectedOptions[0].textContent).toBe('Remo pendlay')
+  await vi.waitFor(() => expect(gymStored().exercises).toHaveLength(1))
+  expect(gymStored().exercises[0]).toMatchObject({ name: 'Remo pendlay', group: 'chest', kind: 'load' })
+  expect(gymStored().exercises[0].id.startsWith('custom-')).toBe(true)
+  create('Press banca')
+  expect(screen.getByText('Ya existe un ejercicio con ese nombre.')).toBeTruthy()
+  create('REMO PENDLAY')
+  expect(screen.getByText('Ya existe un ejercicio con ese nombre.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Archivar Remo pendlay' }))
+  expect([...select().options].some(o => o.textContent === 'Remo pendlay')).toBe(false)
+  expect(select().selectedOptions[0].textContent).toBe('Press banca')
+  await vi.waitFor(() => expect(gymStored().exercises[0].archived).toBe(true))
+  create('Remo Pendlay')
+  expect(screen.getByText('Ya tienes «Remo pendlay» archivado: reactívalo abajo.')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Reactivar Remo pendlay' }))
+  expect([...select().options].some(o => o.textContent === 'Remo pendlay')).toBe(true)
+  await vi.waitFor(() => expect(gymStored().exercises[0]).not.toHaveProperty('archived'))
+})
+
+test('U32 recuperar copia anterior avisa de las series de gym', async () => {
+  render(<App />); openGym()
+  logSet('100', '5')
+  go('Inicio')
+  vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar todo'))
+  await vi.waitFor(() => expect(gymStored().log).toEqual([]))
+  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(false)
+  fireEvent.click(btn('Recuperar copia anterior'))
+  expect(confirm.mock.calls.at(-1)![0]).toContain('Series de gym: 0 → 1.')
+})
