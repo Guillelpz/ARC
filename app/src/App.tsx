@@ -235,9 +235,11 @@ export default function App() {
     if (stale) return setNotice(STALE_BLOCK_TEXT)
     const b = parseBackup(text)
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
-    const r = mergeBackup({ events, custom }, b)
+    const r = mergeBackup({ events, custom, gym }, { ...b, gym: b.gym ?? undefined })
     if (!r.changed) return setNotice(`Esa copia no trae nada nuevo: ya tienes todos sus registros.${r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios; se mantiene lo de este dispositivo.` : ''}`)
-    const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas.`
+    const gymAdded = r.setsAdded + r.exercisesAdded
+    const gymText = gymAdded > 0 ? ` y ${gymAdded} entradas de gym` : ''
+    const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas${gymText}.`
       + (r.renamed > 0 ? ` ${r.renamed} registros coinciden en identificador con uno tuyo pero son distintos (p. ej. del ejemplo): se añaden aparte.` : '')
       + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo, límite o archivado): se mantiene lo de este dispositivo.` : '')
       + (b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : '') + (b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : '')
@@ -245,8 +247,8 @@ export default function App() {
     if (!window.confirm(msg)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha fusionado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup()); unlockStorage()
-    setEvents(r.events); setCustom(r.custom); setToast(null); setGain(null); setOvertake(null)
-    setNotice(`Copia fusionada: ${r.added} registros y ${r.trackersAdded} misiones nuevas.`)
+    setEvents(r.events); setCustom(r.custom); setGym(r.gym); setToast(null); setGain(null); setOvertake(null)
+    setNotice(`Copia fusionada: ${r.added} registros y ${r.trackersAdded} misiones nuevas${gymText}.`)
   }
 
   function restore() {

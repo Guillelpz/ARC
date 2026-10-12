@@ -385,5 +385,25 @@ export function runSelfCheck() {
     ok(old !== null && old.gym === null && old.events.length === SEED_EVENTS.length, 'GY11 copia sin gym → gym null y eventos leídos')
   }
 
+  // GY11 (fusión) y GY12 — gym en la fusión
+  {
+    const gsx = (id: string, weight: number): GymSet => ({ id, exerciseId: 'bench-press', weight, unit: 'kg', reps: 5, occurredAt: `${DEMO_DATE}T10:00:00` })
+    const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }
+    const lg = { log: [gsx('s1', 100)], exercises: [], unit: 'lbs' as const }
+    const L = { events: [] as ActivityEvent[], custom: cu, gym: lg }
+    const g11 = mergeBackup(L, { events: [], custom: cu })
+    ok(JSON.stringify(g11.gym) === JSON.stringify(lg) && g11.setsAdded === 0 && !g11.changed, 'GY11 fusión con copia sin gym: gym local igual')
+    const inc = { events: [], custom: cu, gym: { log: [gsx('s1', 110), { id: 'u1', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }, gsx('s9', 50)], exercises: [{ id: 'custom-1', name: 'Remo', group: 'back' as const, kind: 'load' as const }] } }
+    const before = JSON.stringify([L, inc])
+    const g12 = mergeBackup(L, inc)
+    ok(g12.gym.log.map(x => x.id).join() === 's1,s1~2,u1,s9' && (g12.gym.log[2] as GymUndo).undoes === 's1~2' && g12.setsAdded === 3 && g12.exercisesAdded === 1 &&
+      g12.gym.unit === 'lbs' && JSON.stringify([L, inc]) === before, 'GY12 colisión: id~2, undoes reasignado, sin mutar')
+    const again = mergeBackup({ events: [], custom: cu, gym: g12.gym }, inc)
+    ok(again.setsAdded === 0 && again.exercisesAdded === 0 && !again.changed, 'GY12 idempotente')
+    const L2 = { ...L, gym: { ...lg, log: [gsx('s1', 100), { id: 'u0', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }] } }
+    const dup = mergeBackup(L2, { events: [], custom: cu, gym: { log: [gsx('s1', 100), { id: 'u7', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }], exercises: [] } })
+    ok(dup.setsAdded === 0 && dup.gym.log.length === 2, 'GY12 deshacer duplicado = ya estaba')
+  }
+
   console.info('[selfcheck] done')
 }
