@@ -61,5 +61,17 @@ GitHub Pages está activo en `https://guillelpz.github.io/ARC/`. La app es un si
 - [ ] iOS/Safari: «Añadir a pantalla de inicio» usa el icono de 180. La app instalada arranca vacía y, al importar una copia exportada en Safari, aparecen los datos.
 - [ ] Kill switch, una vez: desplegar con `sw_kill`. Tras abrir y recargar, Application → Service Workers queda vacío y Cache Storage no tiene `rpg-life-*`. Desplegar de nuevo sin `sw_kill` para restaurar.
 - [ ] `npm run dev` no registra ningún service worker.
+- [ ] Voz en iPhone real (PWA instalada; hasta cerrar T8, y otra vez tras el merge a producción). Para una prueba previa sin desplegar: en `app/`, `npm run build && npx vite preview --host --port 4173` y `npx cloudflared tunnel --url http://localhost:4173` (sin `BASE_PATH`); cerrar el túnel al terminar.
+  - [ ] Siri y Dictado activados (Ajustes › Siri; Ajustes › General › Teclado › Activar dictado). Anotar la versión de iOS.
+  - [ ] Yo › Ajustes › «Probar voz» ×5 en Safari y ×5 en la PWA (decir «80 kilos press banca 5 repeticiones»); cerrar y reabrir la app y probar 2 veces más. Capturas con «Detalles técnicos».
+  - [ ] Primera vez: el aviso de privacidad; «Entendido» empieza a escuchar en el mismo toque.
+  - [ ] Gym: dictar «80 kilos press banca 5 repeticiones» → serie, sesión en HERO y aviso; «Deshacer» la quita y retira la sesión.
+  - [ ] «3 series de 5» → 3 series; «Editar» → formulario con el foco en el peso y el teclado abierto.
+  - [ ] Incompleto («press banca 80») → formulario con el foco en las repeticiones.
+  - [ ] «Hoy»: dictar → fila Gym; incompleto → abre Gym; «Volver» → foco en «Hoy».
+  - [ ] Modo avión → «Dictar serie» abre el campo; el dictado del teclado + «Registrar» funciona.
+  - [ ] Ajustes dentro de la PWA: pegar la clave, «Probar clave» → «La clave funciona»; dictar una frase rara («la máquina de piernas 100 10») → Prensa.
+  - [ ] Recargar y cerrar/abrir la app: las series y la clave siguen; «Exportar copia» no contiene la clave.
+  - [ ] 320 px sin scroll horizontal en Gym, «Hoy» y «Yo».
 
 Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`. En Git Bash, antepón `MSYS_NO_PATHCONV=1` (si no, `/rpg/` se convierte en una ruta de Windows).

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { EMPTY_CUSTOM, EMPTY_GYM, GYM_KEY, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, GYM_KEY, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -431,4 +431,42 @@ describe('módulo Gym', () => {
     expect(parseBackup(raw({ log: [null] }))?.dropped).toBe(1)
   })
   test('GS6 isDataKey', () => { expect(isDataKey(GYM_KEY)).toBe(true); expect(isDataKey('otra')).toBe(false) })
+})
+
+describe('clave de Anthropic y ajustes de voz (T3)', () => {
+  const KEY = 'sk-ant-api03-0123456789abcdefghij'
+  test('readAiKey valida el formato', () => {
+    expect(readAiKey(KEY)).toBe(KEY)
+    expect(readAiKey(`  ${KEY}\n`)).toBe(KEY)
+    expect(readAiKey('abc-ant-0123456789abcdefghij')).toBeNull()
+    expect(readAiKey('sk-ant-corta')).toBeNull()
+    expect(readAiKey('sk-ant-0123456789 abcdefghij')).toBeNull()
+    expect(readAiKey(`sk-ant-${'a'.repeat(300)}`)).toBeNull()
+    expect(readAiKey(null)).toBeNull()
+  })
+  test('guardar, leer y borrar', () => {
+    const s = { ...fakeStore(), removeItem(k: string) { this.m.delete(k) } }
+    expect(loadAiKey(s)).toBeNull()
+    expect(saveAiKey(`  ${KEY} `, s)).toBe(true)
+    expect(loadAiKey(s)).toBe(KEY)
+    expect(clearAiKey(s)).toBe(true)
+    expect(loadAiKey(s)).toBeNull()
+    expect(saveAiKey(KEY, fakeStore({}, true))).toBe(false)
+  })
+  test('ajustes de voz: privacyAck', () => {
+    const s = fakeStore()
+    expect(loadVoicePrefs(s)).toEqual({})
+    expect(saveVoicePrefs({ privacyAck: '2026-10-07T10:00:00.000Z' }, s)).toBe(true)
+    expect(loadVoicePrefs(s)).toEqual({ privacyAck: '2026-10-07T10:00:00.000Z' })
+    for (const raw of ['5', '[]', '{"privacyAck":3}', '{roto']) expect(loadVoicePrefs(fakeStore({ [VOICE_KEY]: raw }))).toEqual({})
+  })
+  test('ninguna de las dos claves es de datos ni entra en copias ni exportaciones', () => {
+    expect(isDataKey(AI_KEY)).toBe(false); expect(isDataKey(VOICE_KEY)).toBe(false)
+    const s = fakeStore({ [EV]: JSON.stringify([good]), [AI_KEY]: KEY, [VOICE_KEY]: '{"privacyAck":"x"}' })
+    expect(backupCurrent(s)).toBe(true)
+    expect([...s.m.keys()].filter(k => k.includes('backup')).every(k => !k.includes('ai-key') && !k.includes('voice'))).toBe(true)
+    const text = exportBackup([good], EMPTY_CUSTOM, 'x', EMPTY_GYM)
+    expect(text).not.toContain(KEY); expect(text).not.toContain('privacyAck')
+    expect(JSON.stringify(parseBackup(text))).not.toContain(KEY)
+  })
 })

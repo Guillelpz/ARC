@@ -70,3 +70,43 @@ test('A10 Gym con rutina cargada, progreso y volumen; Inicio con la fila Gym', a
   expect(screen.getByRole('button', { name: /^Gym.*1 serie · 1 ejercicio$/ })).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A12 Yo con Ajustes y el diagnóstico de voz', async () => {
+  render(<App />); go('Yo')
+  expect(screen.getByRole('heading', { name: 'Ajustes' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Probar voz' }))
+  expect(await serious()).toEqual([])
+})
+
+test('A12b Yo con la clave guardada', async () => {
+  localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
+  render(<App />); go('Yo')
+  expect(screen.getByText('Clave guardada: termina en 0000')).toBeTruthy()
+  expect(await serious()).toEqual([])
+})
+
+test('A11 Gym con el aviso de privacidad de la voz y con la tarjeta del resultado', async () => {
+  class Fake {
+    lang = ''; continuous = false; interimResults = false; maxAlternatives = 1
+    onresult: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
+    start() { setTimeout(() => { this.onresult?.({ results: [Object.assign([{ transcript: 'press banca 80 kg 5 reps' }], { isFinal: true })] }); this.onend?.() }, 0) }
+    stop() {}; abort() {}
+  }
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = Fake
+  try {
+    render(<App />); go('Yo'); fireEvent.click(screen.getByRole('button', { name: /^Gym/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dictar serie' }))
+    expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy()
+    expect(await serious()).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: 'Entendido' }))
+    expect(await screen.findByText(/^Registrado:/)).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
+})
+
+test('A13 Inicio con el campo de texto de voz abierto', async () => {
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Escribir' }))
+  expect(screen.getByLabelText('Serie')).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

@@ -6,7 +6,10 @@ import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
 import { unitFor } from '../core/trackers'
 import { shortDate } from '../core/stats'
+import type { Exercise, WeightUnit } from '../core/types'
+import type { GymDraft, VoiceCommand } from '../core/voice'
 import { PlayerHeader } from './PlayerHeader'
+import { VoiceLog, type VoiceMissing } from './VoiceLog'
 import { SaveFailBanner } from './SaveFailBanner'
 const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 
@@ -16,6 +19,10 @@ type Props = {
   gymToday: GymDay
   onOpenGym: () => void
   focusHoy: boolean
+  today: string
+  voice: { exercises: Exercise[]; unit: WeightUnit; ack: boolean; onAck: () => void; onInterpret: (text: string) => Promise<VoiceCommand>
+    onSave: (cmd: VoiceCommand, day: string) => { ids: string[]; auto: boolean }; onUndo: (ids: string[]) => { retracted: boolean }
+    onEdit: (draft: GymDraft) => void; onIncomplete: (draft: GymDraft, missing: VoiceMissing[]) => void }
   weeks: BranchWeek[]
   partyStates: PartyState[]
   archived: Tracker[]
@@ -70,7 +77,7 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
 const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
 const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
 
-export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, today, voice, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const mode = useRef<'replace' | 'merge'>('replace')
   const hoyRef = useRef<HTMLHeadingElement>(null)
@@ -134,6 +141,7 @@ export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, weeks, 
         )}
         <section aria-labelledby="hoy" className="rise flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5 lg:col-span-2">
           <h2 id="hoy" ref={hoyRef} tabIndex={-1} className="text-lg font-semibold">Hoy</h2>
+          <VoiceLog tone="app" day={today} today={today} {...voice} />
           {summary.done.length === 0
             ? <p className="text-sm text-app-muted">Aún nada hoy.</p>
             : <p className="text-sm font-semibold tabular-nums text-app-text">

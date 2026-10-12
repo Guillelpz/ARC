@@ -124,6 +124,12 @@ export function recordText(kinds: RecordKind[], s: GymSet, name: string, pref: W
   return `Nuevo récord en ${name}: ${parts.join(' · ')}`
 }
 
+// GymUndo de las series vivas de `ids` (sin repetir; las ya deshechas o desconocidas se ignoran). occurredAt = el de la serie.
+export function undoMany(log: GymEntry[], ids: string[], newId: () => string): GymUndo[] {
+  const live = new Map(liveSets(log).map(s => [s.id, s]))
+  return [...new Set(ids)].flatMap(id => { const s = live.get(id); return s ? [{ id: newId(), undoes: s.id, occurredAt: s.occurredAt }] : [] })
+}
+
 // Sesión automática (D1)
 export const autoIdRe = (day: string) => new RegExp(`^gym-auto-${day}(-\\d+)?$`)
 export function autoSession(events: ActivityEvent[], day: string): ActivityEvent | null {

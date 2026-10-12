@@ -5,6 +5,24 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y docu
 ## En curso
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
+- Ciclo 26 (registro de series de Gym por voz) — **en curso** (ver sección «Ciclo 26»).
+
+## Ciclo 26 — Registro de series de Gym por voz
+
+Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pasos 1-2 omitidos; no se reabren). Rama `cycle-26`; spec en `docs/TECH_SPEC-voz-gym.md`.
+
+- **Alcance:** solo series de Gym («80 kg press banca 5 reps»). Otros trackers por voz («he corrido 5 km»), en un ciclo posterior; el comando se diseña para poder crecer.
+- **V1 Voz:** Web Speech API; un toque en el micro y empieza a escuchar, se para al detectar silencio. Se acepta que el audio pase por Google/Apple, con aviso la primera vez. Sin soporte (Firefox) o sin conexión → campo de texto. El usuario usa **iPhone**: verificar la Web Speech API en la PWA instalada en iOS antes o al principio de la spec.
+- **V2 Botón:** en la pantalla Gym y en Inicio/«Hoy».
+- **V3 Interpretación:** Haiku 5.5 llamado desde el navegador con una API key que el usuario pega en Ajustes (solo localStorage de ese dispositivo; nunca en repo, build ni copias exportadas). Sin backend. Sin clave o ante cualquier fallo → parser determinista en `core/` (patrón `classifyAI`/`classify`), cubierto por el selfcheck. De momento solo lo usa el propio usuario. Cambia la decisión «IA solo heurística en producción» para este caso. `fetch` frente al SDK (dependencia de runtime): decide el usuario en la spec.
+- **V4 Parser:** español e inglés, con sinónimos/alias por ejercicio. Con unidad, gana la unidad; sin unidad, el número mayor es el peso; peso corporal con un solo número → repeticiones. Varias series («3x5», «3 series de 5», «3 sets of 5»). kg por defecto; lbs/libras/pounds se guardan en lbs.
+- **V5 Guardado:** guarda directamente y luego se revisa: aviso con lo oído y lo registrado, «Deshacer» de todas las series del comando y «Editar» (deshacer + formulario prerrellenado). Si no reconoce el ejercicio o faltan las repeticiones, no guarda: abre el formulario prerrellenado. Sesión automática y récords como hoy.
+
+**Ejecución:** tech-lead (`docs/TECH_SPEC-voz-gym.md`: verificación previa en iPhone/PWA, parser ES/EN en `core/` con asserts nuevos, Haiku 5.5 con clave en Ajustes y structured outputs, guardar y revisar, micro en Gym y «Hoy», tests UI/a11y/e2e con APIs simuladas) → **okay del usuario** (resumen ≤15 líneas + decisiones abiertas) → implementer en `cycle-26` → reviewer (máx. 2 vueltas) → merge `--no-ff` con build/lint/test/e2e → push a `main` → cycle-analyst.
+
+**Decisiones de spec aprobadas (2026-10-12), todas las recomendadas (§13 de la spec):** A `fetch` directo, sin SDK; B prueba en iPhone con `vite preview` + túnel `cloudflared` (o Pages con okay); C plan B en iOS = el botón abre el campo de texto y se dicta con el teclado, solo donde falle según la prueba; D «Borrar todo» no toca la clave; E sin unidad dicha → preferencia del gym (kg por defecto). El usuario pide hacerlo todo seguido y hará la prueba del iPhone al final: T8 (`KEYBOARD_ON_IOS`) se queda en `'never'` con caída al texto tras error de voz hasta que la prueba dé resultado.
+
+**Estado:** **en curso** — implementación (implementer en `cycle-26`).
 
 ## Ciclo 25 — Gym: progreso, volumen, rutinas y «Hoy»
 
@@ -53,7 +71,7 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 - Push de `main` a origin tras cada ciclo cerrado; nunca force-push ni otras ramas. Commits con el email noreply de GitHub; reescribir el historial solo con okay del usuario.
 - Despliegue: GitHub Pages (repo público); entorno `github-pages` limitado a `main` (2026-10-12).
 - Sincronización: opción A, sin servidor («Importar y fusionar» + compartir copia). Worker/servidor descartado por ahora (RGPD art. 9).
-- IA: solo heurística en producción, sin endpoint; el proxy solo en `npm run dev`.
+- IA: solo heurística en producción, sin endpoint; el proxy solo en `npm run dev`. Excepción en el ciclo 26 (voz): Haiku con la clave del usuario guardada en el dispositivo (V3).
 - Balance de XP: se deja como está. PARTY: sigue simulada (2026-10-12).
 - Límite VILLAIN (2026-10-12): opcional y sobrepasable; pasarse solo avisa (sin efecto en XP, niveles, rachas ni party). Solo semana en curso, aviso solo en la tarjeta, avisa al pasarse (no al llegar), se edita en la tarjeta.
 
