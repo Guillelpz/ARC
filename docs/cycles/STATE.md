@@ -33,7 +33,7 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 - Salto −/+ de **2,5 kg / 5 lbs**; catálogo de 21 ejercicios **sin plancha**.
 - P24.6-P24.12 pospuestas.
 
-**Paso actual:** 5 (implementer en `cycle-24`; spec `docs/TECH_SPEC-gym.md` sin decisiones pendientes).
+**Estado:** **cerrado** (merge 4da4d02, push a origin; análisis en `cycle-24/analysis.md`). El workflow vuelve a pausa hasta que el usuario lo reactive.
 
 ## Decisiones vigentes del usuario
 
@@ -52,4 +52,11 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 | id | título | estado |
 |---|---|---|
 | P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta |
+| P24.6 | Nivel Gym propio (requiere peso corporal y cambia reglas de juego) | pospuesta |
+| P24.7 | G5 Progreso por ejercicio (1RM estimado por semanas) | pospuesta |
+| P24.8 | G7 Volumen semanal por grupo muscular | pospuesta |
+| P24.9 | G8 Sugerencia de sobrecarga progresiva | pospuesta |
+| P24.10 | G9 Rutinas/plantillas | pospuesta |
+| P24.11 | G10 Temporizador de descanso | pospuesta |
+| P24.12 | Integración del gym con el bloque «Hoy» | pospuesta |
 | P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |
