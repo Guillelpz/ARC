@@ -5,7 +5,7 @@ import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay } from './core/gym'
-import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -54,6 +54,8 @@ export default function App() {
   const [record, setRecord] = useState<RecordNotice | null>(null)
   const [canRestore, setCanRestore] = useState(hasLastBackup)
   const [lastExport, setLastExport] = useState(loadLastExport)
+  const [voiceAck, setVoiceAck] = useState(() => loadVoicePrefs().privacyAck !== undefined)
+  const ackVoice = () => { saveVoicePrefs({ privacyAck: new Date().toISOString() }); setVoiceAck(true) }
 
   const [, refresh] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {
@@ -357,7 +359,7 @@ export default function App() {
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
-      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} />}
+      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} />}
       {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}

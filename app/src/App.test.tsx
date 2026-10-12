@@ -847,3 +847,47 @@ test('U38 rutinas: guardar, errores, cargar con contadores por día, seleccionar
   await vi.waitFor(() => expect(gymStored()).not.toHaveProperty('routines'))
   expect(gymStored().log).toHaveLength(3)
 })
+
+// Reconocimiento de voz simulado: dice `window.__voz` al empezar
+class FakeSpeech {
+  lang = ''; continuous = false; interimResults = false; maxAlternatives = 1
+  onstart: (() => void) | null = null; onresult: ((e: unknown) => void) | null = null
+  onerror: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
+  start() {
+    const v = (window as unknown as { __voz?: string | { error: string } }).__voz
+    setTimeout(() => {
+      if (typeof v === 'string') this.onresult?.({ results: [Object.assign([{ transcript: v }], { isFinal: true })] })
+      else if (v) this.onerror?.({ error: v.error })
+      this.onend?.()
+    }, 0)
+  }
+  stop() {}
+  abort() {}
+}
+
+test('U-V0 Probar voz: muestra el resultado y guarda privacyAck', async () => {
+  vi.useRealTimers() // la voz simulada usa setTimeout
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeSpeech
+  ;(window as unknown as Record<string, unknown>).__voz = '80 kilos press banca 5 repeticiones'
+  try {
+    render(<App />); go('Yo')
+    fireEvent.click(btn('Probar voz'))
+    expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy()
+    expect(localStorage.getItem('life-rpg-voice-v1')).toBeNull()
+    fireEvent.click(btn('Entendido'))
+    expect(JSON.parse(localStorage.getItem('life-rpg-voice-v1')!).privacyAck).toBeTruthy()
+    expect((await screen.findAllByText(/80 kilos press banca 5 repeticiones/)).length).toBeGreaterThan(0)
+    expect(screen.getByText('disponible (webkitSpeechRecognition)')).toBeTruthy()
+    expect(screen.getByText('Detalles técnicos')).toBeTruthy()
+    expect(JSON.parse(localStorage.getItem('life-rpg-gym-v1')!).log).toEqual([]) // no guarda series
+  } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition; delete (window as unknown as Record<string, unknown>).__voz }
+})
+
+test('U-V0b Probar voz sin API: no disponible', async () => {
+  render(<App />); go('Yo')
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: 'x' }))
+  cleanup(); render(<App />); go('Yo')
+  fireEvent.click(btn('Probar voz'))
+  expect(await screen.findByText('no disponible')).toBeTruthy()
+  expect(screen.getAllByText('Error: not-supported').length).toBeGreaterThan(0)
+})

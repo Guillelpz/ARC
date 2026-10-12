@@ -44,5 +44,7 @@ export default defineConfig(({ command, mode }) => {
     base: env.BASE_PATH || '/', // p. ej. '/<repo>/' en GitHub Pages; vacío = raíz (dev, Cloudflare)
     define: { __AI_PROXY__: JSON.stringify(command === 'serve' && !!key), __SW_KILL__: JSON.stringify(kill) },
     plugins: [react(), tailwindcss(), serviceWorker(kill)], server: { proxy },
+    // solo para la prueba de voz en iPhone con un túnel (docs/TECH_SPEC-voz-gym.md T1); no afecta a dev ni al build
+    preview: { allowedHosts: ['.trycloudflare.com'] },
   }
 })

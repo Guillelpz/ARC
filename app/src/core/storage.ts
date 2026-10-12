@@ -307,6 +307,23 @@ export function restoreLast(r: LastBackup, store: WStore = localStorage): boolea
   return ok
 }
 
+// Ajustes de voz de este dispositivo: fuera de las copias, de la fusión y de «Borrar todo» (no son datos del juego).
+export const VOICE_KEY = 'life-rpg-voice-v1'
+export type VoicePrefs = { privacyAck?: string } // ISO de cuándo se aceptó el aviso de privacidad de la voz
+
+export function loadVoicePrefs(store: Pick<Storage, 'getItem'> = localStorage): VoicePrefs {
+  try {
+    const raw = store.getItem(VOICE_KEY)
+    if (raw === null) return {}
+    const v = json(raw)
+    return isObj(v) && typeof v.privacyAck === 'string' ? { privacyAck: v.privacyAck } : {}
+  } catch { return {} }
+}
+
+export function saveVoicePrefs(p: VoicePrefs, store: Pick<Storage, 'setItem'> = localStorage): boolean {
+  try { store.setItem(VOICE_KEY, JSON.stringify(p)); return true } catch { return false }
+}
+
 // ponytail: persist() es una petición; el navegador puede ignorarla (Safari borra tras 7 días sin uso). La garantía real es exportar.
 export function requestPersist(): void {
   navigator.storage?.persisted?.().then(p => p || navigator.storage.persist()).catch(() => {})

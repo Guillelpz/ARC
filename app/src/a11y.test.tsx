@@ -70,3 +70,10 @@ test('A10 Gym con rutina cargada, progreso y volumen; Inicio con la fila Gym', a
   expect(screen.getByRole('button', { name: /^Gym.*1 serie · 1 ejercicio$/ })).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A12 Yo con Ajustes y el diagnóstico de voz', async () => {
+  render(<App />); go('Yo')
+  expect(screen.getByRole('heading', { name: 'Ajustes' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Probar voz' }))
+  expect(await serious()).toEqual([])
+})

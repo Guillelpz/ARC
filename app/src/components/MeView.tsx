@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { ChevronRight, Dumbbell } from 'lucide-react'
+import { VoiceCheck } from './VoiceCheck'
 
-export function MeView({ onOpenGym, focusGym }: { onOpenGym: () => void; focusGym: boolean }) {
+export function MeView({ onOpenGym, focusGym, voiceAck, onVoiceAck }: { onOpenGym: () => void; focusGym: boolean; voiceAck: boolean; onVoiceAck: () => void }) {
   const ref = useRef<HTMLButtonElement>(null)
   useEffect(() => { if (focusGym) ref.current?.focus() }, [focusGym])
   return (
@@ -20,6 +21,14 @@ export function MeView({ onOpenGym, focusGym }: { onOpenGym: () => void; focusGy
           </span>
           <ChevronRight className="size-4 shrink-0 text-hero-muted transition duration-150 group-hover:translate-x-0.5 motion-reduce:transform-none" aria-hidden />
         </button>
+        <section aria-labelledby="ajustes" className="flex flex-col gap-3">
+          <h2 id="ajustes" className="text-lg font-semibold">Ajustes</h2>
+          <div className="flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5">
+            <h3 className="text-sm font-semibold">Voz</h3>
+            <p className="text-sm leading-6 text-app-muted">Comprueba si este dispositivo puede transcribir lo que dices. No guarda nada.</p>
+            <VoiceCheck ack={voiceAck} onAck={onVoiceAck} />
+          </div>
+        </section>
       </main>
     </div>
   )
