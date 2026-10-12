@@ -29,3 +29,23 @@ Comprobaciones en `cycle-26`: `npm run build` OK, `npm run lint` OK, `npm test` 
 
 ## Pendiente para aprobar
 Corregir 1 y 2, con sus asserts en `selfcheck.ts`, y actualizar la línea 159 de la spec.
+
+## Vuelta 2
+
+Verificado `git diff 181fc5b..cycle-26` (voice.ts, selfcheck.ts, spec §7.1).
+
+- Hallazgo 1 (números en palabra): resuelto. Decenas, compuestos con «y», veinti-, centenas y «one hundred twenty» se convierten; `mil/cero/media/docena...` dejan la frase incompleta (VZ17).
+- Hallazgo 2 (peso corporal fuera de rango): resuelto en `parseGym` y `fromAI` (dicho fuera de rango = incompleto; no dicho = lastre 0) (VZ18).
+- Comandos en `cycle-26`: build OK, lint OK, e2e 9/9 OK. `npm test`: 177/177 en 3 ejecuciones; en una ejecución previa falló una vez `U-V3` (App.test.tsx ~1001, valor del peso tras Editar), coincidiendo con carga por el build; no reproducible. Se anota como posible flaky, `menor`.
+
+### Hallazgos
+
+1. **importante** — `app/src/core/voice.ts:~76-80` (`wordNumber`, rama `TENS_EN` vs `TENS`): la asimetría ES/EN produce registros falsos guardados como completos. Comprobado ejecutando `parseGym`:
+   - «press banca 3 series de ochenta cinco» → normaliza a `3 series de 80 5` → 3 series, **80 reps, 5 kg** (completo, falso).
+   - «press banca ochenta cinco kilos 5 repeticiones» → **5 kg × 5** (el peso 85 se pierde en silencio; el 80 se descarta).
+   - «sentadilla ochenta cinco por cinco» → 80 kg × 5 × 5 series (el 85 pasa a 80).
+   - Inglés: «bench eighty five» → 85 kg, sin reps (incompleto, correcto). «thirty five by eight» → 35 × 8 (correcto).
+   Es dato inventado que se guarda sin confirmación (solo queda Deshacer), justo lo que la vuelta 1 quería evitar. No es bloqueante (reversible, solo ocurre con el número hablado en palabra sin «y»; el reconocimiento del navegador suele entregar dígitos), pero un `ponytail:` no es suficiente porque el arreglo cuesta una línea. Corrección esperada: en español, decena + unidad sin «y» debe fusionarse (80+5=85) o, mínimo, marcar la frase incompleta (como `UNRESOLVED`); en ningún caso partirse en dos números. Añadir assert VZ con «ochenta cinco» (ES) y «press banca 3 series de ochenta cinco».
+2. **menor** — posible flaky `U-V3` (ver arriba); sin acción salvo que reaparezca.
+
+### Veredicto final: CAMBIOS (1 importante, 0 bloqueantes, 1 menor)

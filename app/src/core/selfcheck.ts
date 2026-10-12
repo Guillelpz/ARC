@@ -578,6 +578,8 @@ export function runSelfCheck() {
       f(p('sentadilla ciento veinte kilos cinco')) === 'squat/120 kg/5/1' && f(p('sentadilla ciento treinta y cinco kilos cinco')) === 'squat/135 kg/5/1' &&
       f(p('squat thirty-five kilos 8')) === 'squat/35 kg/8/1' && f(p('squat thirty five kilos 8')) === 'squat/35 kg/8/1' && f(p('squat one hundred twenty kilos 5')) === 'squat/120 kg/5/1' &&
       f(p('bench ninety kilos 3 sets of five')) === 'bench-press/90 kg/5/3', 'VZ17 números en palabra')
+    ok(f(p('press banca ochenta cinco kilos 5 repeticiones')) === 'bench-press/85 kg/5/1' && f(p('sentadilla ochenta cinco por cinco')) === 'squat/85 kg/5/1' &&
+      f(p('press banca 3 series de ochenta cinco')) === 'bench-press/null kg/85/3' && !isComplete(p('press banca 3 series de ochenta cinco'), EX), 'VZ19 decena + unidad sin «y» se fusiona (ES como EN)')
     ok(!isComplete(p('press banca mil kilos 5'), EX) && !isComplete(p('press banca cero kilos 5'), EX) && !isComplete(p('press banca medio kilo 5'), EX) &&
       p('press banca mil kilos 5').exerciseId === 'bench-press', 'VZ17 palabra-número sin resolver: incompleto')
     ok(f(p('dominadas 2500 kg 5')) === 'pull-up/null kg/5/1' && !isComplete(p('dominadas 2500 kg 5'), EX) && f(p('dominadas 5')) === 'pull-up/0 kg/5/1' && isComplete(p('dominadas 5'), EX) &&

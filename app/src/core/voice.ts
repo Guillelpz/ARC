@@ -73,7 +73,7 @@ function wordNumber(tk: string[], i: number): { v: number; next: number } | null
   if (TENS.has(x)) {
     v += TENS.get(x)!; j++
     if (tk[j] === 'y' && UNITS.has(tk[j + 1])) { v += UNITS.get(tk[j + 1])!; j += 2 }
-    else if (TENS_EN.has(x) && UNITS_EN.has(tk[j])) { v += UNITS_EN.get(tk[j])!; j++ }
+    else if (UNITS.has(tk[j])) { v += UNITS.get(tk[j])!; j++ } // «ochenta cinco» = 85, como «thirty five»
   } else if (SMALL.has(x)) { v += SMALL.get(x)!; j++ }
   return j > i ? { v, next: j } : null
 }
