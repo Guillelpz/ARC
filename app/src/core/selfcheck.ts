@@ -7,7 +7,8 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
-import { ALIASES, draftText, isComplete, matchExercise, normalizeVoice, parseGym, type GymDraft } from './voice'
+import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
+import { voicePrompt, voiceSchema } from './haiku'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -574,6 +575,22 @@ export function runSelfCheck() {
     const bd = (id: string, w: number, u: 'kg' | 'lbs', r: number, s: number): GymDraft => ({ exerciseId: id, weight: w, unit: u, reps: r, sets: s })
     ok(draftText(bd('bench-press', 80, 'kg', 5, 1), EX, 'kg') === 'Press banca · 80 kg × 5' && draftText(bd('bench-press', 80, 'kg', 5, 3), EX, 'kg') === 'Press banca · 3 series · 80 kg × 5' &&
       draftText(bd('pull-up', 0, 'kg', 12, 1), EX, 'kg') === 'Dominadas · 12 reps' && draftText({ ...bd('x', 1, 'kg', 1, 1), exerciseId: null }, EX, 'kg') === 'Ejercicio sin reconocer', 'VZ13 draftText')
+    // VZ14–VZ16 — respuesta de Haiku, elección y esquema
+    const fa = (o: unknown) => fromAI(o, EX, 'kg')
+    const base14 = { exerciseId: 'squat', weight: 100, unit: 'none', reps: 5, sets: 3 }
+    ok(f(fa(base14)!) === 'squat/100 kg/5/3' && fa({ ...base14, exerciseId: 'ghost' }) === null && fa({ ...base14, exerciseId: 'none' })?.exerciseId === null &&
+      fa({ ...base14, sets: 0 }) === null && fa({ ...base14, weight: '80' })?.weight === null && fa({ exerciseId: 'pull-up', weight: null, unit: 'none', reps: 8, sets: 1 })?.weight === 0 &&
+      fa({ ...base14, unit: 'lbs' })?.unit === 'lbs' && fa(null) === null && fa([]) === null, 'VZ14 fromAI')
+    {
+      const full1 = bd('bench-press', 80, 'kg', 5, 1), full2 = bd('squat', 100, 'kg', 5, 3), hole = { ...full1, reps: null }
+      const a = pickDraft(full2, full1, EX), b = pickDraft(hole, full1, EX), c = pickDraft(null, full1, EX), d = pickDraft(hole, { ...full1, weight: null }, EX)
+      ok(a.source === 'ai' && a.draft === full2 && b.source === 'parser' && b.draft === full1 && c.source === 'parser' && d.source === 'ai' && d.draft === hole, 'VZ15 pickDraft')
+    }
+    {
+      const sch = voiceSchema(['a', 'b']), pr = voicePrompt('a <b> c', [{ id: 'a', name: 'X<>Y', group: 'chest', kind: 'load' }], 'kg')
+      ok(JSON.stringify(sch.properties.exerciseId.enum) === '["a","b","none"]' && sch.required.length === 5 && sch.additionalProperties === false &&
+        pr.includes('<frase>a  b  c</frase>') && pr.includes('a: X  Y (carga)') && !pr.includes('<b>'), 'VZ16 esquema y prompt')
+    }
   }
 
   console.info('[selfcheck] done')
