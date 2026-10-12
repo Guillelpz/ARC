@@ -10,6 +10,7 @@ Ver `docs/WORKFLOW.md`.
 - Ciclo 19 — cerrado; primer despliegue automático OK (2026-10-09). Desde aquí, cada push a main que toque app/ despliega a producción.
 - Ciclo 20 — cerrado. El usuario hace en paralelo los pasos de GitHub de P20.1.
 - Ciclo 21 — cerrado.
+- Ciclo 23 (P23.1) — hecho en la rama `cycle-23`: límite semanal VILLAIN (avisa, no bloquea; sin efecto en XP/rachas/party). Pendiente de merge.
 - Ciclo 22 (P22.1) — hecho: `.gitattributes` LF (sin cambios de contenido); humo verificado en el deploy del 21; el usuario limitó el entorno `github-pages` a `main` (2026-10-12). **PAUSA del workflow** (decisión del usuario 2026-10-10) hasta que el usuario lo reactive con datos de uso real.
 
 ## Nota
@@ -92,4 +93,5 @@ El 2026-10-09 se reescribió el historial (email noreply) antes del primer push:
 | P20.1 | Proteger producción: humo post-deploy (JS publicado = dist), rollback con git revert; pasos de GitHub los hace el usuario | aprobada | 20 |
 | P20.2 | No pisar datos de otra pestaña tras aviso de datos dañados | aprobada | 20 |
 | P20.3 | Sincronización | opción A aprobada (ciclo 21); Worker descartado por ahora | 21 |
+| P23.1 | Límite semanal VILLAIN opcional (retoma P11.2) | hecha (rama cycle-23) | 23 |
 | P22.1 | Riesgos operativos: humo del deploy 21, `.gitattributes` LF, entorno github-pages solo main | hecha | 22 |
