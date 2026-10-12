@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { CircleAlert, Keyboard, Mic } from 'lucide-react'
 import type { Exercise, WeightUnit } from '../core/types'
@@ -58,7 +58,7 @@ export function VoiceLog(props: Props) {
   const { tone, day, today, exercises, unit, ack } = props
   const t = VT[tone]
   const ref = useRef(props)
-  useEffect(() => { ref.current = props })
+  useLayoutEffect(() => { ref.current = props }) // layout: al commit, antes de que «Deshacer»/«Editar» se puedan pulsar
   const [mode, setMode] = useState<Mode>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [saved, setSaved] = useState<Saved | null>(null)
