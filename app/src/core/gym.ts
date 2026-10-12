@@ -43,6 +43,8 @@ export const exerciseName = (id: string, custom: Exercise[]) => allExercises(cus
 const r1 = (x: number) => Math.round(x * 10) / 10, r2 = (x: number) => Math.round(x * 100) / 100, r3 = (x: number) => Math.round(x * 1000) / 1000
 export const toKg = (w: number, u: WeightUnit) => (u === 'kg' ? w : w * LB_KG)
 export const convert = (w: number, from: WeightUnit, to: WeightUnit) => (from === to ? w : r1(from === 'kg' ? w / LB_KG : w * LB_KG))
+// kg → unidad preferida, a 1 decimal (1RM)
+export const fromKg = (kg: number, u: WeightUnit) => r1(u === 'kg' ? kg : kg / LB_KG)
 export const kgKey = (s: Pick<GymSet, 'weight' | 'unit'>) => r3(toKg(s.weight, s.unit))
 
 export function parseWeight(text: string): number | null {
@@ -114,7 +116,7 @@ export function recordText(kinds: RecordKind[], s: GymSet, name: string, pref: W
     if (k === 'weight') return `peso máximo ${w}`
     if (k === '1rm') {
       const kg = e1rm(toKg(s.weight, s.unit), s.reps) ?? 0
-      return `1RM estimado ${fmtWeight(r1(pref === 'kg' ? kg : kg / LB_KG), pref)}`
+      return `1RM estimado ${fmtWeight(fromKg(kg, pref), pref)}`
     }
     return kind === 'bodyweight' && s.weight === 0 ? `${s.reps} repeticiones sin lastre` : `${s.reps} repeticiones con ${w}`
   })
