@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
+import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay } from './core/gym'
+import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
-import { askHaiku, type HaikuError } from './core/haiku'
+import { askHaiku, interpretGym, type HaikuError } from './core/haiku'
+import type { VoiceCommand } from './core/voice'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
 import { PARTIES, buildRanking, derivePartyState, overtakes, proposeTo } from './core/party'
@@ -193,28 +194,41 @@ export default function App() {
 
   const r2 = (x: number) => Math.round(x * 100) / 100
   const gymTracker = () => trackers.find(t => t.id === GYM_TRACKER)!
-  function addSet(input: Omit<GymSet, 'id' | 'occurredAt'>, day: string): { kinds: RecordKind[]; auto: boolean } {
+  // n series iguales con el mismo `occurredAt`; un solo setGym. Solo la primera puede batir récord (las siguientes son iguales).
+  function addSets(input: Omit<GymSet, 'id' | 'occurredAt'>, n: number, day: string): { ids: string[]; kinds: RecordKind[]; auto: boolean } {
     if (day > today) day = today
-    const set: GymSet = { id: crypto.randomUUID(), ...input, weight: r2(input.weight), occurredAt: nowStamp(day) }
-    const kinds = beaten(liveSets(gym.log).filter(s => s.exerciseId === set.exerciseId), set)
-    setGym({ ...gym, log: [...gym.log, set] })
+    const at = nowStamp(day)
+    const sets: GymSet[] = Array.from({ length: n }, () => ({ id: crypto.randomUUID(), ...input, weight: r2(input.weight), occurredAt: at }))
+    const kinds = beaten(liveSets(gym.log).filter(s => s.exerciseId === input.exerciseId), sets[0])
+    setGym({ ...gym, log: [...gym.log, ...sets] })
     // la regla «series vivas ⇒ ≥ 1 sesión» la cumple también `add` (deshacer o «−» de la sesión): ver ensureAuto
     const ev = autoSession(events, day)
     if (ev) push([ev], gymTracker())
     if (kinds.length) {
-      const x = allExercises(gym.exercises).find(e => e.id === set.exerciseId)
-      setRecord({ key: set.id, text: recordText(kinds, set, exerciseName(set.exerciseId, gym.exercises), gym.unit ?? 'kg', x?.kind ?? 'load') })
+      const x = allExercises(gym.exercises).find(e => e.id === input.exerciseId)
+      setRecord({ key: sets[0].id, text: recordText(kinds, sets[0], exerciseName(input.exerciseId, gym.exercises), gym.unit ?? 'kg', x?.kind ?? 'load') })
     }
-    return { kinds, auto: !!ev }
+    return { ids: sets.map(s => s.id), kinds, auto: !!ev }
   }
-  function undoSet(s: GymSet): { retracted: boolean } {
-    if (!liveSets(gym.log).some(x => x.id === s.id)) return { retracted: false }
-    const u: GymUndo = { id: crypto.randomUUID(), undoes: s.id, occurredAt: s.occurredAt }
-    const log2 = [...gym.log, u]
+  const addSet = (input: Omit<GymSet, 'id' | 'occurredAt'>, day: string) => addSets(input, 1, day)
+  // Deshace de una vez las series vivas de `ids`; la sesión automática solo se retira si el día se queda sin series vivas.
+  function undoSets(ids: string[]): { undone: number; retracted: boolean } {
+    const us = undoMany(gym.log, ids, () => crypto.randomUUID())
+    if (us.length === 0) return { undone: 0, retracted: false }
+    const log2 = [...gym.log, ...us]
     setGym({ ...gym, log: log2 })
-    const evs = retractAuto(events, log2, s.occurredAt.slice(0, 10), () => crypto.randomUUID())
+    const evs = retractAuto(events, log2, us[0].occurredAt.slice(0, 10), () => crypto.randomUUID())
     if (evs.length) push(evs, gymTracker())
-    return { retracted: evs.length > 0 }
+    return { undone: us.length, retracted: evs.length > 0 }
+  }
+  const undoSet = (s: GymSet) => undoSets([s.id])
+  // Voz: el comando ya está completo (isComplete). Se guarda en la unidad dicha.
+  const interpretVoice = (text: string): Promise<VoiceCommand> =>
+    interpretGym(text, allExercises(gym.exercises).filter(x => !x.archived), gym.unit ?? 'kg', loadAiKey(), navigator.onLine !== false)
+  const saveVoice = (cmd: VoiceCommand, day: string) => {
+    const d = cmd.draft
+    const r = addSets({ exerciseId: d.exerciseId!, weight: d.weight!, unit: d.unit, reps: d.reps! }, d.sets, day)
+    return { ids: r.ids, auto: r.auto }
   }
   const setUnit = (u: WeightUnit) => setGym(g => { const { unit: _, ...rest } = g; return u === 'lbs' ? { ...rest, unit: u } : rest })
 
@@ -375,7 +389,7 @@ export default function App() {
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
-      {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'gym' && <GymView gym={gym} today={today} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}

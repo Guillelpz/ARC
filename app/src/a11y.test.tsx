@@ -84,3 +84,22 @@ test('A12b Yo con la clave guardada', async () => {
   expect(screen.getByText('Clave guardada: termina en 0000')).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A11 Gym con el aviso de privacidad de la voz y con la tarjeta del resultado', async () => {
+  class Fake {
+    lang = ''; continuous = false; interimResults = false; maxAlternatives = 1
+    onresult: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
+    start() { setTimeout(() => { this.onresult?.({ results: [Object.assign([{ transcript: 'press banca 80 kg 5 reps' }], { isFinal: true })] }); this.onend?.() }, 0) }
+    stop() {}; abort() {}
+  }
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = Fake
+  try {
+    render(<App />); go('Yo'); fireEvent.click(screen.getByRole('button', { name: /^Gym/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dictar serie' }))
+    expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy()
+    expect(await serious()).toEqual([])
+    fireEvent.click(screen.getByRole('button', { name: 'Entendido' }))
+    expect(await screen.findByText(/^Registrado:/)).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
+})

@@ -4,7 +4,9 @@ import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, Routine, Weigh
 import { GROUPS, MAX_ROUTINES, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, groupVolume, lastSet, liveSets, parseReps, parseWeight, recordText, records, routineFromDay, routineProgress, stepWeight, weeklyBest1rm } from '../core/gym'
 import { dayLabel, shortDate } from '../core/stats'
 import { isValidName, normalizeText, trackerName } from '../core/classify'
+import { draftText, type GymDraft, type VoiceCommand } from '../core/voice'
 import { DayPicker } from './DayPicker'
+import { VoiceLog, type VoiceMissing } from './VoiceLog'
 import { SaveFailBanner } from './SaveFailBanner'
 import { Segmented } from './Segmented'
 
@@ -21,6 +23,7 @@ type Props = {
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
+  voice: { ack: boolean; onAck: () => void; onInterpret: (text: string) => Promise<VoiceCommand>; onSave: (cmd: VoiceCommand, day: string) => { ids: string[]; auto: boolean }; onUndo: (ids: string[]) => { retracted: boolean } }
 }
 
 const DEFAULT_EXERCISE = 'bench-press'
@@ -32,7 +35,7 @@ const secondary = `${btnBase} border border-hero-border bg-transparent text-hero
 const int = (kg: number, u: WeightUnit) => `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: 'always' }).format(Math.round(fromKg(kg, u)))} ${u}`
 const num = (n: number) => String(n).replace('.', ',')
 
-export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onSaveRoutine, onDeleteRoutine, onBack, saveFailed, onExport }: Props) {
+export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onSaveRoutine, onDeleteRoutine, onBack, saveFailed, onExport, voice }: Props) {
   const unit = gym.unit ?? 'kg'
   const exercises = allExercises(gym.exercises)
   const active = exercises.filter(x => !x.archived)
@@ -50,6 +53,9 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
   const [errors, setErrors] = useState<{ weight?: string; reps?: string }>({})
   const [status, setStatus] = useState('')
   const headingRef = useRef<HTMLHeadingElement>(null)
+  const selectRef = useRef<HTMLSelectElement>(null)
+  const weightRef = useRef<HTMLInputElement>(null)
+  const repsRef = useRef<HTMLInputElement>(null)
   const [newName, setNewName] = useState('')
   const [newGroup, setNewGroup] = useState<MuscleGroup>('chest')
   const [newKind, setNewKind] = useState<Exercise['kind']>('load')
@@ -89,6 +95,20 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
 
   const changeExercise = (id: string) => { setExerciseId(id); setForm(prefill(id, unit)); setErrors({}) }
   const changeUnit = (u: WeightUnit) => { onSetUnit(u); setForm(prefill(sel, u)); setErrors({}) }
+  const MISSING_TEXT: Record<VoiceMissing, string> = { exercise: 'No se ha entendido el ejercicio.', reps: 'Faltan las repeticiones.', weight: 'Falta el peso.', sets: 'Indica entre 1 y 10 series.' }
+  // Rellena el formulario con el borrador de voz y enfoca el primer dato que falte (si no falta nada, el peso).
+  function applyDraft(d: GymDraft, note: string) {
+    const id = d.exerciseId !== null && active.some(x => x.id === d.exerciseId) ? d.exerciseId : null
+    const target = id ?? sel
+    if (id) setExerciseId(id)
+    const base = prefill(target, unit)
+    setForm({ w: d.weight !== null ? num(convert(d.weight, d.unit, unit)) : base.w, r: d.reps !== null ? String(d.reps) : '' })
+    setErrors({}); setStatus(note)
+    const el = id === null ? selectRef : d.weight === null ? weightRef : d.reps === null ? repsRef : weightRef
+    setTimeout(() => el.current?.focus(), 0) // como loadRoutine: los campos ya existen, pero el estado aún no se ha pintado
+  }
+  const editNote = (d: GymDraft) => `Formulario rellenado con ${draftText(d, active, unit)}. Registra la serie${d.sets > 1 ? ' y usa «Repetir serie» para las demás' : ''}.`
+  const incompleteNote = (missing: VoiceMissing[]) => `${missing.map(m => MISSING_TEXT[m]).join(' ')} Completa el formulario.`
   const step = (dir: 1 | -1) => setForm(f => ({ ...f, w: num(stepWeight(parseWeight(f.w) ?? 0, unit, dir)) }))
 
   const register = (input: Omit<GymSet, 'id' | 'occurredAt'>) => {
@@ -174,7 +194,7 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
           options={[{ value: 'kg', label: 'kg' }, { value: 'lbs', label: 'lbs' }]} />
         <DayPicker day={day} today={today} onChange={setDay} tone="hero" />
         <label className="flex flex-col gap-1 text-sm font-medium">Ejercicio
-          <select value={sel} onChange={e => changeExercise(e.target.value)} className={field}>
+          <select ref={selectRef} value={sel} onChange={e => changeExercise(e.target.value)} className={field}>
             {groups.filter(g => g.items.length > 0).map(g => (
               <optgroup key={g.id} label={g.label}>
                 {g.items.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -208,13 +228,19 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
           </section>
         )}
 
+        <section aria-labelledby="gym-voice" className={card}>
+          <h2 id="gym-voice" className="text-base font-semibold">Por voz</h2>
+          <VoiceLog tone="hero" day={day} today={today} exercises={active} unit={unit} ack={voice.ack} onAck={voice.onAck} onInterpret={voice.onInterpret}
+            onSave={voice.onSave} onUndo={voice.onUndo} onEdit={d => applyDraft(d, editNote(d))} onIncomplete={(d, m) => applyDraft(d, incompleteNote(m))} />
+        </section>
+
         <form onSubmit={submit} className={card} noValidate>
           <h2 className="text-base font-semibold">Registrar serie</h2>
           <div className="flex flex-col gap-1">
             <label htmlFor="gym-weight" className="text-xs font-medium">{kind === 'bodyweight' ? `Lastre (${unit})` : `Peso (${unit})`}</label>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => step(-1)} aria-label={`Bajar ${stepLabel}`} className={`${secondary} min-w-11 px-0`}><Minus className="size-5" aria-hidden /></button>
-              <input id="gym-weight" type="text" inputMode="decimal" autoComplete="off" value={form.w} onChange={e => setForm(f => ({ ...f, w: e.target.value }))}
+              <input id="gym-weight" ref={weightRef} type="text" inputMode="decimal" autoComplete="off" value={form.w} onChange={e => setForm(f => ({ ...f, w: e.target.value }))}
                 aria-invalid={!!errors.weight} aria-describedby={errors.weight ? 'gym-weight-err' : undefined} className={`${field} text-center tabular-nums`} />
               <button type="button" onClick={() => step(1)} aria-label={`Subir ${stepLabel}`} className={`${secondary} min-w-11 px-0`}><Plus className="size-5" aria-hidden /></button>
             </div>
@@ -222,7 +248,7 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
           </div>
           <div className="flex flex-col gap-1">
             <label htmlFor="gym-reps" className="text-xs font-medium">Repeticiones</label>
-            <input id="gym-reps" type="text" inputMode="numeric" autoComplete="off" value={form.r} onChange={e => setForm(f => ({ ...f, r: e.target.value }))}
+            <input id="gym-reps" ref={repsRef} type="text" inputMode="numeric" autoComplete="off" value={form.r} onChange={e => setForm(f => ({ ...f, r: e.target.value }))}
               aria-invalid={!!errors.reps} aria-describedby={errors.reps ? 'gym-reps-err' : undefined} className={`${field} tabular-nums`} />
             {errors.reps && <p id="gym-reps-err" className="flex items-center gap-2 text-sm text-hero-text"><CircleAlert className="size-4 shrink-0" aria-hidden />{errors.reps}</p>}
           </div>

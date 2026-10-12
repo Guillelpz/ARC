@@ -947,3 +947,148 @@ test('U-V12 Probar clave: ok y 401', async () => {
     expect(await screen.findByText('Anthropic rechaza la clave. Comprueba que la has copiado entera.')).toBeTruthy()
   } finally { vi.unstubAllGlobals() }
 })
+
+// ---- Voz en Gym (T6) ----
+type W = Record<string, unknown>
+const win = window as unknown as W
+const setVoz = (v: string | { error: string }) => { win.webkitSpeechRecognition = FakeSpeech; win.__voz = v }
+afterEach(() => { delete win.webkitSpeechRecognition; delete win.__voz; Object.defineProperty(navigator, 'onLine', { value: true, configurable: true }) })
+const ackVoice = () => localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
+const gymLog = () => JSON.parse(localStorage.getItem('life-rpg-gym-v1') ?? '{"log":[]}').log as { id: string; exerciseId?: string; weight?: number; unit?: string; reps?: number; undoes?: string; occurredAt: string }[]
+const liveGym = () => { const l = gymLog(); const u = new Set(l.filter(e => e.undoes).map(e => e.undoes)); return l.filter(e => !e.undoes && !u.has(e.id)) }
+const gymSum = () => stored().filter((e: { trackerId: string }) => e.trackerId === 'gym').reduce((n: number, e: { amount: number }) => n + e.amount, 0)
+const dictate = (v: string | { error: string }) => { setVoz(v); fireEvent.click(btn('Dictar serie')) }
+const KEY2 = 'sk-ant-test-0000000000000000'
+
+test('U-V1 primera vez: privacidad, dictar, guardar con sesion en HERO', async () => {
+  render(<App />); openGym()
+  setVoz('80 kilos press banca 5 repeticiones')
+  fireEvent.click(btn('Dictar serie'))
+  expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy()
+  fireEvent.click(btn('Entendido'))
+  expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
+  expect(screen.getByText('Serie 1 · 80 kg × 5')).toBeTruthy()
+  expect(screen.getByText('Oído: «80 kilos press banca 5 repeticiones»')).toBeTruthy()
+  expect(screen.getByText(/Sesión de Gym apuntada en HERO \(hoy\)\./)).toBeTruthy()
+  expect(stored().some((e: { id: string; amount: number }) => e.id === 'gym-auto-2026-10-07' && e.amount === 1)).toBe(true)
+  expect(JSON.parse(localStorage.getItem('life-rpg-voice-v1')!).privacyAck).toBeTruthy()
+  // la segunda vez no sale el aviso
+  fireEvent.click(btn('Cerrar'))
+  dictate('sentadilla 100 5')
+  expect(screen.queryByRole('heading', { name: 'Privacidad de la voz' })).toBeNull()
+  expect(await screen.findByText(/^Registrado: Sentadilla · 100 kg × 5/)).toBeTruthy()
+  expect(liveGym()).toHaveLength(2)
+})
+
+test('U-V2 3x5, Deshacer: 0 series, sesion retirada y foco en Dictar serie', async () => {
+  ackVoice(); render(<App />); openGym()
+  dictate('press banca 80 kg 3x5')
+  expect(await screen.findByText(/^Registrado: Press banca · 3 series · 80 kg × 5/)).toBeTruthy()
+  expect(liveGym()).toHaveLength(3); expect(gymSum()).toBe(1)
+  fireEvent.click(btn('Deshacer'))
+  expect(liveGym()).toHaveLength(0); expect(gymSum()).toBe(0)
+  expect(screen.getByText('Deshecho: 3 series de Press banca. Sesión de Gym retirada.')).toBeTruthy()
+  await vi.waitFor(() => expect(document.activeElement).toBe(btn('Dictar serie')))
+})
+
+test('U-V3 Editar: deshace y rellena el formulario con el foco en el peso', async () => {
+  ackVoice(); render(<App />); openGym()
+  dictate('press banca 80 kg 5 reps')
+  await screen.findByText(/^Registrado:/)
+  fireEvent.click(btn('Editar'))
+  expect(liveGym()).toHaveLength(0)
+  expect((screen.getByLabelText(/^Peso \(/) as HTMLInputElement).value).toBe('80')
+  expect((screen.getByLabelText('Repeticiones') as HTMLInputElement).value).toBe('5')
+  expect((screen.getByLabelText('Ejercicio') as HTMLSelectElement).value).toBe('bench-press')
+  expect(screen.getByText('Formulario rellenado con Press banca · 80 kg × 5. Registra la serie.')).toBeTruthy()
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText(/^Peso \(/)))
+})
+
+test('U-V4 incompleto: no guarda, formulario con foco en las repeticiones', async () => {
+  ackVoice(); render(<App />); openGym()
+  dictate('press banca 80')
+  expect(await screen.findByText('Faltan las repeticiones. Completa el formulario.')).toBeTruthy()
+  expect(liveGym()).toHaveLength(0)
+  expect((screen.getByLabelText(/^Peso \(/) as HTMLInputElement).value).toBe('80')
+  expect((screen.getByLabelText('Repeticiones') as HTMLInputElement).value).toBe('')
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Repeticiones')))
+})
+
+test('U-V5 sin API: Dictar serie abre el campo de texto', async () => {
+  ackVoice(); render(<App />); openGym()
+  fireEvent.click(btn('Dictar serie'))
+  const input = screen.getByLabelText('Serie') as HTMLInputElement
+  expect(document.activeElement).toBe(input)
+  expect(screen.getByText(/no puede reconocer la voz/)).toBeTruthy()
+  fireEvent.change(input, { target: { value: 'dominadas 12' } })
+  fireEvent.click(btn('Registrar'))
+  expect(await screen.findByText('Serie 1 · 12 reps')).toBeTruthy()
+})
+
+test('U-V8 con clave y fallo de la IA: usa el parser; con 401, avisa', async () => {
+  ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn().mockResolvedValueOnce(new Response('{}', { status: 500 })).mockResolvedValueOnce(new Response('{}', { status: 401 }))
+  vi.stubGlobal('fetch', f)
+  try {
+    render(<App />); openGym()
+    dictate('press banca 80 kg 5 reps')
+    expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
+    expect(screen.queryByText(/La IA no está disponible/)).toBeNull()
+    fireEvent.click(btn('Cerrar'))
+    dictate('sentadilla 100 kg 5 reps')
+    expect(await screen.findByText(/^Registrado: Sentadilla/)).toBeTruthy()
+    expect(screen.getByText(/La IA no está disponible \(clave rechazada o sin saldo\)/)).toBeTruthy()
+    expect(f).toHaveBeenCalledTimes(2)
+    expect(liveGym()).toHaveLength(2)
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-V10 sin conexion: campo de texto y fetch no se llama', async () => {
+  ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn(); vi.stubGlobal('fetch', f)
+  try {
+    setVoz('x'); Object.defineProperty(navigator, 'onLine', { value: false, configurable: true })
+    render(<App />); openGym()
+    fireEvent.click(btn('Dictar serie'))
+    expect(screen.getByText(/Sin conexión: el reconocimiento de voz necesita internet/)).toBeTruthy()
+    const input = screen.getByLabelText('Serie') as HTMLInputElement
+    expect(document.activeElement).toBe(input)
+    fireEvent.change(input, { target: { value: 'dominadas 12' } }); fireEvent.click(btn('Registrar'))
+    expect(await screen.findByText('Serie 1 · 12 reps')).toBeTruthy()
+    expect(f).not.toHaveBeenCalled()
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-V11 not-allowed: mensaje y campo de texto enfocado', async () => {
+  ackVoice(); render(<App />); openGym()
+  dictate({ error: 'not-allowed' })
+  expect(await screen.findByText(/No hay permiso para el micrófono/)).toBeTruthy()
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Serie')))
+  expect(liveGym()).toHaveLength(0)
+})
+
+test('U-V13 dia pasado: 3 series ese dia', async () => {
+  ackVoice(); render(<App />); openGym()
+  fireEvent.click(screen.getByRole('button', { name: 'Ayer' }))
+  dictate('dominadas 3x8 con 10 kilos')
+  expect(await screen.findByText(/^Registrado: Dominadas · 3 series · \+10 kg × 8/)).toBeTruthy()
+  const l = liveGym()
+  expect(l).toHaveLength(3); expect(l.every(s => s.occurredAt.startsWith('2026-10-06') && s.weight === 10)).toBe(true)
+  expect(stored().some((e: { id: string }) => e.id === 'gym-auto-2026-10-06')).toBe(true)
+})
+
+test('U-V14 libras dichas se guardan en lbs', async () => {
+  ackVoice(); render(<App />); openGym()
+  dictate('sentadilla 225 libras 5')
+  await screen.findByText(/^Registrado:/)
+  expect(liveGym()[0]).toMatchObject({ exerciseId: 'squat', weight: 225, unit: 'lbs', reps: 5 })
+})
+
+test('Voz: una serie que bate el peso maximo muestra Nuevo record', async () => {
+  ackVoice(); render(<App />); openGym()
+  dictate('press banca 100 5')
+  await screen.findByText(/^Registrado:/)
+  fireEvent.click(btn('Cerrar'))
+  dictate('press banca 105 5')
+  expect(await screen.findByText('Nuevo récord')).toBeTruthy()
+})
