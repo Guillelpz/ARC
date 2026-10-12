@@ -1,4 +1,4 @@
-import type { ActivityEvent, CustomData, Exercise, GoalLogEntry, Goals, GymData, GymEntry, Limits, Proposal, Tracker } from './types'
+import type { ActivityEvent, CustomData, Exercise, GoalLogEntry, Goals, GymData, GymEntry, Limits, Proposal, Routine, Tracker } from './types'
 import { defaultGoal, isFixedVillain } from './trackers'
 import { mondayOf } from './stats'
 import { EMPTY_GYM } from './gym'
@@ -102,7 +102,21 @@ const validEntry = (e: unknown): e is GymEntry => {
     (e.unit === 'kg' || e.unit === 'lbs') && typeof e.reps === 'number' && Number.isInteger(e.reps) && e.reps >= 1 && e.reps <= 999 &&
     typeof e.occurredAt === 'string' && STAMP.test(e.occurredAt)
 }
-const KNOWN_GYM = new Set(['log', 'exercises', 'unit', '__proto__'])
+const KNOWN_GYM = new Set(['log', 'exercises', 'unit', 'routines', '__proto__'])
+
+// Rutina no válida → null (se descarta); ítems no válidos o repetidos → se quitan (`fixed`); más de 20 → se recorta. exerciseId desconocido: se conserva.
+function readRoutine(x: unknown): { r: Routine; fixed: number } | null {
+  if (!isObj(x) || typeof x.id !== 'string' || !x.id.startsWith('routine-') || x.id.length <= 8 || typeof x.name !== 'string' ||
+    x.name.trim().length < 1 || x.name.trim().length > 40 || !Array.isArray(x.items)) return null
+  const items: Routine['items'] = []
+  let fixed = 0
+  for (const i of x.items) {
+    if (isObj(i) && isStr(i.exerciseId) && typeof i.sets === 'number' && Number.isInteger(i.sets) && i.sets >= 1 && i.sets <= 10 && !items.some(y => y.exerciseId === i.exerciseId)) {
+      if (items.length < 20) items.push({ exerciseId: i.exerciseId, sets: i.sets }); else fixed++
+    } else fixed++
+  }
+  return items.length ? { r: { id: x.id, name: x.name, items }, fixed } : null
+}
 
 export function readGym(v: unknown): Parsed<GymData> {
   if (!isObj(v)) return null
@@ -121,7 +135,19 @@ export function readGym(v: unknown): Parsed<GymData> {
   const data = { log, exercises } as GymData
   for (const [k, x] of Object.entries(v)) if (!KNOWN_GYM.has(k)) (data as unknown as Record<string, unknown>)[k] = x
   if (v.unit !== undefined) { if (v.unit === 'kg' || v.unit === 'lbs') data.unit = v.unit; else fixedN++ }
-  return { data, dropped: rawL.length - log.length + rawE.length - exercises.length, fixed: fixedN }
+  let rDropped = 0
+  if (v.routines !== undefined) {
+    if (!Array.isArray(v.routines)) rDropped++
+    else {
+      const routines: Routine[] = []
+      for (const x of v.routines) {
+        const r = readRoutine(x)
+        if (r) { routines.push(r.r); fixedN += r.fixed } else rDropped++
+      }
+      if (routines.length) data.routines = routines
+    }
+  }
+  return { data, dropped: rawL.length - log.length + rawE.length - exercises.length + rDropped, fixed: fixedN }
 }
 
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM

@@ -1,4 +1,4 @@
-import type { ActivityEvent, Exercise, GymData, GymDay, GymEntry, GymRecords, GymSet, GymUndo, GroupVolume, MuscleGroup, RecordKind, WeekBest, WeightUnit } from './types'
+import type { ActivityEvent, Exercise, GymData, GymDay, GymEntry, GymRecords, GymSet, GymUndo, GroupVolume, MuscleGroup, RecordKind, Routine, WeekBest, WeightUnit } from './types'
 import { addDays, clampAmount, dayTotal, mondayOf, undoneIds } from './stats'
 
 export const EMPTY_GYM: GymData = { log: [], exercises: [] }
@@ -192,4 +192,27 @@ export function groupVolume(log: GymEntry[], custom: Exercise[], today: string):
 export function gymDay(log: GymEntry[], day: string): GymDay {
   const sets = daySets(log, day)
   return { sets: sets.length, exercises: new Set(sets.map(s => s.exerciseId)).size }
+}
+
+export const MAX_ROUTINES = 20
+export const MAX_ROUTINE_ITEMS = 20
+export const MAX_ROUTINE_SETS = 10
+
+// Ítems en orden de primera serie viva del día; sets = min(10, nº de series). null si el día no tiene series.
+export function routineFromDay(log: GymEntry[], day: string, name: string, id: string): Routine | null {
+  const items: Routine['items'] = []
+  for (const s of daySets(log, day)) {
+    const it = items.find(x => x.exerciseId === s.exerciseId)
+    if (it) it.sets = Math.min(MAX_ROUTINE_SETS, it.sets + 1); else items.push({ exerciseId: s.exerciseId, sets: 1 })
+  }
+  return items.length ? { id, name, items: items.slice(0, MAX_ROUTINE_ITEMS) } : null
+}
+
+// done = series vivas de ese ejercicio en `day`; complete = done >= sets
+export function routineProgress(r: Routine, log: GymEntry[], day: string): { exerciseId: string; sets: number; done: number; complete: boolean }[] {
+  const today = daySets(log, day)
+  return r.items.map(i => {
+    const done = today.filter(s => s.exerciseId === i.exerciseId).length
+    return { exerciseId: i.exerciseId, sets: i.sets, done, complete: done >= i.sets }
+  })
 }

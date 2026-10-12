@@ -5,9 +5,9 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { parseBackup, parseCustom } from './storage'
+import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
-import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, gymDay, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
+import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -484,6 +484,28 @@ export function runSelfCheck() {
       const g17 = gymDay([mk('a', 'bench-press'), mk('b', 'bench-press'), mk('c', 'squat'), un('uc', 'c')], D)
       const g17b = gymDay([mk('a', 'bench-press'), mk('b', 'bench-press'), mk('c', 'squat')], D)
       ok(g17.sets === 2 && g17.exercises === 1 && g17b.sets === 3 && g17b.exercises === 2 && gymDay([mk('a', 'squat')], P).sets === 0 && gymDay([], D).exercises === 0, 'GY17 gymDay')
+    }
+    // GY18 — routineFromDay / routineProgress
+    {
+      const mk = (id: string, ex: string, day = D): GymSet => ({ id, exerciseId: ex, weight: 50, unit: 'kg', reps: 5, occurredAt: `${day}T10:00:00` })
+      const l18 = [mk('a', 'squat'), mk('b', 'bench-press'), mk('c', 'squat'), mk('d', 'bench-press'), mk('e', 'bench-press', P)]
+      const r18 = routineFromDay(l18, D, 'Pierna', 'routine-1')!
+      const big = routineFromDay(Array.from({ length: 12 }, (_, i) => mk(`x${i}`, 'squat')), D, 'Grande', 'routine-2')!
+      const p18 = routineProgress({ id: 'routine-1', name: 'R', items: [{ exerciseId: 'squat', sets: 2 }, { exerciseId: 'bench-press', sets: 3 }] }, l18, D)
+      ok(r18.items.map(i => `${i.exerciseId}:${i.sets}`).join() === 'squat:2,bench-press:2' && big.items[0].sets === 10 && routineFromDay([mk('a', 'squat')], P, 'X', 'routine-3') === null &&
+        p18[0].done === 2 && p18[0].complete && p18[1].done === 2 && !p18[1].complete && routineProgress(r18, l18, P)[1].done === 1, 'GY18 rutinas del día')
+    }
+    // GY19 — readGym con rutinas
+    {
+      const rt = { id: 'routine-a', name: 'Push', items: [{ exerciseId: 'bench-press', sets: 3 }] }
+      const g0 = readGym({ log: [], exercises: [] })!, g1 = readGym({ log: [], exercises: [], routines: [rt] })!
+      const g2 = readGym({ log: [], exercises: [], routines: [{ ...rt, items: [...rt.items, { exerciseId: 'squat', sets: 0 }] }] })!
+      const g3 = readGym({ log: [], exercises: [], routines: [{ ...rt, items: [{ exerciseId: 'squat', sets: 0 }] }] })!
+      const g4 = readGym({ log: [], exercises: [], routines: 5 })!
+      const old = parseBackup(JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: { trackers: [], proposals: [] }, gym: { log: [], exercises: [], unit: 'lbs' } }))
+      ok(!('routines' in g0.data) && g0.dropped === 0 && JSON.stringify(g1.data.routines) === JSON.stringify([rt]) && g1.dropped === 0 && g1.fixed === 0 &&
+        g2.fixed === 1 && g2.data.routines?.[0].items.length === 1 && g3.dropped === 1 && !('routines' in g3.data) && g4.dropped === 1 && !('routines' in g4.data) &&
+        old !== null && old.gym?.unit === 'lbs' && !('routines' in (old.gym ?? {})), 'GY19 readGym con rutinas')
     }
   }
 
