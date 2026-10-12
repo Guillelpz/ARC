@@ -4,7 +4,7 @@ import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, GymUndo, Rec
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { GYM_TRACKER, autoSession, beaten, retractAuto, liveSets } from './core/gym'
+import { GYM_TRACKER, allExercises, autoSession, beaten, exerciseName, recordText, retractAuto, liveSets } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
@@ -21,7 +21,7 @@ import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT, UpdateBanner } from './components/UpdateBanner'
 import { registerSW } from './pwa'
 import { liveText } from './components/liveText'
-import { LevelUpToast, OvertakeBanner, PassedBanner, type Overtake, type Toast } from './components/LevelUpToast'
+import { LevelUpToast, OvertakeBanner, PassedBanner, RecordBanner, type Overtake, type RecordNotice, type Toast } from './components/LevelUpToast'
 
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
@@ -49,6 +49,7 @@ export default function App() {
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
   const [overtake, setOvertake] = useState<Overtake | null>(null)
+  const [record, setRecord] = useState<RecordNotice | null>(null)
   const [canRestore, setCanRestore] = useState(hasLastBackup)
   const [lastExport, setLastExport] = useState(loadLastExport)
 
@@ -100,6 +101,12 @@ export default function App() {
     return () => clearTimeout(id)
   }, [gain])
   // el banner espera a que termine el level-up: una celebración cada vez
+  // el banner de récord también espera a level-up y adelantamientos
+  useEffect(() => {
+    if (!record || toast || overtake) return
+    const id = setTimeout(() => setRecord(null), 3200)
+    return () => clearTimeout(id)
+  }, [record, toast, overtake])
   useEffect(() => {
     if (!overtake || toast) return
     const id = setTimeout(() => setOvertake(null), 3200)
@@ -169,6 +176,10 @@ export default function App() {
     setGym({ ...gym, log: [...gym.log, set] })
     const ev = autoSession(events, day)
     if (ev) push([ev], gymTracker())
+    if (kinds.length) {
+      const x = allExercises(gym.exercises).find(e => e.id === set.exerciseId)
+      setRecord({ key: set.id, text: recordText(kinds, set, exerciseName(set.exerciseId, gym.exercises), gym.unit ?? 'kg', x?.kind ?? 'load') })
+    }
     return { kinds, auto: !!ev }
   }
   function undoSet(s: GymSet): { retracted: boolean } {
@@ -234,7 +245,7 @@ export default function App() {
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
-    setEvents([]); setCustom(EMPTY_CUSTOM); setGym(EMPTY_GYM); setToast(null); setGain(null); setOvertake(null)
+    setEvents([]); setCustom(EMPTY_CUSTOM); setGym(EMPTY_GYM); setToast(null); setGain(null); setOvertake(null); setRecord(null)
   }
 
   async function exportData(): Promise<boolean> {
@@ -326,6 +337,7 @@ export default function App() {
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
+      {record && !toast && !overtake && <RecordBanner r={record} />}
       <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={goTo} />
       {stale ? <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />

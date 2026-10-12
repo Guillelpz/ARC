@@ -657,6 +657,7 @@ test('U28 aviso de récord', () => {
   expect(statusText()).not.toContain('Nuevo récord')
   logSet('105', '5')
   expect(statusText()).toContain('Nuevo récord en Press banca')
+  expect(screen.getByText('Nuevo récord')).toBeTruthy() // RecordBanner
   fireEvent.click(screen.getByRole('button', { name: 'Deshacer serie 2 de Press banca: 105 kg × 5' }))
   expect(statusText()).not.toContain('Nuevo récord')
 })
