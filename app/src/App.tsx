@@ -74,7 +74,7 @@ export default function App() {
     const r = await askHaiku('press banca 80 kg 5 repeticiones', EXERCISES, 'kg', key)
     return r.ok ? (r.draft.exerciseId === 'bench-press' ? 'ok' : 'invalid') : r.error
   }
-  const ackVoice = () => { saveVoicePrefs({ privacyAck: new Date().toISOString() }); setVoiceAck(true) }
+  const ackVoice = () => { saveVoicePrefs({ ...loadVoicePrefs(), privacyAck: new Date().toISOString() }); setVoiceAck(true) }
 
   const [, refresh] = useReducer((n: number) => n + 1, 0)
   useEffect(() => {

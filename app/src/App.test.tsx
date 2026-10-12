@@ -854,6 +854,7 @@ class FakeSpeech {
   onstart: (() => void) | null = null; onresult: ((e: unknown) => void) | null = null
   onerror: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
   start() {
+    (window as unknown as { __lang?: string }).__lang = this.lang
     const v = (window as unknown as { __voz?: string | { error: string } }).__voz
     setTimeout(() => {
       if (typeof v === 'string') this.onresult?.({ results: [Object.assign([{ transcript: v }], { isFinal: true })] })
@@ -1148,4 +1149,20 @@ test('U-V7 con clave, la IA resuelve una frase rara desde Hoy', async () => {
     await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
     expect(liveGym()[0]).toMatchObject({ exerciseId: 'leg-press', weight: 100, reps: 10 })
   } finally { vi.unstubAllGlobals() }
+})
+
+test('U-V15 idioma del dictado: español por defecto aunque el sistema esté en inglés; English se guarda', async () => {
+  ackVoice()
+  const nav = vi.spyOn(navigator, 'language', 'get').mockReturnValue('en-US')
+  try {
+    render(<App />); openGym()
+    dictate('press banca 80 kg 5 reps')
+    await screen.findByText(/^Registrado:/)
+    expect(win.__lang).toBe('es-ES')
+    go('Yo')
+    fireEvent.click(screen.getByRole('button', { name: 'English' }))
+    expect(JSON.parse(localStorage.getItem('life-rpg-voice-v1')!)).toMatchObject({ lang: 'en-US', privacyAck: expect.any(String) })
+    fireEvent.click(btn('Probar voz'))
+    await vi.waitFor(() => expect(win.__lang).toBe('en-US'))
+  } finally { nav.mockRestore(); delete win.__lang }
 })
