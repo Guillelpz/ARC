@@ -7,7 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
-import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, stepWeight, toKg } from './gym'
+import { EXERCISES, GROUPS, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, setDays, stepWeight, toKg } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -442,6 +442,19 @@ export function runSelfCheck() {
     const m10b = mergeBackup({ events: [a1, ua, a2], custom: cu }, { events: [a1, ub], custom: cu })
     ok(dayTotal(m10.events, 'gym', D) === 0 && m10.existing === 2 && m10.added === 0 && dayTotal(m10b.events, 'gym', D) === 1, 'GY10 deshacer entre dispositivos')
     ok(get(deriveGame([a1], D), 'gym').xp.xp === 30 && get(deriveGame([man('m')], D), 'gym').xp.xp === 30, 'GY13 XP de la sesión automática = manual')
+    // GY14 — ensureAuto
+    {
+      const P2 = '2026-10-05'
+      const log1 = [gsx('s1'), un('x1', 's1'), gsx('s2')]
+      const e14 = ensureAuto([man('m'), man('m2', -1)], log1, [D])
+      const e14b = ensureAuto([a1, { id: 'ua', trackerId: 'gym', amount: -1, occurredAt: a1.occurredAt, undoes: a1.id }], log1, [D])
+      const two14 = [gsx('t1'), gsx('t2', P2)]
+      const e14c = ensureAuto([], two14, [D, P2, D])
+      ok(e14.length === 1 && e14[0].id === `gym-auto-${D}` && e14b.length === 1 && e14b[0].id === `gym-auto-${D}-2` &&
+        ensureAuto([man('m')], log1, [D]).length === 0 && ensureAuto([], [gsx('s1'), un('x1', 's1')], [D]).length === 0 &&
+        e14c.map(e => e.id).join() === `gym-auto-${D},gym-auto-${P2}` && ensureAuto(e14c, two14, [D, P2]).length === 0 &&
+        setDays([gsx('a', P2), gsx('b'), gsx('c', P2), un('u', 'b')]).join() === P2, 'GY14 ensureAuto')
+    }
   }
 
   console.info('[selfcheck] done')

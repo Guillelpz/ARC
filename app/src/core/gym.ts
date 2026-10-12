@@ -143,3 +143,16 @@ export function retractAuto(events: ActivityEvent[], log: GymEntry[], day: strin
   }
   return out
 }
+
+// Regla: día con series vivas ⇒ al menos 1 sesión de Gym. Devuelve las sesiones automáticas que faltan (idempotente).
+export function ensureAuto(events: ActivityEvent[], log: GymEntry[], days: string[]): ActivityEvent[] {
+  const out: ActivityEvent[] = []
+  for (const day of [...new Set(days)]) {
+    if (daySets(log, day).length === 0) continue
+    const ev = autoSession([...events, ...out], day)
+    if (ev) out.push(ev)
+  }
+  return out
+}
+// Días con series vivas, ordenados
+export const setDays = (log: GymEntry[]): string[] => [...new Set(liveSets(log).map(s => s.occurredAt.slice(0, 10)))].sort()
