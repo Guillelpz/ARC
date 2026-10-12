@@ -144,6 +144,30 @@ test('U-F4 fusionar y recuperar', async () => {
   await vi.waitFor(() => expect(stored()).toEqual([x1]))
 })
 
+test('U-F5 fusionar con la pestaña desactualizada', async () => {
+  seedX1()
+  const { container } = render(<App />)
+  localStorage.setItem(EV, '{roto'); window.dispatchEvent(new StorageEvent('storage', { key: EV }))
+  await vi.waitFor(() => expect(screen.getByText(STALE_TAB_TEXT)).toBeTruthy())
+  mergeFile(container, exportBackup([x1, x2], { trackers: [], proposals: [] }, 'x'))
+  expect(await screen.findByText('Recarga la página antes de cambiar tus datos.')).toBeTruthy()
+  expect(window.confirm).not.toHaveBeenCalled()
+  expect(localStorage.getItem(EV)).toBe('{roto')
+})
+
+test('U-F6 fusionar sin poder guardar la copia interna', async () => {
+  seedX1()
+  const { container } = render(<App />)
+  const set = localStorage.setItem.bind(localStorage)
+  const spy = vi.spyOn(localStorage, 'setItem').mockImplementation((k, v) => { if (k.includes('.backup.')) throw new DOMException('quota', 'QuotaExceededError'); set(k, v) })
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  mergeFile(container, exportBackup([x1, x2], { trackers: [], proposals: [] }, 'x'))
+  expect(await screen.findByText(/^No se pudo guardar la copia interna, así que no se ha fusionado nada/)).toBeTruthy()
+  spy.mockRestore()
+  expect(stored()).toEqual([x1])
+  expect(localStorage.getItem(EV + '.backup.last')).toBeNull()
+})
+
 const shareEnv = (canShare: boolean, share: () => Promise<void>) => {
   window.matchMedia = vi.fn(() => ({ matches: true })) as never
   Object.defineProperty(navigator, 'canShare', { configurable: true, value: () => canShare })
