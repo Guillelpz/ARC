@@ -7,7 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom } from './storage'
 import { mergeBackup } from './merge'
-import { beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, recordText, records, stepWeight, toKg } from './gym'
+import { autoSession, beaten, convert, e1rm, fmtWeight, liveSets, parseWeight, retractAuto, recordText, records, stepWeight, toKg } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
 export function runSelfCheck() {
@@ -403,6 +403,43 @@ export function runSelfCheck() {
     const L2 = { ...L, gym: { ...lg, log: [gsx('s1', 100), { id: 'u0', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }] } }
     const dup = mergeBackup(L2, { events: [], custom: cu, gym: { log: [gsx('s1', 100), { id: 'u7', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }], exercises: [] } })
     ok(dup.setsAdded === 0 && dup.gym.log.length === 2, 'GY12 deshacer duplicado = ya estaba')
+  }
+
+  // GY6–GY10, GY13 — sesión automática
+  {
+    const D = DEMO_DATE, P = '2026-10-05'
+    const man = (id: string, amount = 1, day = D): ActivityEvent => ({ id, trackerId: 'gym', amount, occurredAt: `${day}T09:00:00` })
+    const gsx = (id: string, day = D): GymSet => ({ id, exerciseId: 'bench-press', weight: 60, unit: 'kg', reps: 8, occurredAt: `${day}T10:00:00` })
+    const un = (id: string, of: string, day = D): GymUndo => ({ id, undoes: of, occurredAt: `${day}T10:00:00` })
+    const a1 = autoSession([], D)!
+    ok(a1.id === `gym-auto-${D}` && a1.occurredAt === `${D}T12:00:00` && a1.amount === 1 && autoSession([a1], D) === null && autoSession([man('m')], D) === null &&
+      autoSession([], P)!.occurredAt.startsWith(P), 'GY6 sesión automática')
+    const ids = () => `u${Math.random()}`
+    const two = [gsx('s1'), gsx('s2')]
+    const evA = [a1]
+    const r1 = retractAuto(evA, [...two, un('x1', 's1')], D, ids)
+    const r2 = retractAuto(evA, [...two, un('x1', 's1'), un('x2', 's2')], D, ids)
+    const after = [...evA, ...r2]
+    const manMinus = [man('m'), man('m2', -1)]
+    const withMan = [man('m'), a1]
+    const rm = retractAuto(withMan, [], D, ids)
+    ok(r1.length === 0 && r2.length === 1 && r2[0].amount === -1 && r2[0].undoes === a1.id && r2[0].occurredAt === `${D}T12:00:00` &&
+      dayTotal(after, 'gym', D) === 0 && autoSession(after, D)!.id === `gym-auto-${D}-2` &&
+      retractAuto(manMinus, [], D, ids).length === 0 && rm.length === 1 && dayTotal([...withMan, ...rm], 'gym', D) === 1, 'GY7 deshacer')
+    const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }
+    const A = { events: [a1], custom: cu, gym: { log: [gsx('a1'), gsx('a2')], exercises: [] } }
+    const B = { events: [{ ...a1 }], custom: cu, gym: { log: [gsx('b1'), gsx('b2')], exercises: [] } }
+    const m8 = mergeBackup(A, B)
+    const m8b = mergeBackup({ events: m8.events, custom: cu, gym: m8.gym }, B)
+    ok(m8.events.filter(e => e.id === a1.id).length === 1 && dayTotal(m8.events, 'gym', D) === 1 && liveSets(m8.gym.log).length === 4 && m8b.added === 0 && m8b.setsAdded === 0, 'GY8 dos dispositivos')
+    const m9 = mergeBackup({ events: [man('rand')], custom: cu }, { events: [a1], custom: cu })
+    ok(dayTotal(m9.events, 'gym', D) === 2, 'GY9 manual + automática')
+    const ua = { id: 'ua', trackerId: 'gym', amount: -1, occurredAt: a1.occurredAt, undoes: a1.id }, ub = { ...ua, id: 'ub' }
+    const m10 = mergeBackup({ events: [a1, ua], custom: cu }, { events: [a1, ub], custom: cu })
+    const a2 = { id: `gym-auto-${D}-2`, trackerId: 'gym', amount: 1, occurredAt: a1.occurredAt }
+    const m10b = mergeBackup({ events: [a1, ua, a2], custom: cu }, { events: [a1, ub], custom: cu })
+    ok(dayTotal(m10.events, 'gym', D) === 0 && m10.existing === 2 && m10.added === 0 && dayTotal(m10b.events, 'gym', D) === 1, 'GY10 deshacer entre dispositivos')
+    ok(get(deriveGame([a1], D), 'gym').xp.xp === 30 && get(deriveGame([man('m')], D), 'gym').xp.xp === 30, 'GY13 XP de la sesión automática = manual')
   }
 
   console.info('[selfcheck] done')

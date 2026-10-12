@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useReducer, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, GymData, Tracker } from './core/types'
+import type { ActivityEvent, CustomData, GymData, GymSet, GymUndo, RecordKind, Tracker } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
-import { liveSets } from './core/gym'
+import { GYM_TRACKER, autoSession, beaten, retractAuto, liveSets } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
@@ -117,6 +117,30 @@ export default function App() {
     transition(() => { setScreen(s); window.scrollTo(0, 0) }, 'screen')
   }
 
+  // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
+  function push(evs: ActivityEvent[], t: Tracker) {
+    const next = [...events, ...evs]
+    const amount = evs.reduce((n, e) => n + e.amount, 0), key = evs[evs.length - 1].id
+    const after = deriveGame(next, today, trackers)
+    const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
+    setEvents(next) // evento creado fuera del updater (StrictMode)
+    setGain({ trackerId: t.id, xp: amount * t.xpPerUnit, branch: t.branch, key })
+    if (up) setToast({ ...up, key, down: amount < 0, tone: up.title.includes('— PLAYER') ? 'neutral' : t.branch })
+    // adelantamientos: tú superas a alguien (ranking HERO) o alguien te supera en HERO/VILLAIN/profundidad
+    for (const [i, p] of PARTIES.entries()) {
+      const before = partyStates[i]
+      const after = derivePartyState(p, next, today, trackers, custom.proposals)
+      const names = overtakes(after.ranking, before.ranking)
+      if (names.length) { setOvertake({ key, party: p.name, names, position: after.position }); break }
+      const lost = ([t.branch, 'depth'] as const).map(metric => {
+        const a = buildRanking(after.game, p.members, metric, today)
+        const names = overtakes(buildRanking(before.game, p.members, metric, today), a)
+        return { key, party: p.name, names, position: a.findIndex(m => m.isYou) + 1, lost: metric }
+      }).find(o => o.names.length)
+      if (lost) { setOvertake(lost); break }
+    }
+  }
+
   // amount < 0 = corrección (evento negativo); no deja el día por debajo de 0
   // undo = registro positivo que se anula entero
   function add(t: Tracker, amount: number, day = today, undo?: ActivityEvent): number {
@@ -126,27 +150,31 @@ export default function App() {
     if (!amount || (undo && amount !== -undo.amount)) return 0
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,
       occurredAt: undo ? undo.occurredAt : nowStamp(day), ...(undo && { undoes: undo.id }) }
-    const next = [...events, ev]
-    const after = deriveGame(next, today, trackers)
-    const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
-    setEvents(next) // evento creado fuera del updater (StrictMode)
-    setGain({ trackerId: t.id, xp: amount * t.xpPerUnit, branch: t.branch, key: ev.id })
-    if (up) setToast({ ...up, key: ev.id, down: amount < 0, tone: up.title.includes('— PLAYER') ? 'neutral' : t.branch })
-    // adelantamientos: tú superas a alguien (ranking HERO) o alguien te supera en HERO/VILLAIN/profundidad
-    for (const [i, p] of PARTIES.entries()) {
-      const before = partyStates[i]
-      const after = derivePartyState(p, next, today, trackers, custom.proposals)
-      const names = overtakes(after.ranking, before.ranking)
-      if (names.length) { setOvertake({ key: ev.id, party: p.name, names, position: after.position }); break }
-      const lost = ([t.branch, 'depth'] as const).map(metric => {
-        const a = buildRanking(after.game, p.members, metric, today)
-        const names = overtakes(buildRanking(before.game, p.members, metric, today), a)
-        return { key: ev.id, party: p.name, names, position: a.findIndex(m => m.isYou) + 1, lost: metric }
-      }).find(o => o.names.length)
-      if (lost) { setOvertake(lost); break }
-    }
+    push([ev], t)
     return amount
   }
+
+  const r2 = (x: number) => Math.round(x * 100) / 100
+  const gymTracker = () => trackers.find(t => t.id === GYM_TRACKER)!
+  function addSet(input: Omit<GymSet, 'id' | 'occurredAt'>, day: string): { kinds: RecordKind[]; auto: boolean } {
+    if (day > today) day = today
+    const set: GymSet = { id: crypto.randomUUID(), ...input, weight: r2(input.weight), occurredAt: nowStamp(day) }
+    const kinds = beaten(liveSets(gym.log).filter(s => s.exerciseId === set.exerciseId), set)
+    setGym({ ...gym, log: [...gym.log, set] })
+    const ev = autoSession(events, day)
+    if (ev) push([ev], gymTracker())
+    return { kinds, auto: !!ev }
+  }
+  function undoSet(s: GymSet): { retracted: boolean } {
+    if (!liveSets(gym.log).some(x => x.id === s.id)) return { retracted: false }
+    const u: GymUndo = { id: crypto.randomUUID(), undoes: s.id, occurredAt: s.occurredAt }
+    const log2 = [...gym.log, u]
+    setGym({ ...gym, log: log2 })
+    const evs = retractAuto(events, log2, s.occurredAt.slice(0, 10), () => crypto.randomUUID())
+    if (evs.length) push(evs, gymTracker())
+    return { retracted: evs.length > 0 }
+  }
+  void [addSet, undoSet] // ponytail: se conectan a la pantalla Gym en T8
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 

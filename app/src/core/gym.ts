@@ -1,4 +1,5 @@
-import type { Exercise, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeightUnit } from './types'
+import type { ActivityEvent, Exercise, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeightUnit } from './types'
+import { clampAmount, dayTotal, undoneIds } from './stats'
 
 export const GYM_TRACKER = 'gym'
 export const MAX_WEIGHT = 2000
@@ -88,4 +89,24 @@ export function recordText(kinds: RecordKind[], s: GymSet, name: string, pref: W
     return kind === 'bodyweight' && s.weight === 0 ? `${s.reps} repeticiones sin lastre` : `${s.reps} repeticiones con ${w}`
   })
   return `Nuevo récord en ${name}: ${parts.join(' · ')}`
+}
+
+// Sesión automática (D1)
+export const autoIdRe = (day: string) => new RegExp(`^gym-auto-${day}(-\\d+)?$`)
+export function autoSession(events: ActivityEvent[], day: string): ActivityEvent | null {
+  if (dayTotal(events, GYM_TRACKER, day) > 0) return null
+  const re = autoIdRe(day)
+  const n = events.filter(e => re.test(e.id)).length + 1
+  return { id: n === 1 ? `gym-auto-${day}` : `gym-auto-${day}-${n}`, trackerId: GYM_TRACKER, amount: 1, occurredAt: `${day}T12:00:00` }
+}
+export function retractAuto(events: ActivityEvent[], log: GymEntry[], day: string, newId: () => string): ActivityEvent[] {
+  if (daySets(log, day).length > 0) return []
+  const re = autoIdRe(day), undone = undoneIds(events)
+  const autos = events.filter(e => re.test(e.id) && e.amount > 0 && !undone.has(e.id)).reverse()
+  const out: ActivityEvent[] = []
+  for (const a of autos) {
+    if (clampAmount([...events, ...out], GYM_TRACKER, day, -1) === -1)
+      out.push({ id: newId(), trackerId: GYM_TRACKER, amount: -1, occurredAt: a.occurredAt, undoes: a.id })
+  }
+  return out
 }
