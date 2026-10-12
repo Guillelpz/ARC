@@ -12,6 +12,7 @@ export type MergeResult = {
   gym: GymData
   setsAdded: number // entradas de log del gym añadidas (incluye renombradas)
   exercisesAdded: number
+  routinesAdded: number
   conflicts: string[] // nombres locales donde la copia difiere; se mantiene lo local
   changed: boolean
 }
@@ -72,6 +73,17 @@ export function mergeBackup(local: Side, incoming: Side): MergeResult {
     if (l && JSON.stringify([l.name, l.group, l.kind, !!l.archived]) !== JSON.stringify([x.name, x.group, x.kind, !!x.archived])) exConflicts.push(l.name)
   }
   const gym: GymData = { ...lg, log: gl.list, exercises: [...lg.exercises, ...newEx] }
+  // rutinas: se añaden las de la copia con id nuevo; mismo id y otro contenido → se mantiene la local y su nombre sale en conflictos
+  const lr = new Map((lg.routines ?? []).map(r => [r.id, r]))
+  const newRt = (ig.routines ?? []).filter(r => !lr.has(r.id))
+  const rtConflicts: string[] = []
+  for (const r of ig.routines ?? []) {
+    const l = lr.get(r.id)
+    if (l && JSON.stringify([l.name, l.items]) !== JSON.stringify([r.name, r.items])) rtConflicts.push(l.name)
+  }
+  const routines = [...(lg.routines ?? []), ...newRt]
+  if (routines.length > 0) gym.routines = routines
+  else delete gym.routines
 
   const lc = local.custom, ic = incoming.custom
   const localById = new Map(lc.trackers.map(t => [t.id, t]))
@@ -101,7 +113,7 @@ export function mergeBackup(local: Side, incoming: Side): MergeResult {
   if (custom.goals && Object.keys(custom.goals).length === 0) delete custom.goals
   if (custom.limits && Object.keys(custom.limits).length === 0) delete custom.limits
   return {
-    events, custom, added, existing, renamed, trackersAdded: newTrackers.length, conflicts: [...conflicts, ...exConflicts], gym, setsAdded: gl.added, exercisesAdded: newEx.length,
-    changed: added > 0 || gl.added > 0 || newEx.length > 0 || newTrackers.length > 0 || newProps.length > 0 || newLog.length > 0,
+    events, custom, added, existing, renamed, trackersAdded: newTrackers.length, conflicts: [...conflicts, ...exConflicts, ...rtConflicts], gym, setsAdded: gl.added, exercisesAdded: newEx.length, routinesAdded: newRt.length,
+    changed: added > 0 || gl.added > 0 || newEx.length > 0 || newRt.length > 0 || newTrackers.length > 0 || newProps.length > 0 || newLog.length > 0,
   }
 }

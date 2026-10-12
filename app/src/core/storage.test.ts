@@ -380,6 +380,23 @@ describe('módulo Gym', () => {
     expect(readGym({ log: 'x' })).toBeNull(); expect(readGym([])).toBeNull()
     expect(readGym({ log: [{ ...set, exerciseId: 'desconocido' }] })?.dropped).toBe(0)
   })
+  test('GS6 readGym con rutinas: roundtrip, reparación y descarte', () => {
+    const rt = { id: 'routine-a', name: 'Push', items: [{ exerciseId: 'bench-press', sets: 3 }, { exerciseId: 'desconocido', sets: 10 }] }
+    expect(readGym(JSON.parse(JSON.stringify({ log: [], exercises: [], routines: [rt] })))).toEqual({ data: { log: [], exercises: [], routines: [rt] }, dropped: 0, fixed: 0 })
+    expect(readGym({ log: [] })!.data).not.toHaveProperty('routines')
+    const items = [{ exerciseId: 'a', sets: 0 }, { exerciseId: '', sets: 2 }, { exerciseId: 'b', sets: 1.5 }, { exerciseId: 'c', sets: 11 }, { exerciseId: 'd', sets: 2 }, { exerciseId: 'd', sets: 3 }, 'x']
+    const r = readGym({ routines: [{ ...rt, items }, { ...rt, id: 'routine-b', items: [{ exerciseId: 'a', sets: 0 }] }, { ...rt, id: 'x-1' }, { ...rt, id: 'routine-c', name: '  ' },
+      { ...rt, id: 'routine-d', items: 'no' }, null, { ...rt, id: 'routine-e', name: 'a'.repeat(41) }] })!
+    expect(r.data.routines).toEqual([{ id: 'routine-a', name: 'Push', items: [{ exerciseId: 'd', sets: 2 }] }])
+    expect(r.fixed).toBe(6); expect(r.dropped).toBe(6)
+    const many = Array.from({ length: 25 }, (_, i) => ({ exerciseId: `e${i}`, sets: 1 }))
+    const m = readGym({ routines: [{ ...rt, items: many }] })!
+    expect(m.data.routines![0].items).toHaveLength(20); expect(m.fixed).toBe(5)
+    const lots = readGym({ routines: Array.from({ length: 22 }, (_, i) => ({ ...rt, id: `routine-${i}` })) })!
+    expect(lots.data.routines).toHaveLength(22); expect(lots.dropped).toBe(0)
+    const bad = readGym({ routines: 5 })!
+    expect(bad.dropped).toBe(1); expect(bad.data).not.toHaveProperty('routines')
+  })
   test('GS2 loadAll con gym corrupto: backup y lo demás intacto', () => {
     const s = fakeStore({ [EV]: JSON.stringify([good]), [CU]: JSON.stringify(EMPTY_CUSTOM), [GY]: '{roto' })
     const r = loadAll(s, D)

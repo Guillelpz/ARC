@@ -1,8 +1,8 @@
-import { useRef, useState } from 'react'
-import { ArrowLeft, CircleAlert, Minus, Plus } from 'lucide-react'
-import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, WeightUnit } from '../core/types'
-import { GROUPS, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, lastSet, liveSets, parseReps, parseWeight, recordText, records, stepWeight } from '../core/gym'
-import { dayLabel } from '../core/stats'
+import { useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Check, CircleAlert, Minus, Plus } from 'lucide-react'
+import type { Exercise, GymData, GymSet, MuscleGroup, RecordKind, Routine, WeightUnit } from '../core/types'
+import { GROUPS, MAX_ROUTINES, STEP, allExercises, convert, daySets, exerciseName, fmtSet, fmtWeight, fromKg, groupVolume, lastSet, liveSets, parseReps, parseWeight, recordText, records, routineFromDay, routineProgress, stepWeight, weeklyBest1rm } from '../core/gym'
+import { dayLabel, shortDate } from '../core/stats'
 import { isValidName, normalizeText, trackerName } from '../core/classify'
 import { DayPicker } from './DayPicker'
 import { SaveFailBanner } from './SaveFailBanner'
@@ -16,6 +16,8 @@ type Props = {
   onSetUnit: (u: WeightUnit) => void
   onCreateExercise: (e: Exercise) => void
   onArchiveExercise: (id: string, archived: boolean) => void
+  onSaveRoutine: (r: Routine) => void
+  onDeleteRoutine: (id: string) => void
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
@@ -27,9 +29,10 @@ const field = 'min-h-11 w-full rounded-lg border border-hero-border bg-transpare
 const btnBase = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold outline-hero transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
 const primary = `${btnBase} bg-hero text-hero-on-accent hover:bg-hero/90 active:scale-[0.98] motion-reduce:transform-none`
 const secondary = `${btnBase} border border-hero-border bg-transparent text-hero-text hover:bg-hero-surface`
+const int = (kg: number, u: WeightUnit) => `${new Intl.NumberFormat('es-ES', { maximumFractionDigits: 0, useGrouping: 'always' }).format(Math.round(fromKg(kg, u)))} ${u}`
 const num = (n: number) => String(n).replace('.', ',')
 
-export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onBack, saveFailed, onExport }: Props) {
+export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateExercise, onArchiveExercise, onSaveRoutine, onDeleteRoutine, onBack, saveFailed, onExport }: Props) {
   const unit = gym.unit ?? 'kg'
   const exercises = allExercises(gym.exercises)
   const active = exercises.filter(x => !x.archived)
@@ -51,6 +54,11 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
   const [newGroup, setNewGroup] = useState<MuscleGroup>('chest')
   const [newKind, setNewKind] = useState<Exercise['kind']>('load')
   const [newErr, setNewErr] = useState('')
+  const [routineName, setRoutineName] = useState('')
+  const [routineErr, setRoutineErr] = useState('')
+  const [loadedId, setLoadedId] = useState<string | null>(null) // estado de UI: no se persiste
+  const routinesRef = useRef<HTMLHeadingElement>(null)
+  const loadedRef = useRef<HTMLHeadingElement>(null)
 
   const sel = active.some(x => x.id === exerciseId) ? exerciseId : DEFAULT_EXERCISE
   const kind = kindOf(sel)
@@ -58,8 +66,25 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
   const last = lastSet(gym.log, sel)
   const recs = records(liveSets(gym.log).filter(s => s.exerciseId === sel))
   const sessionSets = daySets(gym.log, day)
+  const progress = useMemo(() => weeklyBest1rm(gym.log, sel, today), [gym.log, sel, today])
+  const volume = useMemo(() => groupVolume(gym.log, gym.exercises, today).filter(v => v.sets > 0 || v.prevSets > 0), [gym.log, gym.exercises, today])
+  const maxSets = Math.max(1, ...volume.map(v => v.sets))
+  const withData = progress.flatMap(w => (w.kg === null ? [] : [w.kg]))
+  const pMin = Math.min(...withData), pMax = Math.max(...withData)
+  const px = (i: number) => 6 + i * (88 / (progress.length - 1))
+  const py = (kg: number) => (pMax === pMin ? 20 : 34 - ((kg - pMin) / (pMax - pMin)) * 28)
+  const runs: string[] = [] // tramos de semanas consecutivas con dato; los huecos cortan la línea
+  progress.forEach((w, i) => {
+    if (w.kg === null) return
+    const pt = `${px(i).toFixed(1)},${py(w.kg).toFixed(1)}`
+    if (i > 0 && progress[i - 1].kg !== null) runs[runs.length - 1] += ` ${pt}`; else runs.push(pt)
+  })
   const groups: { id: string; label: string; items: Exercise[] }[] = GROUPS.map(g => ({ ...g, items: active.filter(x => x.group === g.id) }))
   const dayWord = dayLabel(day, today).toLowerCase()
+  const routines = gym.routines ?? []
+  const loaded = routines.find(r => r.id === loadedId) // si se borra la rutina activa, el panel se cierra solo
+  const loadedItems = loaded ? routineProgress(loaded, gym.log, day) : []
+  const routineDay = day === today ? 'hoy' : dayWord === 'ayer' ? 'ayer' : `el ${dayWord}`
   const sessionNote = (auto: boolean) => (auto ? ` Sesión de Gym apuntada en HERO (${dayWord}).` : '')
 
   const changeExercise = (id: string) => { setExerciseId(id); setForm(prefill(id, unit)); setErrors({}) }
@@ -83,6 +108,26 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
     onCreateExercise(x)
     setNewName(''); setNewErr('')
     setExerciseId(x.id); setForm(prefill(x.id, unit)); setErrors({}) // queda seleccionado
+  }
+  const saveRoutine = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isValidName(routineName)) return setRoutineErr('El nombre debe tener entre 2 y 40 caracteres.')
+    if (routines.some(r => normalizeText(r.name) === normalizeText(routineName))) return setRoutineErr('Ya tienes una rutina con ese nombre.')
+    if (routines.length >= MAX_ROUTINES) return setRoutineErr(`Has llegado al máximo de ${MAX_ROUTINES} rutinas: borra alguna para guardar otra.`)
+    const r = routineFromDay(gym.log, day, trackerName(routineName), `routine-${crypto.randomUUID()}`)
+    if (!r) return
+    onSaveRoutine(r)
+    setRoutineName(''); setRoutineErr(''); setStatus(`Rutina ${r.name} guardada.`)
+  }
+  const loadRoutine = (r: Routine) => {
+    setLoadedId(r.id); setStatus(`Rutina ${r.name} cargada.`)
+    setTimeout(() => loadedRef.current?.focus(), 0) // el panel aún no existe en este render
+  }
+  const deleteRoutine = (r: Routine) => {
+    if (!window.confirm(`¿Borrar la rutina «${r.name}»? Tus series no cambian.`)) return
+    onDeleteRoutine(r.id)
+    setStatus(`Rutina ${r.name} borrada.`)
+    routinesRef.current?.focus()
   }
   const archive = (id: string, archived: boolean) => {
     onArchiveExercise(id, archived)
@@ -138,6 +183,31 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
           </select>
         </label>
 
+        {loaded && (
+          <section aria-labelledby="gym-loaded" className={card}>
+            <div className="flex items-center justify-between gap-3">
+              <h2 id="gym-loaded" ref={loadedRef} tabIndex={-1} className="text-base font-semibold outline-hero focus-visible:outline-2">Rutina: {loaded.name}</h2>
+              <button type="button" onClick={() => setLoadedId(null)} className={secondary}>Quitar</button>
+            </div>
+            <ul className="divide-y divide-hero-border rounded-lg border border-hero-border">
+              {loadedItems.map(i => {
+                const x = active.find(e => e.id === i.exerciseId)
+                return (
+                  <li key={i.exerciseId} className="flex items-center justify-between gap-2">
+                    {x
+                      ? <button type="button" onClick={() => changeExercise(x.id)} aria-current={x.id === sel ? 'true' : undefined}
+                          className="min-h-11 flex-1 px-3 text-left text-sm font-semibold outline-hero hover:bg-hero-bg focus-visible:outline-2 focus-visible:-outline-offset-2">
+                          {x.name} · {i.done}/{i.sets} series
+                        </button>
+                      : <span className="min-h-11 flex-1 px-3 py-3 text-sm text-hero-muted">{exerciseName(i.exerciseId, gym.exercises)} (no disponible)</span>}
+                    {i.complete && <span className="mr-3 inline-flex items-center gap-1 text-sm font-semibold text-hero"><Check className="size-4" aria-hidden />hecho</span>}
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+
         <form onSubmit={submit} className={card} noValidate>
           <h2 className="text-base font-semibold">Registrar serie</h2>
           <div className="flex flex-col gap-1">
@@ -183,6 +253,24 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
           )}
         </section>
 
+        <section aria-labelledby="gym-progress" className={card}>
+          <h2 id="gym-progress" className="text-base font-semibold">Progreso · {name}</h2>
+          {withData.length === 0 ? <p className="text-sm text-hero-muted">Aún no hay datos para el progreso: cuenta el 1RM estimado de series con peso y de hasta 12 repeticiones.</p> : (
+            <>
+              <svg viewBox="0 0 100 40" className="h-24 w-full text-hero" aria-hidden>
+                {runs.filter(r => r.includes(' ')).map(r => <polyline key={r} points={r} fill="none" stroke="currentColor" strokeWidth="1" strokeLinejoin="round" strokeLinecap="round" />)}
+                {progress.map((w, i) => w.kg === null ? null
+                  : <circle key={w.monday} cx={px(i)} cy={py(w.kg)} r="1.6" stroke="currentColor" strokeWidth="1" fill={w.current ? 'none' : 'currentColor'} />)}
+              </svg>
+              <p className="text-sm font-semibold tabular-nums">Mejor del periodo: ≈ {fmtWeight(fromKg(pMax, unit), unit)}</p>
+              <p className="text-xs text-hero-muted">Mejor 1RM estimado por semana (Epley)</p>
+              <ul className="sr-only">
+                {progress.map(w => <li key={w.monday}>{`Semana del ${shortDate(w.monday)}${w.current ? ' (en curso)' : ''}: ${w.kg === null ? 'sin datos' : `≈ ${fmtWeight(fromKg(w.kg, unit), unit)}`}`}</li>)}
+              </ul>
+            </>
+          )}
+        </section>
+
         <section aria-labelledby="gym-session" className={card}>
           <h2 id="gym-session" ref={headingRef} tabIndex={-1} className="text-base font-semibold outline-hero focus-visible:outline-2">{sessionTitle}</h2>
           {byExercise.length === 0 ? <p className="text-sm text-hero-muted">No hay series este día.</p> : (
@@ -207,6 +295,49 @@ export function GymView({ gym, today, onAddSet, onUndoSet, onSetUnit, onCreateEx
                 )
               })}
             </div>
+          )}
+        </section>
+
+        <section aria-labelledby="gym-volume" className={card}>
+          <h2 id="gym-volume" className="text-base font-semibold">Volumen semanal</h2>
+          {volume.length === 0 ? <p className="text-sm text-hero-muted">Aún no hay series esta semana.</p> : (
+            <ul className="flex flex-col gap-3">
+              {volume.map(v => (
+                <li key={v.group} className="flex flex-col gap-1">
+                  <span className="text-sm font-semibold tabular-nums">{`${v.label} · ${v.sets} ${v.sets === 1 ? 'serie' : 'series'} · ${int(v.kg, unit)}`}</span>
+                  <span className="h-2 w-full overflow-hidden rounded-full bg-hero-border" aria-hidden><span className="block h-full rounded-full bg-hero" style={{ width: `${(v.sets / maxSets) * 100}%` }} /></span>
+                  <span className="text-xs text-hero-muted tabular-nums">{`semana anterior hasta hoy: ${v.prevSets} ${v.prevSets === 1 ? 'serie' : 'series'} · ${int(v.prevKg, unit)}`}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="text-xs text-hero-muted">El volumen es peso × repeticiones; el peso corporal sin lastre cuenta solo como serie.</p>
+        </section>
+
+        <section aria-labelledby="gym-routines" className={card}>
+          <h2 id="gym-routines" ref={routinesRef} tabIndex={-1} className="text-base font-semibold outline-hero focus-visible:outline-2">Rutinas</h2>
+          <form onSubmit={saveRoutine} className="flex flex-col gap-3" noValidate>
+            <h3 className="text-sm font-semibold">Guardar la sesión de {routineDay} como rutina</h3>
+            <label className="flex flex-col gap-1 text-xs font-medium">Nombre de la rutina
+              <input value={routineName} onChange={e => setRoutineName(e.target.value)} maxLength={40} autoComplete="off" aria-invalid={!!routineErr}
+                aria-describedby={routineErr ? 'gym-routine-err' : undefined} className={field} />
+            </label>
+            {routineErr && <p id="gym-routine-err" className="flex items-center gap-2 text-sm text-hero-text"><CircleAlert className="size-4 shrink-0" aria-hidden />{routineErr}</p>}
+            <button type="submit" disabled={sessionSets.length === 0} aria-describedby={sessionSets.length === 0 ? 'gym-routine-help' : undefined} className={primary}>Guardar rutina</button>
+            {sessionSets.length === 0 && <p id="gym-routine-help" className="text-xs text-hero-muted">Registra alguna serie en este día para guardarla como rutina.</p>}
+          </form>
+          {routines.length === 0 ? <p className="text-sm text-hero-muted">Aún no tienes rutinas.</p> : (
+            <ul className="divide-y divide-hero-border rounded-lg border border-hero-border">
+              {routines.map(r => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1 pl-3">
+                  <span className="text-sm"><span className="font-semibold">{r.name}</span> · {r.items.length} {r.items.length === 1 ? 'ejercicio' : 'ejercicios'}</span>
+                  <span className="flex gap-1 pr-1">
+                    <button type="button" onClick={() => loadRoutine(r)} aria-label={`Cargar rutina ${r.name}`} className={`${secondary} px-3`}>Cargar</button>
+                    <button type="button" onClick={() => deleteRoutine(r)} aria-label={`Borrar rutina ${r.name}`} className={`${secondary} px-3`}>Borrar</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
 

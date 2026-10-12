@@ -1,6 +1,6 @@
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Merge, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
-import type { ActivityEvent, Branch, BranchWeek, GameState, PartyState, TodaySummary, Tracker } from '../core/types'
+import type { ActivityEvent, Branch, BranchWeek, GameState, GymDay, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
@@ -13,6 +13,9 @@ const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 type Props = {
   game: GameState
   summary: TodaySummary
+  gymToday: GymDay
+  onOpenGym: () => void
+  focusHoy: boolean
   weeks: BranchWeek[]
   partyStates: PartyState[]
   archived: Tracker[]
@@ -67,10 +70,11 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
 const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
 const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
 
-export function HomeView({ game, summary, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const mode = useRef<'replace' | 'merge'>('replace')
   const hoyRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => { if (focusHoy) hoyRef.current?.focus() }, [focusHoy])
   const branchSummary = (b: Branch) => {
     return { count: game.trackers.filter(t => t.tracker.branch === b && !t.tracker.archived).length, weekXp: weeklyXp(game, b) }
   }
@@ -146,6 +150,18 @@ export function HomeView({ game, summary, weeks, partyStates, archived, onUnarch
                   run: () => { if (d.amount + onUndo(d.tracker, u) <= 0) hoyRef.current?.focus() } } }) }
               })} onGo={onNavigate} />
             </>
+          )}
+          {gymToday.sets > 0 && (
+            <ul className="divide-y divide-app-border rounded-lg border border-app-border">
+              <li>
+                <button type="button" onClick={onOpenGym}
+                  className="flex min-h-11 w-full items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
+                  <span className="flex-1 text-sm font-semibold">Gym</span>
+                  <span className="text-sm text-app-muted tabular-nums">{`${gymToday.sets} ${gymToday.sets === 1 ? 'serie' : 'series'} · ${gymToday.exercises} ${gymToday.exercises === 1 ? 'ejercicio' : 'ejercicios'}`}</span>
+                  <ChevronRight className="size-4 shrink-0 text-app-muted" aria-hidden />
+                </button>
+              </li>
+            </ul>
           )}
           {summary.best && (
             <p className="flex items-center gap-2 text-sm">

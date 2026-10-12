@@ -1,5 +1,5 @@
-import type { ActivityEvent, Exercise, GymData, GymEntry, GymRecords, GymSet, GymUndo, MuscleGroup, RecordKind, WeightUnit } from './types'
-import { clampAmount, dayTotal, undoneIds } from './stats'
+import type { ActivityEvent, Exercise, GymData, GymDay, GymEntry, GymRecords, GymSet, GymUndo, GroupVolume, MuscleGroup, RecordKind, Routine, WeekBest, WeightUnit } from './types'
+import { addDays, clampAmount, dayTotal, mondayOf, undoneIds } from './stats'
 
 export const EMPTY_GYM: GymData = { log: [], exercises: [] }
 export const GYM_TRACKER = 'gym'
@@ -142,4 +142,77 @@ export function retractAuto(events: ActivityEvent[], log: GymEntry[], day: strin
       out.push({ id: newId(), trackerId: GYM_TRACKER, amount: -1, occurredAt: a.occurredAt, undoes: a.id })
   }
   return out
+}
+
+// Regla: día con series vivas ⇒ al menos 1 sesión de Gym. Devuelve las sesiones automáticas que faltan (idempotente).
+export function ensureAuto(events: ActivityEvent[], log: GymEntry[], days: string[]): ActivityEvent[] {
+  const out: ActivityEvent[] = []
+  for (const day of [...new Set(days)]) {
+    if (daySets(log, day).length === 0) continue
+    const ev = autoSession([...events, ...out], day)
+    if (ev) out.push(ev)
+  }
+  return out
+}
+// Días con series vivas, ordenados
+export const setDays = (log: GymEntry[]): string[] => [...new Set(liveSets(log).map(s => s.occurredAt.slice(0, 10)))].sort()
+
+// Mejor 1RM estimado por semana (n semanas, la última es la en curso); solo series vivas del ejercicio; sin dato → null
+export function weeklyBest1rm(log: GymEntry[], exerciseId: string, today: string, n = 8): WeekBest[] {
+  const cur = mondayOf(today), mine = liveSets(log).filter(s => s.exerciseId === exerciseId)
+  return Array.from({ length: n }, (_, i) => {
+    const monday = addDays(cur, -7 * (n - 1 - i)), end = addDays(monday, 7)
+    let kg: number | null = null
+    for (const s of mine) {
+      const d = s.occurredAt.slice(0, 10)
+      if (d < monday || d >= end) continue
+      const e = e1rm(toKg(s.weight, s.unit), s.reps)
+      if (e !== null && (kg === null || e > kg)) kg = e
+    }
+    return { monday, kg, current: i === n - 1 }
+  })
+}
+
+// Series y volumen (Σ kg×reps, kg normalizados) por grupo: semana en curso hasta hoy frente al mismo tramo de la anterior.
+// ponytail: un ejercicio que no está en el catálogo ni en los propios (p. ej. de otra copia) no tiene grupo y se ignora.
+export function groupVolume(log: GymEntry[], custom: Exercise[], today: string): GroupVolume[] {
+  const mon = mondayOf(today), pMon = addDays(mon, -7), pEnd = addDays(today, -7), all = allExercises(custom)
+  const out: GroupVolume[] = GROUPS.map(g => ({ group: g.id, label: g.label, sets: 0, kg: 0, prevSets: 0, prevKg: 0 }))
+  for (const s of liveSets(log)) {
+    const d = s.occurredAt.slice(0, 10), cur = d >= mon && d <= today, prev = d >= pMon && d <= pEnd
+    if (!cur && !prev) continue
+    const x = all.find(e => e.id === s.exerciseId)
+    if (!x) continue
+    const row = out.find(r => r.group === x.group)!, kg = toKg(s.weight, s.unit) * s.reps
+    if (cur) { row.sets++; row.kg += kg } else { row.prevSets++; row.prevKg += kg }
+  }
+  return out
+}
+
+export function gymDay(log: GymEntry[], day: string): GymDay {
+  const sets = daySets(log, day)
+  return { sets: sets.length, exercises: new Set(sets.map(s => s.exerciseId)).size }
+}
+
+export const MAX_ROUTINES = 20
+export const MAX_ROUTINE_ITEMS = 20
+export const MAX_ROUTINE_SETS = 10
+
+// Ítems en orden de primera serie viva del día; sets = min(10, nº de series). null si el día no tiene series.
+export function routineFromDay(log: GymEntry[], day: string, name: string, id: string): Routine | null {
+  const items: Routine['items'] = []
+  for (const s of daySets(log, day)) {
+    const it = items.find(x => x.exerciseId === s.exerciseId)
+    if (it) it.sets = Math.min(MAX_ROUTINE_SETS, it.sets + 1); else items.push({ exerciseId: s.exerciseId, sets: 1 })
+  }
+  return items.length ? { id, name, items: items.slice(0, MAX_ROUTINE_ITEMS) } : null
+}
+
+// done = series vivas de ese ejercicio en `day`; complete = done >= sets
+export function routineProgress(r: Routine, log: GymEntry[], day: string): { exerciseId: string; sets: number; done: number; complete: boolean }[] {
+  const today = daySets(log, day)
+  return r.items.map(i => {
+    const done = today.filter(s => s.exerciseId === i.exerciseId).length
+    return { exerciseId: i.exerciseId, sets: i.sets, done, complete: done >= i.sets }
+  })
 }
