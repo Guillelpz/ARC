@@ -7,6 +7,7 @@ import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCrit
 import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
+import { ALIASES, draftText, isComplete, matchExercise, normalizeVoice, parseGym, type GymDraft } from './voice'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -528,6 +529,38 @@ export function runSelfCheck() {
       const m21 = man('m'), u21 = { id: 'um', trackerId: 'gym', amount: -1, occurredAt: m21.occurredAt, undoes: 'm' }
       ok(get(deriveGame([m21, u21, a1], D), 'gym').xp.xp === get(deriveGame([m21], D), 'gym').xp.xp, 'GY21 XP neta 0 al reponer la sesión')
     }
+  }
+
+  // VZ1–VZ13 — parser de voz (ES/EN)
+  {
+    const EX = [...EXERCISES, { id: 'custom-x', name: 'Press 45 grados', group: 'chest' as const, kind: 'load' as const }]
+    const p = (t: string, u: 'kg' | 'lbs' = 'kg') => parseGym(t, EX, u)
+    const f = (d: GymDraft) => `${d.exerciseId}/${d.weight} ${d.unit}/${d.reps}/${d.sets}`
+    const aliasesOf = (id: string) => [normalizeVoice(EXERCISES.find(x => x.id === id)!.name), ...(ALIASES[id] ?? []).map(normalizeVoice)]
+    const all = EXERCISES.flatMap(x => aliasesOf(x.id).map(a => [x.id, a] as const))
+    ok(EXERCISES.every(x => aliasesOf(x.id).length >= 2) && all.every(([id, a]) => all.filter(([, b]) => b === a).every(([i2]) => i2 === id)) &&
+      EXERCISES.every(x => matchExercise(normalizeVoice(x.name), EXERCISES)?.id === x.id), 'VZ1 alias: ≥ 2 por ejercicio, sin repetidos entre ids, el nombre resuelve a sí mismo')
+    ok(['peso muerto rumano 100 kg 8', 'peso muerto 140 5', 'curl martillo de biceps 14 10', 'incline bench 30 kg 10'].map(t => p(t).exerciseId).join() === 'romanian-deadlift,deadlift,hammer-curl,incline-db-press', 'VZ2 gana el alias más largo')
+    ok(f(p('80 kilos press banca 5 repeticiones')) === 'bench-press/80 kg/5/1' && f(p('press banca 5 kg 8')) === 'bench-press/5 kg/8/1', 'VZ3 con unidad gana la unidad')
+    ok(f(p('press banca 5 80')) === 'bench-press/80 kg/5/1' && f(p('sentadilla 100 por 5')) === 'squat/100 kg/5/1', 'VZ4 sin unidad, el mayor es el peso')
+    ok(f(p('squat 225 pounds 5 reps')) === 'squat/225 lbs/5/1' && f(p('sentadilla 100 libras 5')) === 'squat/100 lbs/5/1' &&
+      f(p('bench 185 5', 'lbs')) === 'bench-press/185 lbs/5/1' && f(p('bench 185 5')) === 'bench-press/185 kg/5/1', 'VZ5 libras, y unidad por defecto')
+    ok(f(p('dominadas 12')) === 'pull-up/0 kg/12/1' && f(p('fondos 20 kilos 8')) === 'dips/20 kg/8/1' && f(p('pull ups 10 reps')) === 'pull-up/0 kg/10/1', 'VZ6 peso corporal')
+    ok(f(p('press banca 80 kg 3x5')) === 'bench-press/80 kg/5/3' && f(p('sentadilla 100 kilos 3 series de 5')) === 'squat/100 kg/5/3' &&
+      f(p('bench press 3 sets of 5 100 kg')) === 'bench-press/100 kg/5/3' && f(p('dominadas 3x8')) === 'pull-up/0 kg/8/3' &&
+      f(p('press banca tres series de cinco 80 kilos')) === 'bench-press/80 kg/5/3', 'VZ7 varias series')
+    ok(f(p('press banca 80x5')) === 'bench-press/80 kg/5/1' && f(p('curl martillo 12,5 por 10')) === 'hammer-curl/12.5 kg/10/1' &&
+      f(p('sentadilla 3x5')) === 'squat/null kg/5/3' && !isComplete(p('sentadilla 3x5'), EX), 'VZ8 par «A x B»')
+    ok(f(p('press banca 62,5 kg 8')) === 'bench-press/62.5 kg/8/1' && f(p('press banca 62.5 kg 8')) === 'bench-press/62.5 kg/8/1' &&
+      f(p('press banca 80, 5 repeticiones')) === 'bench-press/80 kg/5/1', 'VZ9 decimales y comas')
+    const v10 = ['80 kilos 5 repeticiones', 'press banca 80', 'press banca 5 repeticiones', ''].map(t => p(t))
+    ok(v10.map(f).join('|') === 'null/80 kg/5/1|bench-press/80 kg/null/1|bench-press/null kg/5/1|null/null kg/null/1' && v10.every(d => !isComplete(d, EX)), 'VZ10 incompletos')
+    ok(f(p('press 45 grados 40 kg 10')) === 'custom-x/40 kg/10/1' && f(p('hip thrust 100 10') /* el propio archivado no está en la lista activa */) === 'null/100 kg/10/1', 'VZ11 ejercicio propio, el 45 del nombre no cuenta; archivado fuera')
+    const v12 = ['press banca 2500 kg 5', 'press banca 80 kg 1000 reps', 'press banca 80 kg 12 series de 5', 'press banca 0 kg 5'].map(t => p(t))
+    ok(v12[0].weight === null && v12[1].reps === null && v12[2].sets === 12 && !isComplete(v12[2], EX) && v12[3].weight === null, 'VZ12 rangos')
+    const bd = (id: string, w: number, u: 'kg' | 'lbs', r: number, s: number): GymDraft => ({ exerciseId: id, weight: w, unit: u, reps: r, sets: s })
+    ok(draftText(bd('bench-press', 80, 'kg', 5, 1), EX, 'kg') === 'Press banca · 80 kg × 5' && draftText(bd('bench-press', 80, 'kg', 5, 3), EX, 'kg') === 'Press banca · 3 series · 80 kg × 5' &&
+      draftText(bd('pull-up', 0, 'kg', 12, 1), EX, 'kg') === 'Dominadas · 12 reps' && draftText({ ...bd('x', 1, 'kg', 1, 1), exerciseId: null }, EX, 'kg') === 'Ejercicio sin reconocer', 'VZ13 draftText')
   }
 
   console.info('[selfcheck] done')
