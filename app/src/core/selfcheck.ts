@@ -8,8 +8,8 @@ import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDupli
 import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
-import { voicePrompt, voiceSchema } from './haiku'
-import { captureNorm, convNote, isOtherDay, isReady, routeCapture, type CaptureCtx } from './capture'
+import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
+import { captureFromAI, captureNorm, convNote, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -636,6 +636,28 @@ export function runSelfCheck() {
     ok(f('medité 10 minutos') === 'new/Medité/duration/10/baja' && f('hice 20 flexiones') === 'new/Flexiones/count/20/baja' && f('3 vasos de agua') === 'new/Agua/custom:vasos/3/media' &&
       f('ajedrez 1 hora') === 'new/Ajedrez/duration/60/baja/dup:Ajedrez' && !isReady(routeCapture('ajedrez 1 hora', ctx), ctx), 'CV10 nombre del hábito nuevo')
     ok(captureNorm('una hora') === '1 hora' && captureNorm('half an hour') === '30 min' && isOtherDay(captureNorm('el viernes')) && !isOtherDay(captureNorm('esta mañana')), 'CV11 captureNorm e isOtherDay')
+    // CV6 (combinación) y CV8 — captureFromAI
+    {
+      const ai: CaptureCommand = { kind: 'new', text: 'x', source: 'ai', habit: { name: 'Zumba', branch: 'hero', type: 'count', amount: 1, confidence: 'alta', reason: 'r' }, said: null }
+      const gymFull = (src: 'ai' | 'parser'): CaptureCommand => ({ kind: 'gym', text: 'x', source: src, draft: { exerciseId: 'bench-press', weight: 80, unit: 'kg', reps: 5, sets: 1 } })
+      const trk = (src: 'ai' | 'parser', id = 'beer', problem: 'unit' | null = null): CaptureCommand => ({ kind: 'tracker', text: 'x', source: src, trackerId: id, amount: problem ? null : 1, said: null, problem })
+      const unk: CaptureCommand = { kind: 'unknown', text: 'x', source: 'parser' }
+      const od: CaptureCommand = { kind: 'other-day', text: 'x', source: 'parser' }
+      ok(pickCapture(ai, trk('parser'), ctx).kind === 'tracker' && pickCapture(gymFull('ai'), trk('parser'), ctx).kind === 'gym' &&
+        pickCapture(trk('ai', 'beer'), trk('parser', 'burgers'), ctx).source === 'ai' && (pickCapture(trk('ai', 'running', 'unit'), unk, ctx) as { trackerId: string }).trackerId === 'running' &&
+        pickCapture(trk('ai'), od, ctx).kind === 'other-day' && pickCapture(od, trk('parser'), ctx).kind === 'other-day', 'CV6 pickCapture')
+      const base = { kind: 'tracker', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'reading', amount: 50, amountUnit: 'pages', unitWord: 'pages',
+        name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }
+      const fa = (o: Record<string, unknown>) => captureFromAI({ ...base, ...o }, 'x', ctx)
+      const newo = { kind: 'new', trackerId: 'none', amount: 30, amountUnit: 'min', unitWord: 'min', name: 'Grounding', confidence: 'alta', type: 'duration', reason: 'r' }
+      const r8 = fa({}) as { amount: number } | null, b8 = fa({ kind: 'new', trackerId: 'none', name: 'beer', amountUnit: 'none', amount: 2, unitWord: '' }) as { kind: string; trackerId: string; amount: number } | null
+      ok(fa({ trackerId: 'ghost' }) === null && fa({ trackerId: 'custom-Ajedrez' }) === null && fa({ ...newo, name: 'X' }) === null && fa({ ...newo, type: 'custom', customUnit: '' }) === null &&
+        fa({ ...newo, confidence: 'seguro' }) === null && fa({ otherDay: true })?.kind === 'other-day' && b8?.kind === 'tracker' && b8.trackerId === 'beer' && b8.amount === 2 && r8?.amount === 100 &&
+        (fa(newo) as { habit: { amount: number; confidence: string } }).habit.amount === 30 && (fa(newo) as { habit: { confidence: string } }).habit.confidence === 'alta' && fa({ kind: 'none' })?.kind === 'unknown' && captureFromAI(null, 'x', ctx) === null, 'CV8 captureFromAI')
+      const sch = captureSchema(['a'], ['b']), pr = capturePrompt('hola <b>', ctx)
+      ok(sch.properties.exerciseId.enum.join() === 'a,none' && sch.properties.trackerId.enum.join() === 'b,none' && sch.required.length === 17 && sch.required.every(k => k in sch.properties) &&
+        sch.additionalProperties === false && !pr.includes('Ajedrez') && !pr.includes('<b>') && pr.includes('<habitos>') && pr.includes('reading: Reading · HERO · min'), 'CV9 esquema y prompt')
+    }
   }
 
   console.info('[selfcheck] done')

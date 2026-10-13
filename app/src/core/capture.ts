@@ -1,6 +1,6 @@
 import type { Branch, Confidence, Exercise, Tracker, WeightUnit } from './types'
 import { STOPWORDS, classify, isValidName, isValidUnit, matchTracker, normalizeText, trackerName } from './classify'
-import { isComplete, matchExercise, normalizeVoice, parseGym, type HaikuError, type VoiceCommand } from './voice'
+import { fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type HaikuError, type VoiceCommand } from './voice'
 
 export const PAGE_MIN = 2        // 1 página = 2 min (solo en Reading)
 export const MAX_CAPTURE = 999
@@ -164,4 +164,54 @@ export function isReady(c: CaptureCommand, ctx: CaptureCtx): boolean {
     case 'new': return c.habit.amount !== null && !c.habit.archivedDup
     default: return false
   }
+}
+
+const KINDS = ['gym', 'tracker', 'new', 'none'] as const
+const AMOUNT_UNITS = ['min', 'h', 'km', 'pages', 'count', 'other', 'none'] as const
+const TYPES = ['count', 'distance', 'duration', 'custom'] as const
+const oneOf = <T extends string>(v: unknown, xs: readonly T[]): v is T => xs.includes(v as T)
+const numOrNull = (v: unknown): v is number | null => v === null || (typeof v === 'number' && Number.isFinite(v))
+
+// Respuesta de Haiku (ya parseada) → comando, o null si algún campo no es válido (entonces manda el parser).
+export function captureFromAI(o: unknown, text: string, ctx: CaptureCtx): CaptureCommand | null {
+  if (typeof o !== 'object' || o === null || Array.isArray(o)) return null
+  const x = o as Record<string, unknown>
+  if (!oneOf(x.kind, KINDS) || typeof x.otherDay !== 'boolean' || !oneOf(x.weightUnit, ['kg', 'lbs', 'none'] as const) ||
+    !oneOf(x.amountUnit, AMOUNT_UNITS) || !oneOf(x.branch, ['hero', 'villain'] as const) || !oneOf(x.confidence, ['alta', 'media', 'baja'] as const) || !oneOf(x.type, TYPES)) return null
+  if (typeof x.exerciseId !== 'string' || typeof x.trackerId !== 'string' || typeof x.reason !== 'string' || typeof x.name !== 'string') return null
+  if (typeof x.unitWord !== 'string' || x.unitWord.length > 20 || typeof x.customUnit !== 'string' || x.customUnit.length > 20) return null
+  if (!numOrNull(x.weight) || !numOrNull(x.amount) || !(x.reps === null || typeof x.reps === 'number') || typeof x.sets !== 'number') return null
+  const active = ctx.trackers.filter(t => !t.archived)
+  if (!['none', ...ctx.exercises.map(e => e.id)].includes(x.exerciseId) || !['none', ...active.map(t => t.id)].includes(x.trackerId)) return null
+  const src: Src = { text, source: 'ai' }
+  if (x.otherDay) return { ...src, kind: 'other-day' }
+  if (x.kind === 'none') return { ...src, kind: 'unknown' }
+  if (x.kind === 'gym') {
+    if (x.exerciseId === 'none') return null
+    const draft = fromAI({ exerciseId: x.exerciseId, weight: x.weight, unit: x.weightUnit, reps: x.reps, sets: x.sets }, ctx.exercises, ctx.unit)
+    return draft ? { kind: 'gym', text, source: 'ai', draft } : null
+  }
+  const ms: Measure[] = x.amount === null ? [] : [{ value: x.amount, family: x.amountUnit === 'none' ? null : x.amountUnit, word: normalizeText(x.unitWord) }]
+  if (x.kind === 'tracker') {
+    const t = active.find(a => a.id === x.trackerId)
+    return t ? { ...src, kind: 'tracker', trackerId: t.id, ...resolveAmount(t, ms) } : null
+  }
+  const name = trackerName(x.name.trim().replace(/\s+/g, ' '))
+  if (!isValidName(name) || (x.type === 'custom' && !isValidUnit(x.customUnit))) return null
+  return buildNew({ name, type: x.type, unit: x.type === 'custom' ? x.customUnit.trim() : undefined, ms, src, ctx, branch: x.branch, confidence: x.confidence, reason: x.reason.trim().slice(0, 120) })
+}
+
+const RANK: Partial<Record<CaptureCommand['kind'], number>> = { gym: 3, tracker: 2, new: 1 }
+// Combina la IA y el parser: otro día gana; dos gym → pickDraft; si no, el candidato listo de más rango (empate: la IA); si ninguno está listo, la IA si dijo algo.
+export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, ctx: CaptureCtx): CaptureCommand {
+  if (ai?.kind === 'other-day') return ai
+  if (parsed.kind === 'other-day') return parsed
+  if (ai?.kind === 'gym' && parsed.kind === 'gym') {
+    const { draft, source } = pickDraft(ai.draft, parsed.draft, ctx.exercises)
+    return { kind: 'gym', text: ai.text, draft, source }
+  }
+  const cands: CaptureCommand[] = ai ? [ai, parsed] : [parsed]
+  const ready = cands.filter(c => isReady(c, ctx)).sort((a, b) => (RANK[b.kind] ?? 0) - (RANK[a.kind] ?? 0))
+  if (ready.length) return ready[0]
+  return ai && ai.kind !== 'unknown' ? ai : parsed
 }
