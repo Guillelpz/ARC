@@ -7,7 +7,7 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y docu
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
 - Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
-- Ciclo 28 (menos llamadas a Haiku en la captura) — **aprobado, sin arrancar**: falta la decisión M (dónde vive la memoria de frases). Se arrancará en otra sesión.
+- Ciclo 28 (menos llamadas a Haiku en la captura) — **en curso, paso 4 (tech-lead)**. Arrancado el 2026-10-14 con la decisión M-B. Rama `cycle-28`.
 
 ## Ciclo 28 — Menos llamadas a Haiku en la captura por voz
 
@@ -16,7 +16,7 @@ Aprobado por el usuario el 2026-10-14 (pasos 1-2 omitidos). Motivo: rapidez (res
 - **O3 Saltarse Haiku si el dispositivo está seguro:** coincidencia exacta con el nombre o un alias de un hábito activo, o serie de gym completa con ejercicio reconocido → no se llama a Haiku. Las coincidencias aproximadas (erratas, prefijos: «bread» → Reading) siguen yendo a Haiku. Otro día (C6) se sigue detectando en el dispositivo.
 - **O1 Memoria de frases confirmadas:** al apuntar algo por voz que no se deshace, se guarda la frase normalizada sin números → decisión (gym/ejercicio, hábito). Una frase equivalente después se resuelve en el dispositivo (el parser saca la cantidad). Deshacer borra la entrada. Al usarla se valida que el hábito/ejercicio siga existiendo y activo. Tope de tamaño (lo fija el tech-lead).
 - **No entra:** alias aprendidos (O2), recorte del prompt (O4).
-- **Decisión M pendiente (la toma el usuario al arrancar):** M-A la memoria es dato del usuario (entra en Exportar/Importar, fusión, «Recuperar copia anterior» y «Borrar todo»); M-B es caché del dispositivo, como la clave de Anthropic (fuera de copias y fusión; «Borrar todo» la vacía igualmente). Recomendación del orquestador: M-B.
+- **Decisión M (usuario, 2026-10-14): M-B.** La memoria de frases es caché del dispositivo, como la clave de Anthropic: fuera de Exportar/Importar, fusión y «Recuperar copia anterior»; «Borrar todo» la vacía igualmente.
 
 ## Ciclo 27 — Captura rápida por voz: gym, hábito existente o hábito nuevo
 
