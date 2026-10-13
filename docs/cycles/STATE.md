@@ -6,7 +6,7 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y docu
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
 - Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
-- Ciclo 27 (captura rápida por voz desde el «+») — **en curso, paso 4 (tech-lead)**.
+- Ciclo 27 (captura rápida por voz desde el «+») — **en curso, paso 5 (implementer)**. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 
 ## Ciclo 27 — Captura rápida por voz: gym, hábito existente o hábito nuevo
 
