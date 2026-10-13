@@ -181,3 +181,10 @@ export function matchTracker(norm: string, trackers: Tracker[], skip: ReadonlySe
   }
   return best?.t
 }
+
+// Hábito con coincidencia exacta de palabra (nombre o ALIASES) y único: si hay dos, undefined. Es la puntuación 3 de matchTracker.
+export function exactTracker(norm: string, trackers: Tracker[], skip: ReadonlySet<string> = new Set()): Tracker | undefined {
+  const ws = normalizeText(norm).split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !/^\d+$/.test(w) && !skip.has(w) && !STOPWORDS.has(w))
+  const hits = trackers.filter(t => words(`${t.name} ${ALIASES[t.id] ?? ''}`).filter(x => !STOPWORDS.has(x)).some(x => ws.includes(x)))
+  return hits.length === 1 ? hits[0] : undefined
+}

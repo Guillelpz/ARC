@@ -120,4 +120,18 @@ describe('captura', () => {
     const r = await run('ate a burguer', mock(() => ok(reply({ ...cap, kind: 'tracker', trackerId: 'ghost' }))))
     expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'invalid' })
   })
+  test('O3: el dispositivo seguro no llama a fetch', async () => {
+    for (const t of ['Read 50 pages of the name of the wind', '80kg bench press 5 reps', 'corrí 30 minutos', 'ayer leí 20 páginas']) {
+      const f = mock(() => ok(reply(newAlta)))
+      await run(t, f)
+      expect(f, t).not.toHaveBeenCalled()
+    }
+  })
+  test('O3: lo aproximado o incompleto sí llama a fetch', async () => {
+    for (const t of ['ate a burguer', 'grounding 30 min', 'press banca 80']) {
+      const f = mock(() => ok(reply(newAlta)))
+      await run(t, f)
+      expect(f, t).toHaveBeenCalledTimes(1)
+    }
+  })
 })

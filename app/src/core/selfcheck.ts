@@ -4,12 +4,12 @@ import { allTrackers, logGoal, setGoal, setLimit, TRACKERS, unitFor } from './tr
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
-import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
+import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
-import { captureFromAI, captureNorm, convNote, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -636,6 +636,15 @@ export function runSelfCheck() {
     ok(f('medité 10 minutos') === 'new/Medité/duration/10/baja' && f('hice 20 flexiones') === 'new/Flexiones/count/20/baja' && f('3 vasos de agua') === 'new/Agua/custom:vasos/3/media' &&
       f('ajedrez 1 hora') === 'new/Ajedrez/duration/60/baja/dup:Ajedrez' && !isReady(routeCapture('ajedrez 1 hora', ctx), ctx), 'CV10 nombre del hábito nuevo')
     ok(captureNorm('una hora') === '1 hora' && captureNorm('half an hour') === '30 min' && isOtherDay(captureNorm('el viernes')) && !isOtherDay(captureNorm('esta mañana')), 'CV11 captureNorm e isOtherDay')
+    {
+      const ex = (t: string) => exactTracker(captureNorm(t), ctx.trackers, ALL_UNITS)?.id
+      const two = [mk('Cold shower', 'count'), mk('Hot shower', 'count')]
+      ok(ex('Read 50 pages of the name of the wind') === 'reading' && ex('corrí 5 km') === 'running' && ex('fui al gimnasio') === 'gym' && ex('ate a burguer') === undefined &&
+        ex('lectur') === undefined && exactTracker('shower 10 min', two) === undefined, 'CV12 exactTracker')
+      const sure = (t: string) => deviceSure(routeCapture(t, ctx), ctx)
+      ok(['80kg bench press 5 reps', 'Read 50 pages of the name of the wind', 'corrí 30 minutos'].every(sure) &&
+        !['press banca 80', 'ate a burguer', 'grounding 30 min', 'ayer leí 20 páginas'].some(sure), 'CV13 deviceSure')
+    }
     // CV6 (combinación) y CV8 — captureFromAI
     {
       const ai: CaptureCommand = { kind: 'new', text: 'x', source: 'ai', habit: { name: 'Zumba', branch: 'hero', type: 'count', amount: 1, confidence: 'alta', reason: 'r' }, said: null }
