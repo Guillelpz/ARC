@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
@@ -1246,4 +1246,84 @@ test('U-C6 unidad que no encaja: no guarda y pide la cantidad en la unidad del h
   fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Running · \+5 km/)).toBeTruthy()
   expect(net('running')).toBe(5)
+})
+
+const customTrackers = () => JSON.parse(localStorage.getItem(CU) ?? '{"trackers":[]}').trackers as { id: string; name: string; branch: string; type: string; unit: string; archived?: boolean }[]
+const newReply = { kind: 'new', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: 30, amountUnit: 'min', unitWord: 'min',
+  name: 'Grounding', branch: 'hero', confidence: 'alta', type: 'duration', customUnit: '', reason: 'Bienestar mental' }
+
+test('U-C3 sin clave, un hábito nuevo nunca se crea solo: propuesta editable', async () => {
+  ackVoice(); setVoz('grounding 30 min'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByRole('heading', { name: 'Propuesta: HERO' })).toBeTruthy()
+  expect(screen.getByText('Confianza baja')).toBeTruthy()
+  expect(screen.queryByText(/Se crea sola/)).toBeNull()
+  expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Grounding')
+  expect((screen.getByLabelText('Cantidad (min)') as HTMLInputElement).value).toBe('30')
+  fireEvent.click(within(screen.getByRole('group', { name: 'Rama' })).getByRole('button', { name: 'VILLAIN' }))
+  expect(screen.getByRole('heading', { name: 'Propuesta: VILLAIN' })).toBeTruthy()
+  fireEvent.click(btn('Crear y apuntar'))
+  expect(await screen.findByText(/^Creada: Grounding \(VILLAIN\) · \+30 min\.$/)).toBeTruthy()
+  expect(customTrackers()).toHaveLength(1)
+  expect(customTrackers()[0]).toMatchObject({ name: 'Grounding', branch: 'villain', type: 'duration' })
+  expect(stored()).toHaveLength(1)
+  expect(stored()[0]).toMatchObject({ trackerId: customTrackers()[0].id, amount: 30 })
+  expect(screen.queryByText('¿A qué parties la propones?')).toBeNull()
+})
+
+const settle = async () => { for (let i = 0; i < 6; i++) await act(async () => { await vi.advanceTimersByTimeAsync(0) }) }
+const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+async function dictateNewWithKey() {
+  ackVoice(); setVoz('grounding 30 min'); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(aiReply(newReply)))
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] }); vi.setSystemTime(new Date(2026, 9, 7, 12, 0, 0))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  await settle()
+}
+
+test('U-C4 con clave y confianza alta, la propuesta se crea sola a los 10 s', async () => {
+  try {
+    await dictateNewWithKey()
+    expect(screen.getByRole('heading', { name: 'Propuesta: HERO' })).toBeTruthy()
+    expect(screen.getByText('Confianza alta')).toBeTruthy()
+    expect(screen.getByText(/Se crea sola en/)).toBeTruthy()
+    expect(screen.getByText('Se creará sola en 10 segundos. Toca la tarjeta para revisarla.')).toBeTruthy()
+    for (let i = 0; i < 9; i++) await tick(1000)
+    expect(customTrackers()).toHaveLength(0)
+    await tick(1000)
+    expect(customTrackers()).toHaveLength(1)
+    expect(customTrackers()[0]).toMatchObject({ name: 'Grounding', branch: 'hero', type: 'duration' })
+    expect(stored()[0]).toMatchObject({ amount: 30 })
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-C4b tocar la tarjeta cancela la cuenta atrás', async () => {
+  try {
+    await dictateNewWithKey()
+    for (let i = 0; i < 3; i++) await tick(1000)
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Grounding diario' } })
+    for (let i = 0; i < 12; i++) await tick(1000)
+    expect(customTrackers()).toHaveLength(0)
+    expect(screen.queryByText(/Se crea sola/)).toBeNull()
+    expect(screen.getByText('Cuenta atrás parada. Revisa la propuesta.')).toBeTruthy()
+    fireEvent.click(btn('Crear y apuntar'))
+    expect(customTrackers()[0].name).toBe('Grounding diario')
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-C7 Deshacer un hábito recién creado lo archiva y anula el registro', async () => {
+  ackVoice(); setVoz('grounding 30 min'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  await screen.findByRole('heading', { name: 'Propuesta: HERO' })
+  fireEvent.click(btn('Crear y apuntar'))
+  await screen.findByText(/^Creada: Grounding/)
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: Grounding archivada y registro anulado.')).toBeTruthy()
+  const id = customTrackers()[0].id
+  expect(customTrackers()[0].archived).toBe(true)
+  expect(net(id)).toBe(0)
+  go('Inicio')
+  expect(screen.getByRole('heading', { name: 'Archivadas' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Reactivar Grounding' })).toBeTruthy()
 })

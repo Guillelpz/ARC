@@ -1,9 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { CircleAlert, Mic } from 'lucide-react'
-import type { ActivityEvent, Exercise, Tracker, WeightUnit } from '../core/types'
+import type { ActivityEvent, Branch, Exercise, Tracker, WeightUnit } from '../core/types'
 import { VOICE_MAX_CHARS, draftText, isComplete, type GymDraft, type VoiceCommand } from '../core/voice'
-import { MAX_CAPTURE, convNote, type CaptureCommand, type Problem } from '../core/capture'
+import { AUTO_CREATE_S, MAX_CAPTURE, convNote, type CaptureCommand, type NewHabit, type Problem } from '../core/capture'
 import { unitFor } from '../core/trackers'
 import { listenOnce, speechLang, speechSupported, keyboardFirst, type ListenStart, type SpeechOutcome } from '../speech'
 import { VT } from './voiceTone'
@@ -11,7 +11,7 @@ import { VoicePrivacy } from './VoicePrivacy'
 import { noApiText, offlineText, speechErrorText } from './voiceErrors'
 import { missingOf, type VoiceMissing } from './voiceNotes'
 import { CARD, LABEL } from './branchTone'
-import { TrackerResult } from './CaptureCards'
+import { CreatedResult, NewHabitCard, TrackerResult } from './CaptureCards'
 
 export type CaptureStart = ListenStart | { mode: 'privacy' } | { mode: 'idle' }
 
@@ -30,6 +30,9 @@ type Props = {
   onGymIncomplete: (draft: GymDraft, missing: VoiceMissing[]) => void
   onAdd: (trackerId: string, amount: number) => ActivityEvent | null
   onUndoEvent: (t: Tracker, ev: ActivityEvent) => void
+  onCreate: (h: NewHabit) => { tracker: Tracker; event: ActivityEvent }
+  onUndoCreate: (t: Tracker, ev: ActivityEvent) => void
+  onGoToMissions: (b: Branch) => void
   onManual: (text: string) => void
   onBusy: (busy: boolean) => void
 }
@@ -38,6 +41,8 @@ type Res =
   | { k: 'gym'; cmd: VoiceCommand; ids: string[]; auto: boolean }
   | { k: 'trk'; text: string; t: Tracker; ev: ActivityEvent; note: string | null }
   | { k: 'form'; text: string; t: Tracker; problem: Problem | null; amount: number | null }
+  | { k: 'new'; cmd: Extract<CaptureCommand, { kind: 'new' }>; auto: boolean }
+  | { k: 'created'; t: Tracker; ev: ActivityEvent }
   | { k: 'other-day' }
   | { k: 'unknown' }
   | { k: 'undone'; text: string }
@@ -59,6 +64,7 @@ export function CaptureView(props: Props) {
   const [message, setMessage] = useState<string | null>(() => s0.mode === 'text' ? (s0.reason === 'offline' ? offlineText(WHAT) : s0.reason === 'no-api' ? noApiText(WHAT) : null) : null)
   const [res, setRes] = useState<Res | null>(null)
   const [text, setText] = useState('')
+  const [stopped, setStopped] = useState(false) // la cuenta atrás de la propuesta se ha parado
   const heard = useRef('')
   const stopRef = useRef<(() => void) | null>(null)
   const alive = useRef(true)
@@ -106,8 +112,10 @@ export function CaptureView(props: Props) {
         else setRes({ k: 'form', text: cmd.text, t: tr, problem: cmd.problem, amount: cmd.amount })
         return
       }
-      default: // ponytail: hábito nuevo (T5) todavía no se crea aquí
-        setMode('idle'); r.onManual(raw)
+      case 'new':
+        setStopped(false); setMode('idle')
+        setRes({ k: 'new', cmd, auto: cmd.source === 'ai' && cmd.habit.confidence === 'alta' && cmd.habit.amount !== null && !cmd.habit.archivedDup && AUTO_CREATE_S > 0 })
+        return
     }
   }
 
@@ -173,6 +181,16 @@ export function CaptureView(props: Props) {
     if (!ev) return
     setRes({ k: 'trk', text: res.text, t: res.t, ev, note: null }); focusMic()
   }
+  function createHabit(h: NewHabit) {
+    if (res?.k !== 'new') return
+    const { tracker, event } = ref.current.onCreate(h)
+    setRes({ k: 'created', t: tracker, ev: event }); focusMic()
+  }
+  function undoCreated() {
+    if (res?.k !== 'created') return
+    ref.current.onUndoCreate(res.t, res.ev)
+    setRes({ k: 'undone', text: `Deshecho: ${res.t.name} archivada y registro anulado.` }); focusMic()
+  }
   const close = () => { setRes(null); focusMic() }
 
   useEffect(() => {
@@ -197,12 +215,14 @@ export function CaptureView(props: Props) {
     : res?.k === 'gym' ? `Registrado: ${draftText(res.cmd.draft, exercises, unit)}${res.auto ? ' Sesión de Gym apuntada en HERO (hoy).' : ''}`
     : res?.k === 'trk' ? `Registrado: ${res.t.name} · +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)} · +${res.ev.amount * res.t.xpPerUnit} ${LABEL[res.t.branch]} XP`
     : res?.k === 'form' ? (res.problem === 'unit' ? `${res.t.name} se mide en ${res.t.unit}: no se ha apuntado nada.` : res.problem === 'range' ? `La cantidad debe estar entre 1 y ${MAX_CAPTURE} ${res.t.unit}: no se ha apuntado nada.` : '')
+    : res?.k === 'new' ? (res.auto ? (stopped ? 'Cuenta atrás parada. Revisa la propuesta.' : `Se creará sola en ${AUTO_CREATE_S} segundos. Toca la tarjeta para revisarla.`) : '')
+    : res?.k === 'created' ? `Creada: ${res.t.name} (${LABEL[res.t.branch]}) · +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)}.`
     : res?.k === 'other-day' ? OTHER_DAY_TEXT
     : res?.k === 'unknown' ? UNKNOWN_TEXT
     : res?.k === 'undone' ? res.text
     : mode === 'text' ? (message ?? '') : ''
-  const visible = busy || res !== null || (mode === 'text' && message !== null)
-  const branch = res?.k === 'trk' || res?.k === 'form' ? CARD[res.t.branch] : null
+  const visible = statusText !== '' && res?.k !== 'new' && (busy || res !== null || (mode === 'text' && message !== null))
+  const branch = res?.k === 'trk' || res?.k === 'form' || res?.k === 'created' ? CARD[res.t.branch] : null
   const card = res?.k === 'gym' ? `flex flex-col gap-2 rounded-lg border p-3 ${t.border} ${t.surface} ${t.text}` : branch ? `flex flex-col gap-2 rounded-lg border p-3 ${branch.box}` : ''
 
   return (
@@ -227,12 +247,17 @@ export function CaptureView(props: Props) {
             </div>
           )}
           <div className={card}>
-            <p role="status" className={visible ? `flex items-start gap-2 text-sm ${res?.k === 'gym' || res?.k === 'trk' ? 'font-semibold' : ''} ${branch ? '' : t.text}` : 'sr-only'}>
+            <p role="status" className={visible ? `flex items-start gap-2 text-sm ${res?.k === 'gym' || res?.k === 'trk' || res?.k === 'created' ? 'font-semibold' : ''} ${branch ? '' : t.text}` : 'sr-only'}>
               {(res?.k === 'other-day' || res?.k === 'unknown' || (mode === 'text' && message !== null)) && <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />}{statusText}
             </p>
             {(res?.k === 'trk' || res?.k === 'form') && (
               <TrackerResult key={res.k} tracker={res.t} heard={res.text} note={res.k === 'trk' ? res.note : null} form={res.k === 'form'} amount={res.k === 'form' ? res.amount : null}
                 onUndo={undoTracker} onEdit={editTracker} onClose={close} onSubmit={applyAmount} onCancel={close} />
+            )}
+            {res?.k === 'created' && <CreatedResult branch={res.t.branch} onUndo={undoCreated} onGo={() => ref.current.onGoToMissions(res.t.branch)} onClose={close} />}
+            {res?.k === 'new' && (
+              <NewHabitCard habit={res.cmd.habit} heard={res.cmd.text} trackers={props.trackers} auto={res.auto} stopped={stopped} onStop={() => setStopped(true)}
+                onCreate={createHabit} onDiscard={close} />
             )}
             {res?.k === 'gym' && (
               <>

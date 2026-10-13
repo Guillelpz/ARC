@@ -7,7 +7,8 @@ import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from '.
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
-import type { CaptureCommand } from './core/capture'
+import type { CaptureCommand, NewHabit } from './core/capture'
+import { TYPE_DEFAULTS, createTracker } from './core/classify'
 import { beginListen } from './speech'
 import type { GymDraft, VoiceCommand } from './core/voice'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
@@ -171,11 +172,11 @@ export default function App() {
   const backFromGym = () => { setGymPrefill(null); if (gymFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusGym(true); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
-  function push(evs: ActivityEvent[], t: Tracker) {
+  function push(evs: ActivityEvent[], t: Tracker, list = trackers) {
     const next = [...events, ...evs]
     const amount = evs.reduce((n, e) => n + e.amount, 0), key = evs[evs.length - 1].id
     if (amount === 0) return setEvents(next) // neto 0 (deshacer la sesión de un día con series + sesión automática): sin XP, toast ni animación
-    const after = deriveGame(next, today, trackers)
+    const after = deriveGame(next, today, list)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
     setEvents(next) // evento creado fuera del updater (StrictMode)
     setGain({ trackerId: t.id, xp: amount * t.xpPerUnit, branch: t.branch, key })
@@ -183,7 +184,7 @@ export default function App() {
     // adelantamientos: tú superas a alguien (ranking HERO) o alguien te supera en HERO/VILLAIN/profundidad
     for (const [i, p] of PARTIES.entries()) {
       const before = partyStates[i]
-      const after = derivePartyState(p, next, today, trackers, custom.proposals)
+      const after = derivePartyState(p, next, today, list, custom.proposals)
       const names = overtakes(after.ranking, before.ranking)
       if (names.length) { setOvertake({ key, party: p.name, names, position: after.position }); break }
       const lost = ([t.branch, 'depth'] as const).map(metric => {
@@ -309,6 +310,19 @@ export default function App() {
   const archived = useMemo(() => custom.trackers.filter(t => t.archived), [custom.trackers])
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
 
+  // Captura: hábito nuevo + su primer registro; el deshacer lo archiva (no se borra: «Reactivar» lo recupera).
+  function captureCreate(h: NewHabit): { tracker: Tracker; event: ActivityEvent } {
+    const t = createTracker({ name: h.name, branch: h.branch, type: h.type, unit: h.unit, xpPerUnit: TYPE_DEFAULTS[h.type].xpPerUnit }, `custom-${crypto.randomUUID()}`)
+    create(t)
+    const event: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount: h.amount ?? 1, occurredAt: nowStamp(today) }
+    push([event], t, [...trackers, t])
+    return { tracker: t, event }
+  }
+  function undoCreate(t: Tracker, ev: ActivityEvent) {
+    add(t, -ev.amount, today, ev)
+    saveTracker({ ...t, archived: true })
+  }
+
   function propose(trackerId: string, partyIds: string[]) {
     const now = nowStamp()
     setCustom(c => ({ ...c, proposals: proposeTo(c.proposals, trackerId, partyIds, allTrackers(c.trackers, c.goals), now) }))
@@ -420,7 +434,7 @@ export default function App() {
           ? <CaptureView key={capture.key} start={capture.start} onConsumed={() => setCapture(c => ({ ...c, start: { mode: 'idle' } }))} ack={voiceAck} onAck={ackVoice}
               trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
               onGymEdit={d => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg'))} onGymIncomplete={(d, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing))}
-              onManual={openManual} onBusy={b => { captureBusy.current = b }} />
+              onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }} />
           : <UnknownView key={manualText} initialText={manualText} trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
       )}
       {screen === 'party' && (
