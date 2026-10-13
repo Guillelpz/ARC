@@ -4,6 +4,7 @@ import type { Branch, Classification, Party, Tracker, TrackerDraft, VoteResult }
 import { TYPE_DEFAULTS, buttonLabel, classifyAI, createTracker, findSimilar, isValidName, isValidUnit, normalizeText, trackerName } from '../core/classify'
 import { vote } from '../core/party'
 import { Segmented } from './Segmented'
+import { BRANCH_BTN, BTN, CARD, LABEL, PRESS } from './branchTone'
 
 type Props = {
   trackers: Tracker[]
@@ -13,36 +14,13 @@ type Props = {
   onPropose: (trackerId: string, partyIds: string[]) => void
   onGoToMissions: (b: Branch) => void
   onUnarchive: (t: Tracker) => void
+  initialText?: string
 }
 
 type Step = 'write' | 'proposal' | 'parties' | 'result'
 
-const BTN = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50'
-const PRESS = 'active:scale-[0.98] motion-reduce:transform-none'
 const NEUTRAL = `${BTN} ${PRESS} bg-app-text text-app-surface hover:bg-app-text/90 outline-app-text`
 const SECONDARY = `${BTN} border border-app-border bg-transparent text-app-text hover:bg-app-surface outline-app-text`
-const BRANCH_BTN: Record<Branch, string> = {
-  hero: `${BTN} ${PRESS} bg-hero text-hero-on-accent hover:bg-hero/90 outline-hero`,
-  villain: `${BTN} ${PRESS} bg-villain text-villain-on-accent hover:bg-villain/90 outline-villain`,
-}
-// paleta entera de la tarjeta de propuesta según la rama
-const CARD: Record<Branch, { box: string; muted: string; border: string; secondary: string; input: string }> = {
-  hero: {
-    box: 'bg-hero-surface text-hero-text border-hero-border',
-    muted: 'text-hero-muted',
-    border: 'border-hero-border',
-    secondary: `${BTN} border border-hero-border bg-transparent text-hero-text hover:bg-hero-bg outline-hero`,
-    input: 'border-hero-border bg-hero-bg text-hero-text outline-hero',
-  },
-  villain: {
-    box: 'bg-villain-surface text-villain-text border-villain-border',
-    muted: 'text-villain-muted',
-    border: 'border-villain-border',
-    secondary: `${BTN} border border-villain-border bg-transparent text-villain-text hover:bg-villain-bg outline-villain`,
-    input: 'border-villain-border bg-villain-bg text-villain-text outline-villain',
-  },
-}
-const LABEL = { hero: 'HERO', villain: 'VILLAIN' } as const
 const TYPES: { value: Tracker['type']; label: string }[] = [
   { value: 'count', label: 'Veces' },
   { value: 'distance', label: 'Km' },
@@ -50,9 +28,9 @@ const TYPES: { value: Tracker['type']; label: string }[] = [
   { value: 'custom', label: 'Otro' },
 ]
 
-export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onGoToMissions, onUnarchive }: Props) {
+export function UnknownView({ trackers, parties, onCreate, onAdd, onPropose, onGoToMissions, onUnarchive, initialText = '' }: Props) {
   const [step, setStep] = useState<Step>('write')
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialText)
   const [ai, setAi] = useState<Classification | null>(null)
   const [draft, setDraft] = useState<TrackerDraft | null>(null)
   const [created, setCreated] = useState<Tracker | null>(null)

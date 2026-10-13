@@ -76,7 +76,8 @@ test('E7 voz en Gym a 320 px: serie guardada, recarga, Deshacer; sin clave no ha
 })
 
 test('E8 con clave, la IA resuelve la frase desde Hoy', async ({ page }) => {
-  const reply = { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ exerciseId: 'squat', weight: 100, unit: 'none', reps: 5, sets: 1 }) }] }
+  const reply = { stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ kind: 'gym', otherDay: false, exerciseId: 'squat', weight: 100, weightUnit: 'none', reps: 5, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+    name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }) }] }
   const calls = await anthropic(page, reply)
   await fakeSpeech(page)
   await page.goto('./')
@@ -86,7 +87,7 @@ test('E8 con clave, la IA resuelve la frase desde Hoy', async ({ page }) => {
   await expect(page.getByText('Clave guardada: termina en 0000')).toBeVisible()
   await nav(page, 'Inicio')
   await say(page, 'agachadas con cien kilos cinco veces')
-  await page.getByRole('button', { name: 'Dictar serie' }).click()
+  await page.getByRole('button', { name: 'Dictar', exact: true }).click()
   await page.getByRole('button', { name: 'Entendido' }).click()
   await expect(page.getByText(/^Registrado: Sentadilla · 100 kg × 5/)).toBeVisible()
   expect(calls).toHaveLength(1)

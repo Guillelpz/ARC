@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react'
-import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Merge, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Merge, Mic, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { ActivityEvent, Branch, BranchWeek, GameState, GymDay, PartyState, TodaySummary, Tracker } from '../core/types'
 import type { CopyStatus } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
 import { unitFor } from '../core/trackers'
 import { shortDate } from '../core/stats'
-import type { Exercise, WeightUnit } from '../core/types'
-import type { GymDraft, VoiceCommand } from '../core/voice'
 import { PlayerHeader } from './PlayerHeader'
-import { VoiceLog, type VoiceMissing } from './VoiceLog'
+import { VT } from './voiceTone'
 import { SaveFailBanner } from './SaveFailBanner'
 const MEDAL = ['bg-gold', 'bg-silver', 'bg-bronze'] // mismo podio que PartyView
 
@@ -19,10 +17,8 @@ type Props = {
   gymToday: GymDay
   onOpenGym: () => void
   focusHoy: boolean
-  today: string
-  voice: { exercises: Exercise[]; unit: WeightUnit; ack: boolean; onAck: () => void; onInterpret: (text: string) => Promise<VoiceCommand>
-    onSave: (cmd: VoiceCommand, day: string) => { ids: string[]; auto: boolean }; onUndo: (ids: string[]) => { retracted: boolean }
-    onEdit: (draft: GymDraft) => void; onIncomplete: (draft: GymDraft, missing: VoiceMissing[]) => void }
+  onCapture: () => void // «+» y «Dictar»: abre la captura por voz
+  onWriteNew: () => void // «Añadir algo nuevo»: el formulario a mano
   weeks: BranchWeek[]
   partyStates: PartyState[]
   archived: Tracker[]
@@ -77,7 +73,7 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
 const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
 const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
 
-export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, today, voice, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, onCapture, onWriteNew, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const mode = useRef<'replace' | 'merge'>('replace')
   const hoyRef = useRef<HTMLHeadingElement>(null)
@@ -108,7 +104,7 @@ export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, today, 
         <span className="pointer-events-none absolute top-4 left-1/2 -translate-x-1/2 rounded-full border border-app-border bg-app-surface px-3 py-1 text-sm font-semibold whitespace-nowrap tabular-nums shadow-sm">
           PLAYER Lv. {game.player.level}
         </span>
-        <button type="button" onClick={() => onNavigate('new')} aria-label="Añadir actividad nueva"
+        <button type="button" onClick={onCapture} aria-label="Apuntar por voz"
           className="group absolute top-1/2 left-1/2 grid size-[72px] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full shadow-lg transition duration-150 hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-app-text motion-reduce:transition-none"
           style={{ background: 'conic-gradient(var(--color-hero-surface) 0 50%, var(--color-villain-bg) 0)' }}>
           <span className="grid size-[58px] place-items-center rounded-full bg-app-surface">
@@ -141,7 +137,7 @@ export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, today, 
         )}
         <section aria-labelledby="hoy" className="rise flex flex-col gap-3 rounded-xl border border-app-border bg-app-surface p-4 shadow-sm sm:p-5 lg:col-span-2">
           <h2 id="hoy" ref={hoyRef} tabIndex={-1} className="text-lg font-semibold">Hoy</h2>
-          <VoiceLog tone="app" day={today} today={today} {...voice} />
+          <button type="button" onClick={onCapture} className={`${VT.app.primary} self-start`}><Mic className="size-4" aria-hidden />Dictar</button>
           {summary.done.length === 0
             ? <p className="text-sm text-app-muted">Aún nada hoy.</p>
             : <p className="text-sm font-semibold tabular-nums text-app-text">
@@ -259,7 +255,7 @@ export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, today, 
             </section>
           )}
 
-          <button type="button" onClick={() => onNavigate('new')}
+          <button type="button" onClick={onWriteNew}
             className={`${btn} w-full border border-app-border bg-transparent text-app-text outline-app-text hover:bg-app-surface`}>
             <Sparkles className="size-4" aria-hidden /> Añadir algo nuevo
           </button>

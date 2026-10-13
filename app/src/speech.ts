@@ -96,3 +96,13 @@ export function listenOnce({ lang, timeoutMs = 8000, onEvent }: { lang: string; 
   try { rec.start() } catch (e) { err = 'other'; detail = e instanceof Error ? e.message : String(e); finish() }
   return { result, stop }
 }
+
+export type ListenStart = { mode: 'listen'; result: Promise<SpeechOutcome>; stop(): void } | { mode: 'text'; reason: 'offline' | 'no-api' | null }
+// Empieza a escuchar o, si no se puede (sin conexión, sin API o iOS con KEYBOARD_ON_IOS), pide el campo de texto.
+// Hay que llamarla de forma síncrona dentro del gesto del usuario (iOS).
+export function beginListen(): ListenStart {
+  if (navigator.onLine === false) return { mode: 'text', reason: 'offline' }
+  if (!speechSupported()) return { mode: 'text', reason: 'no-api' }
+  if (keyboardFirst()) return { mode: 'text', reason: null }
+  return { mode: 'listen', ...listenOnce({ lang: speechLang() }) }
+}

@@ -26,7 +26,8 @@ test('A1 home vacía', async () => { render(<App />); expect(await serious()).to
 test('A2 home con ejemplo', async () => { render(<App />); example(); expect(await serious()).toEqual([]) })
 test('A3 HERO', async () => { render(<App />); example(); go('HERO'); expect(await serious()).toEqual([]) })
 test('A4 VILLAIN', async () => { render(<App />); example(); go('VILLAIN'); expect(await serious()).toEqual([]) })
-test('A5 Nuevo', async () => { render(<App />); go('Nuevo'); expect(await serious()).toEqual([]) })
+test('A5 Nuevo: captura con el aviso de privacidad', async () => { render(<App />); go('Nuevo'); expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy(); expect(await serious()).toEqual([]) })
+test('A-C1 Nuevo a mano', async () => { render(<App />); go('Nuevo'); fireEvent.click(screen.getByRole('button', { name: 'Escribir a mano' })); expect(await serious()).toEqual([]) })
 test('A6 Party', async () => { render(<App />); example(); go('Party'); expect(await serious()).toEqual([]) })
 
 test('U19 liveText de banners', () => {
@@ -104,9 +105,10 @@ test('A11 Gym con el aviso de privacidad de la voz y con la tarjeta del resultad
   } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
 })
 
-test('A13 Inicio con el campo de texto de voz abierto', async () => {
+test('A13 captura con el campo de texto abierto', async () => {
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
   render(<App />)
-  fireEvent.click(screen.getByRole('button', { name: 'Escribir' }))
-  expect(screen.getByLabelText('Serie')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar' })) // sin API de voz: abre el campo de texto
+  expect(screen.getByLabelText('¿Qué has hecho hoy?')).toBeTruthy()
   expect(await serious()).toEqual([])
 })

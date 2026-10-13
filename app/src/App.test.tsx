@@ -421,7 +421,7 @@ test('U16 archivar guarda cambios válidos', () => {
 
 test('U17 duplicado de archivada en Nuevo', () => {
   localStorage.setItem(CU, JSON.stringify({ trackers: [{ ...base, archived: true }], proposals: [] }))
-  render(<App />); go('Nuevo')
+  render(<App />); go('Nuevo'); fireEvent.click(btn('Escribir a mano'))
   fireEvent.change(screen.getByLabelText('¿Qué has hecho?'), { target: { value: 'meditar' } })
   expect(screen.getByText(/Ya tienes «Meditar» \(archivada\)/)).toBeTruthy()
   expect((screen.getByRole('button', { name: /Analizar con IA/ }) as HTMLButtonElement).disabled).toBe(true)
@@ -959,6 +959,7 @@ const gymLog = () => JSON.parse(localStorage.getItem('life-rpg-gym-v1') ?? '{"lo
 const liveGym = () => { const l = gymLog(); const u = new Set(l.filter(e => e.undoes).map(e => e.undoes)); return l.filter(e => !e.undoes && !u.has(e.id)) }
 const gymSum = () => stored().filter((e: { trackerId: string }) => e.trackerId === 'gym').reduce((n: number, e: { amount: number }) => n + e.amount, 0)
 const dictate = (v: string | { error: string }) => { setVoz(v); fireEvent.click(btn('Dictar serie')) }
+const dictateHome = (v: string | { error: string }) => { setVoz(v); fireEvent.click(btn('Dictar')) } // «Dictar» de «Hoy»: abre la captura
 const KEY2 = 'sk-ant-test-0000000000000000'
 
 test('U-V1 primera vez: privacidad, dictar, guardar con sesion en HERO', async () => {
@@ -1102,17 +1103,17 @@ const aiReply = (o: unknown) => new Response(JSON.stringify({ stop_reason: 'end_
 
 test('U-V6 desde Hoy: guarda hoy, Deshacer la quita y el incompleto abre Gym prerrellenado', async () => {
   ackVoice(); render(<App />)
-  dictate('press banca 80 kg 5 reps')
+  dictateHome('press banca 80 kg 5 reps')
   expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
-  expect(screen.getByRole('button', { name: /^Gym.*1 serie · 1 ejercicio$/ })).toBeTruthy()
   await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
   expect(liveGym()[0].occurredAt.startsWith('2026-10-07')).toBe(true)
   fireEvent.click(btn('Deshacer'))
   await vi.waitFor(() => expect(liveGym()).toHaveLength(0))
   expect(liveGym()).toHaveLength(0)
+  go('Inicio')
   expect(screen.queryByRole('button', { name: /^Gym.*serie/ })).toBeNull()
   // incompleto: abre Gym con el formulario rellenado
-  dictate('press banca 80')
+  dictateHome('press banca 80')
   expect(await screen.findByRole('heading', { name: 'Gym', level: 1 })).toBeTruthy()
   expect((screen.getByLabelText(/^Peso \(/) as HTMLInputElement).value).toBe('80')
   expect(screen.getByText('Faltan las repeticiones. Completa el formulario.')).toBeTruthy()
@@ -1124,7 +1125,7 @@ test('U-V6 desde Hoy: guarda hoy, Deshacer la quita y el incompleto abre Gym pre
 
 test('U-V6b Editar desde Hoy abre Gym con el formulario del comando deshecho', async () => {
   ackVoice(); render(<App />)
-  dictate('press banca 80 kg 3x5')
+  dictateHome('press banca 80 kg 3x5')
   await screen.findByText(/^Registrado:/)
   fireEvent.click(btn('Editar'))
   await vi.waitFor(() => expect(liveGym()).toHaveLength(0))
@@ -1135,11 +1136,12 @@ test('U-V6b Editar desde Hoy abre Gym con el formulario del comando deshecho', a
 
 test('U-V7 con clave, la IA resuelve una frase rara desde Hoy', async () => {
   ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
-  const f = vi.fn().mockResolvedValue(aiReply({ exerciseId: 'leg-press', weight: 100, unit: 'none', reps: 10, sets: 1 }))
+  const f = vi.fn().mockResolvedValue(aiReply({ kind: 'gym', otherDay: false, exerciseId: 'leg-press', weight: 100, weightUnit: 'none', reps: 10, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+      name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }))
   vi.stubGlobal('fetch', f)
   try {
     render(<App />)
-    dictate('la máquina de piernas 100 10')
+    dictateHome('la máquina de piernas 100 10')
     expect(await screen.findByText(/^Registrado: Prensa · 100 kg × 10/)).toBeTruthy()
     expect(f).toHaveBeenCalledTimes(1)
     const [url, init] = f.mock.calls[0] as [string, RequestInit]
@@ -1165,4 +1167,41 @@ test('U-V15 idioma del dictado: español por defecto aunque el sistema esté en 
     fireEvent.click(btn('Probar voz'))
     await vi.waitFor(() => expect(win.__lang).toBe('en-US'))
   } finally { nav.mockRestore(); delete win.__lang }
+})
+
+// ---- Captura por voz (ciclo 27) ----
+test('U-C0 «+» y «Nuevo» escuchan en el mismo clic; sin aviso aceptado sale la privacidad; sin API, el campo de texto', async () => {
+  ackVoice(); setVoz('press banca 80 kg 5 reps')
+  render(<App />)
+  fireEvent.click(btn('Apuntar por voz'))
+  expect(win.__lang).toBe('es-ES') // ya escuchando, antes de cualquier await
+  expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
+  delete win.__lang
+  go('Inicio'); go('Nuevo')
+  expect(win.__lang).toBe('es-ES')
+  await screen.findByText(/^Registrado: Press banca/)
+  cleanup(); localStorage.clear(); delete win.__lang
+  render(<App />); fireEvent.click(btn('Apuntar por voz'))
+  expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy()
+  expect(win.__lang).toBeUndefined()
+  cleanup(); ackVoice(); delete win.webkitSpeechRecognition
+  render(<App />); fireEvent.click(btn('Dictar'))
+  expect(screen.getByLabelText('¿Qué has hecho hoy?')).toBeTruthy()
+  expect(screen.getByText(/Este navegador no puede reconocer la voz/)).toBeTruthy()
+})
+
+test('U-C5 otro día: no guarda nada', async () => {
+  ackVoice(); render(<App />)
+  setVoz('ayer leí 20 páginas'); const before = JSON.stringify(Object.entries(localStorage))
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Por voz solo se apunta hoy. Para otro día, hazlo a mano.')).toBeTruthy()
+  expect(JSON.stringify(Object.entries(localStorage))).toBe(before)
+})
+
+test('U-C8 Escribir a mano abre el formulario con lo oído', async () => {
+  ackVoice(); render(<App />)
+  setVoz('de la'); fireEvent.click(btn('Dictar'))
+  await screen.findByText('No se ha entendido qué apuntar. Prueba otra vez o escríbelo a mano.')
+  fireEvent.click(btn('Escribir a mano'))
+  expect((screen.getByLabelText('¿Qué has hecho?') as HTMLInputElement).value).toBe('de la')
 })
