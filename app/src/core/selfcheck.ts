@@ -9,6 +9,7 @@ import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { voicePrompt, voiceSchema } from './haiku'
+import { captureNorm, convNote, isOtherDay, isReady, routeCapture, type CaptureCtx } from './capture'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -604,6 +605,37 @@ export function runSelfCheck() {
       ok(JSON.stringify(sch.properties.exerciseId.enum) === '["a","b","none"]' && sch.required.length === 5 && sch.additionalProperties === false &&
         pr.includes('<frase>a  b  c</frase>') && pr.includes('a: X  Y (carga)') && !pr.includes('<b>'), 'VZ16 esquema y prompt')
     }
+  }
+
+  // CV1–CV11 — captura por voz: router determinista
+  {
+    const mk = (name: string, type: Tracker['type'], unit?: string) => createTracker({ name, branch: 'hero', type, xpPerUnit: 1, unit }, `custom-${name}`)
+    const archived = { ...mk('Ajedrez', 'duration'), archived: true }
+    const act = [...TRACKERS, mk('Theatre', 'count'), mk('Offline', 'count'), mk('Mindfulness', 'duration'), mk('Cómics', 'custom', 'páginas')]
+    const ctx: CaptureCtx = { exercises: EXERCISES, trackers: act, all: [...act, archived], unit: 'kg' }
+    const f = (t: string): string => {
+      const c = routeCapture(t, ctx)
+      if (c.kind === 'gym') return `gym/${c.draft.exerciseId}/${c.draft.weight}x${c.draft.reps}/${isComplete(c.draft, EXERCISES)}`
+      if (c.kind === 'tracker') return `tracker/${c.trackerId}/${c.amount}/${c.problem}`
+      if (c.kind === 'new') return `new/${c.habit.name}/${c.habit.type}${c.habit.unit ? `:${c.habit.unit}` : ''}/${c.habit.amount}/${c.habit.confidence}${c.habit.archivedDup ? `/dup:${c.habit.archivedDup}` : ''}`
+      return c.kind
+    }
+    ok(f('80kg bench press 5 reps') === 'gym/bench-press/80x5/true' && f('Read 50 pages of the name of the wind') === 'tracker/reading/100/null' &&
+      ['ate a burguer', 'eat a burguer', 'burguer'].every(t => f(t) === 'tracker/burgers/1/null') && f('grounding 30 min') === 'new/Grounding/duration/30/baja', 'CV1 aceptación')
+    ok(f('comí una hamburguesa') === 'tracker/burgers/1/null' && f('he leído 20 páginas') === 'tracker/reading/40/null' && f('30 minutos de grounding') === 'new/Grounding/duration/30/baja' &&
+      f('I read for 1 hour') === 'tracker/reading/60/null' && f('media hora de lectura') === 'tracker/reading/30/null' && f('corrí 5 km') === 'tracker/running/5/null' &&
+      f('drank 3 beers') === 'tracker/beer/3/null' && f('dos cervezas') === 'tracker/beer/2/null' && f('fui al gimnasio') === 'tracker/gym/1/null', 'CV2 variantes ES/EN')
+    ok(['ayer leí 20 páginas', 'yesterday I ate a burger', 'mañana correré 5 km', 'el otro día fui al gym', 'the other day I ran 5 km', 'hace dos días bebí 3 cervezas', 'el lunes corrí 5 km'].every(t => f(t) === 'other-day') &&
+      f('esta mañana corrí 5 km') === 'tracker/running/5/null' && f('this morning I read 10 pages') === 'tracker/reading/20/null', 'CV3 otro día')
+    ok(f('cómics 10 páginas') === 'tracker/custom-Cómics/10/null' && f('corrí 30 minutos') === 'tracker/running/null/unit' && f('gym 1 hora') === 'tracker/gym/null/unit' &&
+      f('leí 2 km') === 'tracker/reading/null/unit' && convNote({ value: 50, family: 'pages', word: 'pages' }, 100) === '50 páginas ≈ 100 min', 'CV4 páginas → min solo en Reading')
+    ok(!f('the cat of a neighbour').startsWith('tracker') && !f('30 min de grounding').startsWith('tracker') && f('a theatre play') === 'tracker/custom-Theatre/1/null', 'CV5 stopwords')
+    ok(f('bench press 80 kg 5 reps at the gym') === 'gym/bench-press/80x5/true' && f('fui al gym') === 'tracker/gym/1/null', 'CV6 orden: un ejercicio gana al hábito')
+    ok(f('fui a bjj') === 'tracker/bjj/1/null' && f('leí un libro') === 'tracker/reading/30/null' && f('corrí 5') === 'tracker/running/5/null' && f('corrí 5,5 km') === 'tracker/running/6/null' &&
+      f('leí 5000 minutos') === 'tracker/reading/null/range' && f('3 cervezas') === 'tracker/beer/3/null', 'CV7 cantidades')
+    ok(f('medité 10 minutos') === 'new/Medité/duration/10/baja' && f('hice 20 flexiones') === 'new/Flexiones/count/20/baja' && f('3 vasos de agua') === 'new/Agua/custom:vasos/3/media' &&
+      f('ajedrez 1 hora') === 'new/Ajedrez/duration/60/baja/dup:Ajedrez' && !isReady(routeCapture('ajedrez 1 hora', ctx), ctx), 'CV10 nombre del hábito nuevo')
+    ok(captureNorm('una hora') === '1 hora' && captureNorm('half an hour') === '30 min' && isOtherDay(captureNorm('el viernes')) && !isOtherDay(captureNorm('esta mañana')), 'CV11 captureNorm e isOtherDay')
   }
 
   console.info('[selfcheck] done')

@@ -10,8 +10,6 @@ export type GymDraft = {
   reps: number | null     // entero 1..999
   sets: number            // series iguales; válido 1..MAX_VOICE_SETS (fuera de rango → incompleto)
 }
-// ponytail: un solo `kind`. Para otros trackers: `| { kind: 'tracker'; text; trackerId: string | null; amount: number | null; source }`
-// y un `interpret(text, ctx)` que despache por kind. No se implementa ahora.
 // (HaikuError se define aquí y `haiku.ts` lo reexporta: así `voice.ts` no importa de `haiku.ts`, que sí importa de este módulo.)
 export type HaikuError = 'auth' | 'rate' | 'bad-request' | 'http' | 'network' | 'timeout' | 'refusal' | 'invalid'
 export type VoiceCommand = { kind: 'gym'; text: string; draft: GymDraft; source: 'ai' | 'parser'; aiError?: HaikuError }
