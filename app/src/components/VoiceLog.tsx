@@ -2,13 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { CircleAlert, Keyboard, Mic } from 'lucide-react'
 import type { Exercise, WeightUnit } from '../core/types'
-import { MAX_VOICE_SETS, VOICE_MAX_CHARS, draftText, isComplete, type GymDraft, type VoiceCommand } from '../core/voice'
+import { VOICE_MAX_CHARS, draftText, isComplete, type GymDraft, type VoiceCommand } from '../core/voice'
 import { dayLabel } from '../core/stats'
-import { keyboardFirst, listenOnce, speechLang, speechSupported, type SpeechError } from '../speech'
+import { keyboardFirst, listenOnce, speechLang, speechSupported } from '../speech'
 import { VT, type VoiceTone } from './voiceTone'
 import { VoicePrivacy } from './VoicePrivacy'
+import { noApiText, offlineText, speechErrorText } from './voiceErrors'
+import { missingOf, type VoiceMissing } from './voiceNotes'
 
-export type VoiceMissing = 'exercise' | 'weight' | 'reps' | 'sets'
+export type { VoiceMissing }
 
 type Props = {
   tone: VoiceTone
@@ -26,31 +28,6 @@ type Props = {
 }
 type Saved = { cmd: VoiceCommand; ids: string[]; auto: boolean; day: string }
 type Mode = 'idle' | 'privacy' | 'listening' | 'processing' | 'saved' | 'undone' | 'text'
-
-const ERRORS: Record<SpeechError, (d?: string) => string | null> = {
-  'not-allowed': () => 'No hay permiso para el micrófono o el reconocimiento de voz. Escribe la serie o revisa los permisos (en el iPhone: Siri y Dictado activados).',
-  'service-not-allowed': () => 'No hay permiso para el micrófono o el reconocimiento de voz. Escribe la serie o revisa los permisos (en el iPhone: Siri y Dictado activados).',
-  'no-speech': () => 'No se ha oído nada. Vuelve a intentarlo o escribe la serie.',
-  'no-result': () => 'No se ha oído nada. Vuelve a intentarlo o escribe la serie.',
-  timeout: () => 'No se ha oído nada. Vuelve a intentarlo o escribe la serie.',
-  'audio-capture': () => 'No se encuentra el micrófono.',
-  network: () => 'Sin conexión: el reconocimiento de voz necesita internet. Escribe la serie.',
-  'not-supported': () => 'Este navegador no puede reconocer la voz. Escribe la serie.',
-  other: d => `No se ha podido reconocer la voz (${d ?? 'error desconocido'}).`,
-  aborted: () => null,
-}
-const OFFLINE_TEXT = 'Sin conexión: el reconocimiento de voz necesita internet. Escribe la serie.'
-const NO_API_TEXT = 'Este navegador no puede reconocer la voz. Escribe la serie.'
-
-function missingOf(d: GymDraft, exercises: Exercise[]): VoiceMissing[] {
-  const e = exercises.find(x => x.id === d.exerciseId)
-  const out: VoiceMissing[] = []
-  if (!e) out.push('exercise')
-  if (d.weight === null || (e?.kind === 'load' && d.weight <= 0)) out.push('weight')
-  if (d.reps === null) out.push('reps')
-  if (!Number.isInteger(d.sets) || d.sets < 1 || d.sets > MAX_VOICE_SETS) out.push('sets')
-  return out
-}
 
 // Micro + «Escribir»: dicta (o escribe) una serie y la guarda directamente; si falta algo, abre el formulario. Los callbacks se
 // guardan en una ref y se llaman desde ella tras cualquier `await`: los de un render antiguo pisarían cambios hechos mientras tanto.
@@ -102,7 +79,7 @@ export function VoiceLog(props: Props) {
     stopRef.current = null
     if (!alive.current) return
     if (!o.ok) {
-      const msg = ERRORS[o.error](o.detail)
+      const msg = speechErrorText(o.error, o.detail, 'la serie')
       if (msg === null) return setMode('idle')
       return openTextLater(msg)
     }
@@ -112,8 +89,8 @@ export function VoiceLog(props: Props) {
   // ponytail: si no hay API de voz, sin conexión o el valor de KEYBOARD_ON_IOS lo indica, se abre el campo de texto directamente.
   // Cualquier error del reconocimiento cae también al campo, enfocado y con el motivo (ver ERRORS).
   function begin() {
-    if (navigator.onLine === false) return openText(OFFLINE_TEXT)
-    if (!speechSupported() || keyboardFirst()) return openText(speechSupported() ? null : NO_API_TEXT)
+    if (navigator.onLine === false) return openText(offlineText('la serie'))
+    if (!speechSupported() || keyboardFirst()) return openText(speechSupported() ? null : noApiText('la serie'))
     void listen()
   }
   function dictate() {

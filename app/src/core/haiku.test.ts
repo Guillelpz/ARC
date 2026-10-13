@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { EXERCISES } from './gym'
-import { HAIKU_VOICE_MODEL, askHaiku, interpretGym } from './haiku'
+import { TRACKERS } from './trackers'
+import { routeCapture, type CaptureCtx } from './capture'
+import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretGym } from './haiku'
 
 const KEY = 'sk-ant-test-0000000000000000'
 const reply = (o: unknown, extra: Record<string, unknown> = {}) => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(o) }], ...extra })
@@ -72,5 +74,50 @@ describe('interpretGym', () => {
     expect(full).toMatchObject({ source: 'ai', draft: { exerciseId: 'leg-press', weight: 100, reps: 10 } })
     const hole = await interpretGym('press banca 80 5', EXERCISES, 'kg', KEY, true, mock(() => ok(reply({ ...bench, reps: null }))))
     expect(hole).toMatchObject({ source: 'parser', draft: { reps: 5 } })
+  })
+})
+
+describe('captura', () => {
+  const act = TRACKERS
+  const ctx: CaptureCtx = { exercises: EXERCISES, trackers: act, all: act, unit: 'kg' }
+  const cap = { kind: 'none', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+    name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }
+  const newAlta = { ...cap, kind: 'new', name: 'Grounding', branch: 'hero', confidence: 'alta', type: 'duration', amount: 30, amountUnit: 'min', unitWord: 'min', reason: 'Bienestar' }
+  const run = (t: string, f: typeof fetch, key: string | null = KEY, online = true) => interpretCapture(t, ctx, key, online, f)
+
+  test('la peticion exacta de askCapture', async () => {
+    const f = mock(() => ok(reply(newAlta)))
+    const r = await askCapture('grounding 30 min', ctx, KEY, f)
+    expect(r.ok).toBe(true)
+    const [url, init] = f.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe('https://api.anthropic.com/v1/messages')
+    const body = JSON.parse(init.body as string)
+    expect(body.model).toBe('claude-haiku-5-5'); expect(body.max_tokens).toBe(400)
+    expect(body.thinking).toEqual({ type: 'disabled' })
+    expect(body.output_config.format.schema.properties.exerciseId.enum).toEqual([...EXERCISES.map(e => e.id), 'none'])
+    expect(body.output_config.format.schema.properties.trackerId.enum).toEqual([...act.map(t => t.id), 'none'])
+    expect(body.messages[0].content).toContain('<frase>grounding 30 min</frase>')
+    expect(body.messages[0].content).toContain('reading: Reading · HERO · min')
+    expect(JSON.stringify(body)).not.toContain(KEY)
+  })
+  test('sin clave u offline no llama a fetch y devuelve el router', async () => {
+    const f = mock(() => ok(reply(newAlta)))
+    const a = await run('ate a burguer', f, null), b = await run('ate a burguer', f, KEY, false)
+    expect(f).not.toHaveBeenCalled()
+    expect(a).toEqual(routeCapture('ate a burguer', ctx)); expect(b).toEqual(a)
+    expect(a).toMatchObject({ kind: 'tracker', trackerId: 'burgers', amount: 1, source: 'parser' })
+    expect(a).not.toHaveProperty('aiError')
+  })
+  test('un 401 deja el parser con aiError auth', async () => {
+    const r = await run('ate a burguer', mock(() => ok({}, 401)))
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'auth' })
+  })
+  test('la IA new alta llega tal cual', async () => {
+    const r = await run('grounding 30 min', mock(() => ok(reply(newAlta))))
+    expect(r).toMatchObject({ kind: 'new', source: 'ai', habit: { name: 'Grounding', type: 'duration', amount: 30, confidence: 'alta', branch: 'hero' } })
+  })
+  test('la IA con trackerId inventado cae al parser', async () => {
+    const r = await run('ate a burguer', mock(() => ok(reply({ ...cap, kind: 'tracker', trackerId: 'ghost' }))))
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'invalid' })
   })
 })

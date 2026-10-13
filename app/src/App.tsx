@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { transition } from './viewTransition'
 import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
@@ -6,7 +6,10 @@ import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
 import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
-import { askHaiku, interpretGym, type HaikuError } from './core/haiku'
+import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
+import type { CaptureCommand, NewHabit } from './core/capture'
+import { TYPE_DEFAULTS, createTracker } from './core/classify'
+import { beginListen } from './speech'
 import type { GymDraft, VoiceCommand } from './core/voice'
 import { deriveGame, diffLevelDowns, diffLevelUps } from './core/rpg'
 import { allTrackers, defaultGoal, logGoal, setGoal, setLimit } from './core/trackers'
@@ -15,10 +18,11 @@ import { BottomNav, type Screen } from './components/BottomNav'
 import { HomeView } from './components/HomeView'
 import { MissionsView } from './components/MissionsView'
 import { UnknownView } from './components/UnknownView'
+import { CaptureView, type CaptureStart } from './components/CaptureView'
 import { PartyView } from './components/PartyView'
 import { editNote, incompleteNote } from './components/voiceNotes'
 import { MeView } from './components/MeView'
-import type { VoiceMissing } from './components/VoiceLog'
+import type { VoiceMissing } from './components/voiceNotes'
 import { GymView } from './components/GymView'
 import type { Gain } from './components/TrackerCard'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
@@ -52,6 +56,10 @@ export default function App() {
   const [focusHoy, setFocusHoy] = useState(false) // true al volver de Gym abierto desde «Hoy»: el foco va al encabezado «Hoy»
   const [gymFrom, setGymFrom] = useState<'me' | 'home'>('me')
   const [gymPrefill, setGymPrefill] = useState<{ draft: GymDraft; note: string } | null>(null) // borrador de la voz en «Hoy» que abre Gym prerrellenado
+  const [newMode, setNewMode] = useState<'capture' | 'manual'>('capture') // pantalla «Nuevo»: captura por voz o formulario a mano
+  const [manualText, setManualText] = useState('')
+  const [capture, setCapture] = useState<{ key: number; start: CaptureStart }>({ key: 0, start: { mode: 'idle' } })
+  const captureBusy = useRef(false)
   const [partyId, setPartyId] = useState(PARTIES[0].id)
   const [toast, setToast] = useState<Toast | null>(null)
   const [gain, setGain] = useState<Gain | null>(null)
@@ -151,16 +159,24 @@ export default function App() {
     transition(() => { setScreen(s); window.scrollTo(0, 0) }, 'screen')
   }
 
-  const goTo = (s: Screen) => { setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go(s) }
+  // Se llama SÍNCRONO desde el onClick (+, Nuevo, Dictar): el reconocimiento tiene que arrancar dentro del gesto (iOS), antes de la transición.
+  function openCapture() {
+    if (captureBusy.current && screen === 'new' && newMode === 'capture') return // ya escucha o procesa: solo se navega
+    const start: CaptureStart = voiceAck ? beginListen() : { mode: 'privacy' }
+    setCapture(c => ({ key: c.key + 1, start })); setNewMode('capture')
+    setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go('new')
+  }
+  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go('new') }
+  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go(s) }
   const openGym = (from: 'me' | 'home') => { setGymFrom(from); goTo('gym') }
   const backFromGym = () => { setGymPrefill(null); if (gymFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusGym(true); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
-  function push(evs: ActivityEvent[], t: Tracker) {
+  function push(evs: ActivityEvent[], t: Tracker, list = trackers) {
     const next = [...events, ...evs]
     const amount = evs.reduce((n, e) => n + e.amount, 0), key = evs[evs.length - 1].id
     if (amount === 0) return setEvents(next) // neto 0 (deshacer la sesión de un día con series + sesión automática): sin XP, toast ni animación
-    const after = deriveGame(next, today, trackers)
+    const after = deriveGame(next, today, list)
     const up = amount > 0 ? diffLevelUps(game, after) : diffLevelDowns(game, after)
     setEvents(next) // evento creado fuera del updater (StrictMode)
     setGain({ trackerId: t.id, xp: amount * t.xpPerUnit, branch: t.branch, key })
@@ -168,7 +184,7 @@ export default function App() {
     // adelantamientos: tú superas a alguien (ranking HERO) o alguien te supera en HERO/VILLAIN/profundidad
     for (const [i, p] of PARTIES.entries()) {
       const before = partyStates[i]
-      const after = derivePartyState(p, next, today, trackers, custom.proposals)
+      const after = derivePartyState(p, next, today, list, custom.proposals)
       const names = overtakes(after.ranking, before.ranking)
       if (names.length) { setOvertake({ key, party: p.name, names, position: after.position }); break }
       const lost = ([t.branch, 'depth'] as const).map(metric => {
@@ -251,13 +267,20 @@ export default function App() {
 
   const activeExercises = allExercises(gym.exercises).filter(x => !x.archived)
   const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setGymFrom('home'); setFocusGym(false); setFocusHoy(false); go('gym') }
-  const voiceHome = {
-    exercises: activeExercises, unit: gym.unit ?? 'kg', ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets,
-    onEdit: (d: GymDraft) => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg')),
-    onIncomplete: (d: GymDraft, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing)),
-  }
+  const interpretCapt = (text: string): Promise<CaptureCommand> =>
+    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg' }, loadAiKey(), navigator.onLine !== false)
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
+
+  // Captura: apunta hoy y devuelve el evento (para «Deshacer»/«Editar»).
+  function captureAdd(trackerId: string, amount: number): ActivityEvent | null {
+    const t = trackers.find(x => x.id === trackerId)
+    const a = t ? clampAmount(events, t.id, today, amount) : 0
+    if (!t || !a) return null
+    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount: a, occurredAt: nowStamp(today) }
+    push([ev], t)
+    return ev
+  }
 
   const saveTracker = (input: Tracker) => {
     const { pastGoals: _, ...t } = input // derivado: no se persiste
@@ -286,6 +309,19 @@ export default function App() {
   const unarchive = (t: Tracker) => saveTracker({ ...t, archived: false })
   const archived = useMemo(() => custom.trackers.filter(t => t.archived), [custom.trackers])
   const create = (t: Tracker) => setCustom(c => ({ ...c, trackers: [...c.trackers, t] }))
+
+  // Captura: hábito nuevo + su primer registro; el deshacer lo archiva (no se borra: «Reactivar» lo recupera).
+  function captureCreate(h: NewHabit): { tracker: Tracker; event: ActivityEvent } {
+    const t = createTracker({ name: h.name, branch: h.branch, type: h.type, unit: h.unit, xpPerUnit: TYPE_DEFAULTS[h.type].xpPerUnit }, `custom-${crypto.randomUUID()}`)
+    create(t)
+    const event: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount: h.amount ?? 1, occurredAt: nowStamp(today) }
+    push([event], t, [...trackers, t])
+    return { tracker: t, event }
+  }
+  function undoCreate(t: Tracker, ev: ActivityEvent) {
+    add(t, -ev.amount, today, ev)
+    saveTracker({ ...t, archived: true })
+  }
 
   function propose(trackerId: string, partyIds: string[]) {
     const now = nowStamp()
@@ -385,7 +421,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} focusHoy={focusHoy} today={today} voice={voiceHome} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
@@ -394,7 +430,12 @@ export default function App() {
         <MissionsView key={screen} branch={screen} game={game} partyStates={partyStates} gain={gain} events={events} today={today} onAdd={add} onUndo={undo} onSave={saveTracker} onPropose={propose} saveFailed={saveFailed} onExport={exportData} />
       )}
       {screen === 'new' && (
-        <UnknownView trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
+        newMode === 'capture'
+          ? <CaptureView key={capture.key} start={capture.start} onConsumed={() => setCapture(c => ({ ...c, start: { mode: 'idle' } }))} ack={voiceAck} onAck={ackVoice}
+              trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
+              onGymEdit={d => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg'))} onGymIncomplete={(d, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing))}
+              onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }} />
+          : <UnknownView key={manualText} initialText={manualText} trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
       )}
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />

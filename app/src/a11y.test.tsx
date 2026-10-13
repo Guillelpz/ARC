@@ -26,7 +26,8 @@ test('A1 home vacía', async () => { render(<App />); expect(await serious()).to
 test('A2 home con ejemplo', async () => { render(<App />); example(); expect(await serious()).toEqual([]) })
 test('A3 HERO', async () => { render(<App />); example(); go('HERO'); expect(await serious()).toEqual([]) })
 test('A4 VILLAIN', async () => { render(<App />); example(); go('VILLAIN'); expect(await serious()).toEqual([]) })
-test('A5 Nuevo', async () => { render(<App />); go('Nuevo'); expect(await serious()).toEqual([]) })
+test('A5 Nuevo: captura con el aviso de privacidad', async () => { render(<App />); go('Nuevo'); expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy(); expect(await serious()).toEqual([]) })
+test('A-C1 Nuevo a mano', async () => { render(<App />); go('Nuevo'); fireEvent.click(screen.getByRole('button', { name: 'Escribir a mano' })); expect(await serious()).toEqual([]) })
 test('A6 Party', async () => { render(<App />); example(); go('Party'); expect(await serious()).toEqual([]) })
 
 test('U19 liveText de banners', () => {
@@ -104,9 +105,43 @@ test('A11 Gym con el aviso de privacidad de la voz y con la tarjeta del resultad
   } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
 })
 
-test('A13 Inicio con el campo de texto de voz abierto', async () => {
+test('A13 captura con el campo de texto abierto', async () => {
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
   render(<App />)
-  fireEvent.click(screen.getByRole('button', { name: 'Escribir' }))
-  expect(screen.getByLabelText('Serie')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar' })) // sin API de voz: abre el campo de texto
+  expect(screen.getByLabelText('¿Qué has hecho hoy?')).toBeTruthy()
   expect(await serious()).toEqual([])
+})
+
+async function capture(said: string) {
+  class Fake {
+    lang = ''; continuous = false; interimResults = false; maxAlternatives = 1
+    onresult: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
+    start() { setTimeout(() => { this.onresult?.({ results: [Object.assign([{ transcript: said }], { isFinal: true })] }); this.onend?.() }, 0) }
+    stop() {}; abort() {}
+  }
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = Fake
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar' }))
+}
+const noSpeech = () => { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
+
+test('A-C2 propuesta de hábito nuevo en HERO y en VILLAIN', async () => {
+  try {
+    await capture('grounding 30 min')
+    expect(await screen.findByRole('heading', { name: 'Propuesta: HERO' })).toBeTruthy()
+    expect(await serious()).toEqual([])
+    fireEvent.click(within(screen.getByRole('group', { name: 'Rama' })).getByRole('button', { name: 'VILLAIN' }))
+    expect(screen.getByRole('heading', { name: 'Propuesta: VILLAIN' })).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { noSpeech() }
+})
+
+test('A-C3 resultado de un hábito existente', async () => {
+  try {
+    await capture('ate a burguer')
+    expect(await screen.findByText(/^Registrado: Burgers/)).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { noSpeech() }
 })

@@ -6,6 +6,22 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y docu
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
 - Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
+- Ciclo 27 (captura rápida por voz desde el «+») — **en curso, paso 5 (implementer)**. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
+
+## Ciclo 27 — Captura rápida por voz: gym, hábito existente o hábito nuevo
+
+Arrancado por el usuario el 2026-10-13 tras una evaluación de viabilidad en el chat (pasos 1-2 omitidos; decisiones C1-C9 aprobadas, no se reabren). Rama `cycle-27`; spec en `docs/TECH_SPEC-captura-voz.md`.
+
+- **Objetivo:** pulsar «+» → escucha en el mismo toque → transcribe → decide y registra. Ejemplos de aceptación: «80kg bench press 5 reps» → serie de Gym; «Read 50 pages of the name of the wind» → Reading +100 min; «ate a burguer» / «eat a burguer» / «burguer» → Burgers +1; «grounding 30 min» → propuesta de hábito nuevo (rama evaluada, medido en tiempo, 30 min).
+- **C1 Entradas:** el «+» de Inicio (entre HERO y VILLAIN, hoy navega a `new`) y la pestaña «Nuevo» abren la captura con el micro ya activo (el reconocimiento debe arrancar dentro del gesto: iOS). Queda «Escribir a mano» para el flujo actual de `UnknownView`. El botón «Dictar serie» de Inicio pasa a ser la captura general; el de Gym sigue solo para series.
+- **C2 Lectura:** conversión fija 1 página = 2 min (Reading sigue en minutos); el aviso muestra la conversión («50 páginas ≈ 100 min»).
+- **C3 Hábito existente:** se guarda directamente con «Deshacer» (y «Editar»), como las series del ciclo 26.
+- **C4 Hábito nuevo:** siempre tarjeta de propuesta (nombre, rama, tipo/unidad, cantidad editables). Con confianza «alta» se crea sola a los **10 s** con cuenta atrás visible; cualquier interacción con la tarjeta la cancela. Con confianza media/baja nunca se crea sola. Al crearla se apunta también la cantidad dicha.
+- **C5 Unidades libres:** la IA puede proponer tipo `custom` con unidad propia («páginas», «vasos»).
+- **C6 Solo hoy:** si la frase menciona otro día (ayer, mañana, el otro día, yesterday…), no se guarda nada y se muestra: «Por voz solo se apunta hoy. Para otro día, hazlo a mano.»
+- **C7 IA:** una única interpretación con Haiku 5.5 y la clave del usuario (camino de `haiku.ts`), que también sustituye a la clasificación por proxy de dev en este flujo; sin clave o ante fallo → router determinista en `core/` cubierto por el selfcheck. Sin dependencias nuevas, sin backend.
+- **C8 Idioma:** ES/EN; el reconocimiento usa el idioma de Ajustes (sin cambios).
+- **C9** Sin paso de party al crear por voz (se puede proponer después desde las misiones).
 
 ## Ciclo 26 — Registro de series de Gym por voz
 

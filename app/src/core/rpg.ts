@@ -39,7 +39,7 @@ function diffLevels(before: GameState, after: GameState, down: boolean): LevelDi
   const moved = (a: LevelInfo, b: LevelInfo) => (down ? b.level < a.level : b.level > a.level)
   const label = down ? 'LEVEL DOWN' : 'LEVEL UP'
   const ups = after.trackers
-    .filter((s, i) => moved(before.trackers[i].xp, s.xp))
+    .filter(s => moved(before.trackers.find(b => b.tracker.id === s.tracker.id)?.xp ?? { ...s.xp, level: 1 }, s.xp)) // un hábito recién creado no estaba antes: parte del nivel 1
     .map(s => `${s.tracker.name} Lv. ${s.xp.level}`)
   if (moved(before.hero, after.hero)) ups.push(`Hero Lv. ${after.hero.level}`)
   if (moved(before.villain, after.villain)) ups.push(`Villain Lv. ${after.villain.level}`)

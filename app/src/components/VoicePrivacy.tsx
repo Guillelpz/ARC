@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { VT, type VoiceTone } from './voiceTone'
 
-export const PRIVACY_TEXT = 'Para entender lo que dices, tu navegador envía el audio a Google (Chrome) o a Apple (Safari). Si guardas una clave de Anthropic en Ajustes, el texto reconocido se envía a Anthropic para interpretarlo. No se envía nada más.'
+export const PRIVACY_TEXT = 'Para entender lo que dices, tu navegador envía el audio a Google (Chrome) o a Apple (Safari). Si guardas una clave de Anthropic en Ajustes, el texto reconocido se envía a Anthropic para interpretarlo, junto con los nombres de tus hábitos y ejercicios. No se envía nada más.'
 
 // Aviso de privacidad de la voz: panel en línea (no modal). El foco va al encabezado al abrirse.
 export function VoicePrivacy({ tone, onAccept, onSecondary, secondaryLabel = 'Escribir' }: { tone: VoiceTone; onAccept: () => void; onSecondary: () => void; secondaryLabel?: string }) {

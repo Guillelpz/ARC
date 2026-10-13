@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
@@ -421,7 +421,7 @@ test('U16 archivar guarda cambios válidos', () => {
 
 test('U17 duplicado de archivada en Nuevo', () => {
   localStorage.setItem(CU, JSON.stringify({ trackers: [{ ...base, archived: true }], proposals: [] }))
-  render(<App />); go('Nuevo')
+  render(<App />); go('Nuevo'); fireEvent.click(btn('Escribir a mano'))
   fireEvent.change(screen.getByLabelText('¿Qué has hecho?'), { target: { value: 'meditar' } })
   expect(screen.getByText(/Ya tienes «Meditar» \(archivada\)/)).toBeTruthy()
   expect((screen.getByRole('button', { name: /Analizar con IA/ }) as HTMLButtonElement).disabled).toBe(true)
@@ -959,6 +959,7 @@ const gymLog = () => JSON.parse(localStorage.getItem('life-rpg-gym-v1') ?? '{"lo
 const liveGym = () => { const l = gymLog(); const u = new Set(l.filter(e => e.undoes).map(e => e.undoes)); return l.filter(e => !e.undoes && !u.has(e.id)) }
 const gymSum = () => stored().filter((e: { trackerId: string }) => e.trackerId === 'gym').reduce((n: number, e: { amount: number }) => n + e.amount, 0)
 const dictate = (v: string | { error: string }) => { setVoz(v); fireEvent.click(btn('Dictar serie')) }
+const dictateHome = (v: string | { error: string }) => { setVoz(v); fireEvent.click(btn('Dictar')) } // «Dictar» de «Hoy»: abre la captura
 const KEY2 = 'sk-ant-test-0000000000000000'
 
 test('U-V1 primera vez: privacidad, dictar, guardar con sesion en HERO', async () => {
@@ -1102,17 +1103,17 @@ const aiReply = (o: unknown) => new Response(JSON.stringify({ stop_reason: 'end_
 
 test('U-V6 desde Hoy: guarda hoy, Deshacer la quita y el incompleto abre Gym prerrellenado', async () => {
   ackVoice(); render(<App />)
-  dictate('press banca 80 kg 5 reps')
+  dictateHome('press banca 80 kg 5 reps')
   expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
-  expect(screen.getByRole('button', { name: /^Gym.*1 serie · 1 ejercicio$/ })).toBeTruthy()
   await vi.waitFor(() => expect(liveGym()).toHaveLength(1))
   expect(liveGym()[0].occurredAt.startsWith('2026-10-07')).toBe(true)
   fireEvent.click(btn('Deshacer'))
   await vi.waitFor(() => expect(liveGym()).toHaveLength(0))
   expect(liveGym()).toHaveLength(0)
+  go('Inicio')
   expect(screen.queryByRole('button', { name: /^Gym.*serie/ })).toBeNull()
   // incompleto: abre Gym con el formulario rellenado
-  dictate('press banca 80')
+  dictateHome('press banca 80')
   expect(await screen.findByRole('heading', { name: 'Gym', level: 1 })).toBeTruthy()
   expect((screen.getByLabelText(/^Peso \(/) as HTMLInputElement).value).toBe('80')
   expect(screen.getByText('Faltan las repeticiones. Completa el formulario.')).toBeTruthy()
@@ -1124,7 +1125,7 @@ test('U-V6 desde Hoy: guarda hoy, Deshacer la quita y el incompleto abre Gym pre
 
 test('U-V6b Editar desde Hoy abre Gym con el formulario del comando deshecho', async () => {
   ackVoice(); render(<App />)
-  dictate('press banca 80 kg 3x5')
+  dictateHome('press banca 80 kg 3x5')
   await screen.findByText(/^Registrado:/)
   fireEvent.click(btn('Editar'))
   await vi.waitFor(() => expect(liveGym()).toHaveLength(0))
@@ -1135,11 +1136,12 @@ test('U-V6b Editar desde Hoy abre Gym con el formulario del comando deshecho', a
 
 test('U-V7 con clave, la IA resuelve una frase rara desde Hoy', async () => {
   ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
-  const f = vi.fn().mockResolvedValue(aiReply({ exerciseId: 'leg-press', weight: 100, unit: 'none', reps: 10, sets: 1 }))
+  const f = vi.fn().mockResolvedValue(aiReply({ kind: 'gym', otherDay: false, exerciseId: 'leg-press', weight: 100, weightUnit: 'none', reps: 10, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+      name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }))
   vi.stubGlobal('fetch', f)
   try {
     render(<App />)
-    dictate('la máquina de piernas 100 10')
+    dictateHome('la máquina de piernas 100 10')
     expect(await screen.findByText(/^Registrado: Prensa · 100 kg × 10/)).toBeTruthy()
     expect(f).toHaveBeenCalledTimes(1)
     const [url, init] = f.mock.calls[0] as [string, RequestInit]
@@ -1165,4 +1167,163 @@ test('U-V15 idioma del dictado: español por defecto aunque el sistema esté en 
     fireEvent.click(btn('Probar voz'))
     await vi.waitFor(() => expect(win.__lang).toBe('en-US'))
   } finally { nav.mockRestore(); delete win.__lang }
+})
+
+// ---- Captura por voz (ciclo 27) ----
+test('U-C0 «+» y «Nuevo» escuchan en el mismo clic; sin aviso aceptado sale la privacidad; sin API, el campo de texto', async () => {
+  ackVoice(); setVoz('press banca 80 kg 5 reps')
+  render(<App />)
+  fireEvent.click(btn('Apuntar por voz'))
+  expect(win.__lang).toBe('es-ES') // ya escuchando, antes de cualquier await
+  expect(await screen.findByText(/^Registrado: Press banca · 80 kg × 5/)).toBeTruthy()
+  delete win.__lang
+  go('Inicio'); go('Nuevo')
+  expect(win.__lang).toBe('es-ES')
+  await screen.findByText(/^Registrado: Press banca/)
+  cleanup(); localStorage.clear(); delete win.__lang
+  render(<App />); fireEvent.click(btn('Apuntar por voz'))
+  expect(screen.getByRole('heading', { name: 'Privacidad de la voz' })).toBeTruthy()
+  expect(win.__lang).toBeUndefined()
+  cleanup(); ackVoice(); delete win.webkitSpeechRecognition
+  render(<App />); fireEvent.click(btn('Dictar'))
+  expect(screen.getByLabelText('¿Qué has hecho hoy?')).toBeTruthy()
+  expect(screen.getByText(/Este navegador no puede reconocer la voz/)).toBeTruthy()
+})
+
+test('U-C5 otro día: no guarda nada', async () => {
+  ackVoice(); render(<App />)
+  setVoz('ayer leí 20 páginas'); const before = JSON.stringify(Object.entries(localStorage))
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Por voz solo se apunta hoy. Para otro día, hazlo a mano.')).toBeTruthy()
+  expect(JSON.stringify(Object.entries(localStorage))).toBe(before)
+})
+
+test('U-C8 Escribir a mano abre el formulario con lo oído', async () => {
+  ackVoice(); render(<App />)
+  setVoz('de la'); fireEvent.click(btn('Dictar'))
+  await screen.findByText('No se ha entendido qué apuntar. Prueba otra vez o escríbelo a mano.')
+  fireEvent.click(btn('Escribir a mano'))
+  expect((screen.getByLabelText('¿Qué has hecho?') as HTMLInputElement).value).toBe('de la')
+})
+
+const net = (id: string) => stored().filter((e: { trackerId: string }) => e.trackerId === id).reduce((n: number, e: { amount: number }) => n + e.amount, 0)
+
+test('U-C1 «+»: Reading con páginas, conversión y Deshacer deja el neto en 0', async () => {
+  ackVoice(); setVoz('Read 50 pages of the name of the wind'); render(<App />)
+  fireEvent.click(btn('Apuntar por voz'))
+  expect(win.__lang).toBe('es-ES')
+  expect(await screen.findByText(/^Registrado: Reading · \+100 min · \+100 HERO XP$/)).toBeTruthy()
+  expect(screen.getByText('50 páginas ≈ 100 min')).toBeTruthy()
+  expect(stored()).toHaveLength(1)
+  expect(stored()[0]).toMatchObject({ trackerId: 'reading', amount: 100 })
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: +100 min en Reading.')).toBeTruthy()
+  expect(net('reading')).toBe(0)
+})
+
+test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto en 2', async () => {
+  ackVoice(); setVoz('ate a burguer'); render(<App />)
+  go('Nuevo')
+  expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad · \+20 VILLAIN XP$/)).toBeTruthy()
+  expect(net('burgers')).toBe(1)
+  fireEvent.click(btn('Editar'))
+  const q = screen.getByLabelText('Cantidad (unidades)') as HTMLInputElement
+  expect(q.value).toBe('1'); expect(document.activeElement).toBe(q)
+  expect(net('burgers')).toBe(0)
+  fireEvent.change(q, { target: { value: '2' } })
+  fireEvent.click(btn('Apuntar'))
+  expect(await screen.findByText(/^Registrado: Burgers · \+2 unidades/)).toBeTruthy()
+  expect(net('burgers')).toBe(2)
+})
+
+test('U-C6 unidad que no encaja: no guarda y pide la cantidad en la unidad del hábito', async () => {
+  ackVoice(); setVoz('corrí 30 minutos'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Running se mide en km: no se ha apuntado nada.')).toBeTruthy()
+  expect(stored()).toHaveLength(0)
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Cantidad (km)')))
+  fireEvent.change(screen.getByLabelText('Cantidad (km)'), { target: { value: '5' } })
+  fireEvent.click(btn('Apuntar'))
+  expect(await screen.findByText(/^Registrado: Running · \+5 km/)).toBeTruthy()
+  expect(net('running')).toBe(5)
+})
+
+const customTrackers = () => JSON.parse(localStorage.getItem(CU) ?? '{"trackers":[]}').trackers as { id: string; name: string; branch: string; type: string; unit: string; archived?: boolean }[]
+const newReply = { kind: 'new', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: 30, amountUnit: 'min', unitWord: 'min',
+  name: 'Grounding', branch: 'hero', confidence: 'alta', type: 'duration', customUnit: '', reason: 'Bienestar mental' }
+
+test('U-C3 sin clave, un hábito nuevo nunca se crea solo: propuesta editable', async () => {
+  ackVoice(); setVoz('grounding 30 min'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByRole('heading', { name: 'Propuesta: HERO' })).toBeTruthy()
+  expect(screen.getByText('Confianza baja')).toBeTruthy()
+  expect(screen.queryByText(/Se crea sola/)).toBeNull()
+  expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Grounding')
+  expect((screen.getByLabelText('Cantidad (min)') as HTMLInputElement).value).toBe('30')
+  fireEvent.click(within(screen.getByRole('group', { name: 'Rama' })).getByRole('button', { name: 'VILLAIN' }))
+  expect(screen.getByRole('heading', { name: 'Propuesta: VILLAIN' })).toBeTruthy()
+  fireEvent.click(btn('Crear y apuntar'))
+  expect(await screen.findByText(/^Creada: Grounding \(VILLAIN\) · \+30 min\.$/)).toBeTruthy()
+  expect(customTrackers()).toHaveLength(1)
+  expect(customTrackers()[0]).toMatchObject({ name: 'Grounding', branch: 'villain', type: 'duration' })
+  expect(stored()).toHaveLength(1)
+  expect(stored()[0]).toMatchObject({ trackerId: customTrackers()[0].id, amount: 30 })
+  expect(screen.queryByText('¿A qué parties la propones?')).toBeNull()
+})
+
+const settle = async () => { for (let i = 0; i < 6; i++) await act(async () => { await vi.advanceTimersByTimeAsync(0) }) }
+const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync(ms) })
+async function dictateNewWithKey() {
+  ackVoice(); setVoz('grounding 30 min'); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(aiReply(newReply)))
+  vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] }); vi.setSystemTime(new Date(2026, 9, 7, 12, 0, 0))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  await settle()
+}
+
+test('U-C4 con clave y confianza alta, la propuesta se crea sola a los 10 s', async () => {
+  try {
+    await dictateNewWithKey()
+    expect(screen.getByRole('heading', { name: 'Propuesta: HERO' })).toBeTruthy()
+    expect(screen.getByText('Confianza alta')).toBeTruthy()
+    expect(screen.getByText(/Se crea sola en/)).toBeTruthy()
+    expect(screen.getByText('Se creará sola en 10 segundos. Toca la tarjeta para revisarla.')).toBeTruthy()
+    for (let i = 0; i < 9; i++) await tick(1000)
+    expect(customTrackers()).toHaveLength(0)
+    await tick(1000)
+    expect(customTrackers()).toHaveLength(1)
+    expect(customTrackers()[0]).toMatchObject({ name: 'Grounding', branch: 'hero', type: 'duration' })
+    expect(stored()[0]).toMatchObject({ amount: 30 })
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-C4b tocar la tarjeta cancela la cuenta atrás', async () => {
+  try {
+    await dictateNewWithKey()
+    for (let i = 0; i < 3; i++) await tick(1000)
+    fireEvent.change(screen.getByLabelText('Nombre'), { target: { value: 'Grounding diario' } })
+    for (let i = 0; i < 12; i++) await tick(1000)
+    expect(customTrackers()).toHaveLength(0)
+    expect(screen.queryByText(/Se crea sola/)).toBeNull()
+    expect(screen.getByText('Cuenta atrás parada. Revisa la propuesta.')).toBeTruthy()
+    fireEvent.click(btn('Crear y apuntar'))
+    expect(customTrackers()[0].name).toBe('Grounding diario')
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-C7 Deshacer un hábito recién creado lo archiva y anula el registro', async () => {
+  ackVoice(); setVoz('grounding 30 min'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  await screen.findByRole('heading', { name: 'Propuesta: HERO' })
+  fireEvent.click(btn('Crear y apuntar'))
+  await screen.findByText(/^Creada: Grounding/)
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: Grounding archivada y registro anulado.')).toBeTruthy()
+  const id = customTrackers()[0].id
+  expect(customTrackers()[0].archived).toBe(true)
+  expect(net(id)).toBe(0)
+  go('Inicio')
+  expect(screen.getByRole('heading', { name: 'Archivadas' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Reactivar Grounding' })).toBeTruthy()
 })

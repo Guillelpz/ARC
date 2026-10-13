@@ -14,7 +14,7 @@ export const TYPE_DEFAULTS = {
   count: { unit: 'unidades', increment: 1, xpPerUnit: 20 },
   distance: { unit: 'km', increment: 5, xpPerUnit: 5 },
   duration: { unit: 'min', increment: 30, xpPerUnit: 1 },
-  custom: { unit: '', increment: 1, xpPerUnit: 10 }, // unidad la escribe el usuario; la IA nunca propone este tipo
+  custom: { unit: '', increment: 1, xpPerUnit: 10 }, // unidad la escribe el usuario; la IA puede proponerlo en la captura por voz
 } as const
 export const isValidUnit = (u: string): boolean => u.trim().length >= 1 && u.trim().length <= 20
 
@@ -130,8 +130,8 @@ export function editTracker(t: Tracker, e: TrackerEdit): Tracker {
 
 // sinónimos de las misiones base (nombres en inglés) para detectar "parecidas"
 const ALIASES: Record<string, string> = {
-  gym: 'gimnasio pesas entrenar', bjj: 'jiujitsu jiu grappling', running: 'correr carrera trotar',
-  reading: 'leer lectura libro', beer: 'cerveza birra cana', burgers: 'hamburguesa burger',
+  gym: 'gimnasio pesas entrenar entrene', bjj: 'jiujitsu jiu grappling', running: 'correr carrera trotar run ran corri corrido',
+  reading: 'leer lectura libro read leido lei leyendo book', beer: 'cerveza birra cana beers cervezas', burgers: 'hamburguesa burger',
 }
 const words = (s: string) => normalizeText(s).split(/[^a-z0-9]+/).filter(w => w.length >= 3)
 // distancia de Levenshtein (inserción/borrado/sustitución)
@@ -156,4 +156,28 @@ export function findSimilar(text: string, trackers: Tracker[]): Tracker | undefi
     const tw = words(`${t.name} ${ALIASES[t.id] ?? ''}`)
     return ws.some(w => tw.some(x => wordsMatch(w, x)))
   })
+}
+
+export const STOPWORDS: ReadonlySet<string> = new Set(('de del la las el los lo al y o con en por para mi mis me se que he ha has hoy esta este un una unos unas hice hecho hacer fui ir estuve tome tomar comi comer bebi beber ' +
+  'the of a an and or with in on at for to my i today this some did do done had have has ate eat eaten drank drink went go was been made make got took take just').split(' '))
+
+// Hábito activo al que se refiere una frase. `norm` es la frase ya normalizada (captureNorm); `skip` = palabras de unidad que no cuentan.
+// Puntuación por palabra: 3 exacta, 2 prefijo, 1 errata. Gana la mayor; empate: la palabra que sale antes; después, el orden de `trackers`.
+// ponytail: palabra a palabra, sin pesos por frecuencia; si hay falsos positivos se quita la puntuación por errata.
+export function matchTracker(norm: string, trackers: Tracker[], skip: ReadonlySet<string> = new Set()): Tracker | undefined {
+  const ws = normalizeText(norm).split(/[^a-z0-9]+/).map((w, i) => ({ w, i }))
+    .filter(({ w }) => w.length >= 3 && !/^\d+$/.test(w) && !skip.has(w) && !STOPWORDS.has(w))
+  let best: { t: Tracker; score: number; pos: number } | undefined
+  for (const t of trackers) {
+    const tw = words(`${t.name} ${ALIASES[t.id] ?? ''}`).filter(x => !STOPWORDS.has(x))
+    let score = 0, pos = 0
+    for (const { w, i } of ws) {
+      for (const x of tw) {
+        const s = w === x ? 3 : (w.startsWith(x) || x.startsWith(w)) ? 2 : wordsMatch(w, x) ? 1 : 0
+        if (s > score || (s === score && s > 0 && i < pos)) { score = s; pos = i }
+      }
+    }
+    if (score > 0 && (!best || score > best.score || (score === best.score && pos < best.pos))) best = { t, score, pos }
+  }
+  return best?.t
 }
