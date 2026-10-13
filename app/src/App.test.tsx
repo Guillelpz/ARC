@@ -1205,3 +1205,45 @@ test('U-C8 Escribir a mano abre el formulario con lo oído', async () => {
   fireEvent.click(btn('Escribir a mano'))
   expect((screen.getByLabelText('¿Qué has hecho?') as HTMLInputElement).value).toBe('de la')
 })
+
+const net = (id: string) => stored().filter((e: { trackerId: string }) => e.trackerId === id).reduce((n: number, e: { amount: number }) => n + e.amount, 0)
+
+test('U-C1 «+»: Reading con páginas, conversión y Deshacer deja el neto en 0', async () => {
+  ackVoice(); setVoz('Read 50 pages of the name of the wind'); render(<App />)
+  fireEvent.click(btn('Apuntar por voz'))
+  expect(win.__lang).toBe('es-ES')
+  expect(await screen.findByText(/^Registrado: Reading · \+100 min · \+100 HERO XP$/)).toBeTruthy()
+  expect(screen.getByText('50 páginas ≈ 100 min')).toBeTruthy()
+  expect(stored()).toHaveLength(1)
+  expect(stored()[0]).toMatchObject({ trackerId: 'reading', amount: 100 })
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: +100 min en Reading.')).toBeTruthy()
+  expect(net('reading')).toBe(0)
+})
+
+test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto en 2', async () => {
+  ackVoice(); setVoz('ate a burguer'); render(<App />)
+  go('Nuevo')
+  expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad · \+20 VILLAIN XP$/)).toBeTruthy()
+  expect(net('burgers')).toBe(1)
+  fireEvent.click(btn('Editar'))
+  const q = screen.getByLabelText('Cantidad (unidades)') as HTMLInputElement
+  expect(q.value).toBe('1'); expect(document.activeElement).toBe(q)
+  expect(net('burgers')).toBe(0)
+  fireEvent.change(q, { target: { value: '2' } })
+  fireEvent.click(btn('Apuntar'))
+  expect(await screen.findByText(/^Registrado: Burgers · \+2 unidades/)).toBeTruthy()
+  expect(net('burgers')).toBe(2)
+})
+
+test('U-C6 unidad que no encaja: no guarda y pide la cantidad en la unidad del hábito', async () => {
+  ackVoice(); setVoz('corrí 30 minutos'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Running se mide en km: no se ha apuntado nada.')).toBeTruthy()
+  expect(stored()).toHaveLength(0)
+  await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Cantidad (km)')))
+  fireEvent.change(screen.getByLabelText('Cantidad (km)'), { target: { value: '5' } })
+  fireEvent.click(btn('Apuntar'))
+  expect(await screen.findByText(/^Registrado: Running · \+5 km/)).toBeTruthy()
+  expect(net('running')).toBe(5)
+})

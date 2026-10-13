@@ -271,6 +271,16 @@ export default function App() {
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
+  // Captura: apunta hoy y devuelve el evento (para «Deshacer»/«Editar»).
+  function captureAdd(trackerId: string, amount: number): ActivityEvent | null {
+    const t = trackers.find(x => x.id === trackerId)
+    const a = t ? clampAmount(events, t.id, today, amount) : 0
+    if (!t || !a) return null
+    const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount: a, occurredAt: nowStamp(today) }
+    push([ev], t)
+    return ev
+  }
+
   const saveTracker = (input: Tracker) => {
     const { pastGoals: _, ...t } = input // derivado: no se persiste
     if (!t.custom && t.branch === 'villain') {
@@ -408,7 +418,7 @@ export default function App() {
       {screen === 'new' && (
         newMode === 'capture'
           ? <CaptureView key={capture.key} start={capture.start} onConsumed={() => setCapture(c => ({ ...c, start: { mode: 'idle' } }))} ack={voiceAck} onAck={ackVoice}
-              exercises={activeExercises} unit={gym.unit ?? 'kg'} onInterpret={interpretCapt} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
+              trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
               onGymEdit={d => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg'))} onGymIncomplete={(d, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing))}
               onManual={openManual} onBusy={b => { captureBusy.current = b }} />
           : <UnknownView key={manualText} initialText={manualText} trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
