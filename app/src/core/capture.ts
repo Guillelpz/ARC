@@ -201,17 +201,17 @@ export function captureFromAI(o: unknown, text: string, ctx: CaptureCtx): Captur
   return buildNew({ name, type: x.type, unit: x.type === 'custom' ? x.customUnit.trim() : undefined, ms, src, ctx, branch: x.branch, confidence: x.confidence, reason: x.reason.trim().slice(0, 120) })
 }
 
-const RANK: Partial<Record<CaptureCommand['kind'], number>> = { gym: 3, tracker: 2, new: 1 }
-// Combina la IA y el parser: otro día gana; dos gym → pickDraft; si no, el candidato listo de más rango (empate: la IA); si ninguno está listo, la IA si dijo algo.
+// Combina la IA y el parser. Si la IA respondió bien, decide ella (también «none» = no entendido): el parser solo cubre
+// sin clave, sin conexión o con respuesta inválida (ai null). Excepciones: otro día gana siempre; dos gym → pickDraft;
+// mismo hábito con la cantidad de la IA incompleta y la del parser lista → el parser.
 export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, ctx: CaptureCtx): CaptureCommand {
   if (ai?.kind === 'other-day') return ai
   if (parsed.kind === 'other-day') return parsed
-  if (ai?.kind === 'gym' && parsed.kind === 'gym') {
+  if (!ai) return parsed
+  if (ai.kind === 'gym' && parsed.kind === 'gym') {
     const { draft, source } = pickDraft(ai.draft, parsed.draft, ctx.exercises)
     return { kind: 'gym', text: ai.text, draft, source }
   }
-  const cands: CaptureCommand[] = ai ? [ai, parsed] : [parsed]
-  const ready = cands.filter(c => isReady(c, ctx)).sort((a, b) => (RANK[b.kind] ?? 0) - (RANK[a.kind] ?? 0))
-  if (ready.length) return ready[0]
-  return ai && ai.kind !== 'unknown' ? ai : parsed
+  const sameHabit = ai.kind === 'tracker' && parsed.kind === 'tracker' && ai.trackerId === parsed.trackerId
+  return sameHabit && !isReady(ai, ctx) && isReady(parsed, ctx) ? parsed : ai
 }

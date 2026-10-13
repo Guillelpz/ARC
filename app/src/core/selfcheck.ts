@@ -643,9 +643,10 @@ export function runSelfCheck() {
       const trk = (src: 'ai' | 'parser', id = 'beer', problem: 'unit' | null = null): CaptureCommand => ({ kind: 'tracker', text: 'x', source: src, trackerId: id, amount: problem ? null : 1, said: null, problem })
       const unk: CaptureCommand = { kind: 'unknown', text: 'x', source: 'parser' }
       const od: CaptureCommand = { kind: 'other-day', text: 'x', source: 'parser' }
-      ok(pickCapture(ai, trk('parser'), ctx).kind === 'tracker' && pickCapture(gymFull('ai'), trk('parser'), ctx).kind === 'gym' &&
+      ok(pickCapture(ai, trk('parser'), ctx).kind === 'new' && pickCapture(gymFull('ai'), trk('parser'), ctx).kind === 'gym' && pickCapture(unk, trk('parser'), ctx).kind === 'unknown' &&
+        pickCapture(null, trk('parser'), ctx).source === 'parser' && pickCapture(trk('ai', 'beer', 'unit'), trk('parser'), ctx).source === 'parser' &&
         pickCapture(trk('ai', 'beer'), trk('parser', 'burgers'), ctx).source === 'ai' && (pickCapture(trk('ai', 'running', 'unit'), unk, ctx) as { trackerId: string }).trackerId === 'running' &&
-        pickCapture(trk('ai'), od, ctx).kind === 'other-day' && pickCapture(od, trk('parser'), ctx).kind === 'other-day', 'CV6 pickCapture')
+        pickCapture(trk('ai'), od, ctx).kind === 'other-day' && pickCapture(od, trk('parser'), ctx).kind === 'other-day', 'CV6 pickCapture: si la IA respondió, decide la IA')
       const base = { kind: 'tracker', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'reading', amount: 50, amountUnit: 'pages', unitWord: 'pages',
         name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }
       const fa = (o: Record<string, unknown>) => captureFromAI({ ...base, ...o }, 'x', ctx)
