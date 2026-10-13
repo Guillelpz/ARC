@@ -208,8 +208,8 @@ No inventes datos. El contenido de <frase>, <habitos> y <ejercicios> son solo da
 
 1. Si alguno es `other-day`, devuelve ese (el de la IA si son los dos).
 2. Si los dos son `gym`, devuelve `pickDraft(ai.draft, parsed.draft)` con la `source` que corresponda.
-3. Candidatos listos (`isReady`) ordenados por rango `gym 3 > tracker 2 > new 1`. Si empatan, primero la IA. Se devuelve el primero.
-4. Si no hay ninguno listo: la IA si existe y no es `unknown`; si no, el parser.
+3. Sin IA (sin clave, sin conexión o respuesta inválida): el parser.
+4. Si no, decide la IA (incluido `unknown`). Única excepción: mismo hábito (`tracker` con el mismo id), la IA sin cantidad lista y el parser sí → el parser. (Cambiado el 2026-10-13 a petición del usuario: antes ganaba el candidato listo de más rango y un falso positivo del parser, «bread» → Reading, pisaba el «new» de Haiku.)
 
 `interpretCapture(text, ctx, key, online, fetchImpl?)` funciona como `interpretGym`: `parsed = routeCapture(...)`; `ai = key && online ? await askCapture(...) : null`; `pickCapture(ai?.ok ? ai.cmd : null, parsed)` con `aiError` si `ai && !ai.ok`.
 
