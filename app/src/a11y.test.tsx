@@ -112,3 +112,36 @@ test('A13 captura con el campo de texto abierto', async () => {
   expect(screen.getByLabelText('¿Qué has hecho hoy?')).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+async function capture(said: string) {
+  class Fake {
+    lang = ''; continuous = false; interimResults = false; maxAlternatives = 1
+    onresult: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
+    start() { setTimeout(() => { this.onresult?.({ results: [Object.assign([{ transcript: said }], { isFinal: true })] }); this.onend?.() }, 0) }
+    stop() {}; abort() {}
+  }
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = Fake
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar' }))
+}
+const noSpeech = () => { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition }
+
+test('A-C2 propuesta de hábito nuevo en HERO y en VILLAIN', async () => {
+  try {
+    await capture('grounding 30 min')
+    expect(await screen.findByRole('heading', { name: 'Propuesta: HERO' })).toBeTruthy()
+    expect(await serious()).toEqual([])
+    fireEvent.click(within(screen.getByRole('group', { name: 'Rama' })).getByRole('button', { name: 'VILLAIN' }))
+    expect(screen.getByRole('heading', { name: 'Propuesta: VILLAIN' })).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { noSpeech() }
+})
+
+test('A-C3 resultado de un hábito existente', async () => {
+  try {
+    await capture('ate a burguer')
+    expect(await screen.findByText(/^Registrado: Burgers/)).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { noSpeech() }
+})
