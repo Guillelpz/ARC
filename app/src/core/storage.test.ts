@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, GYM_KEY, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, GYM_KEY, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -468,5 +468,30 @@ describe('clave de Anthropic y ajustes de voz (T3)', () => {
     const text = exportBackup([good], EMPTY_CUSTOM, 'x', EMPTY_GYM)
     expect(text).not.toContain(KEY); expect(text).not.toContain('privacyAck')
     expect(JSON.stringify(parseBackup(text))).not.toContain(KEY)
+  })
+})
+
+describe('memoria de la captura', () => {
+  const entries = [{ k: 'burguer', kind: 'tracker' as const, id: 'burgers' }]
+  test('loadMemo: ausente, roto y válido', () => {
+    expect(loadMemo(fakeStore())).toEqual([])
+    expect(loadMemo(fakeStore({ [MEMO_KEY]: '{roto' }))).toEqual([])
+    expect(loadMemo(fakeStore({ [MEMO_KEY]: JSON.stringify({ v: 1, entries }) }))).toEqual(entries)
+  })
+  test('saveMemo y clearMemo', () => {
+    const s = { ...fakeStore(), removeItem(k: string) { this.m.delete(k) } }
+    expect(saveMemo(entries, s)).toBe(true)
+    expect(JSON.parse(s.m.get(MEMO_KEY) as string)).toEqual({ v: 1, entries })
+    expect(loadMemo(s)).toEqual(entries)
+    expect(clearMemo(s)).toBe(true)
+    expect(loadMemo(s)).toEqual([])
+    expect(saveMemo(entries, fakeStore({}, true))).toBe(false)
+  })
+  test('no es clave de datos ni entra en copias ni exportaciones', () => {
+    expect(isDataKey(MEMO_KEY)).toBe(false)
+    const s = fakeStore({ [EV]: JSON.stringify([good]), [MEMO_KEY]: JSON.stringify({ v: 1, entries }) })
+    expect(backupCurrent(s)).toBe(true)
+    expect([...s.m.keys()].some(k => k.startsWith(MEMO_KEY + '.backup'))).toBe(false)
+    expect(exportBackup([good], EMPTY_CUSTOM, 'x', EMPTY_GYM)).not.toContain('burguer')
   })
 })
