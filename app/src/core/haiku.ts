@@ -1,6 +1,7 @@
 import type { Exercise, WeightUnit } from './types'
 import { VOICE_MAX_CHARS, fromAI, parseGym, pickDraft, type GymDraft, type HaikuError, type VoiceCommand } from './voice'
-import { captureFromAI, deviceSure, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { localCapture } from './memory'
+import { captureFromAI, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
 
 export type { HaikuError } from './voice'
 export type HaikuResult = { ok: true; draft: GymDraft } | { ok: false; error: HaikuError }
@@ -147,11 +148,11 @@ export async function askCapture(text: string, ctx: CaptureCtx, key: string, fet
   return cmd ? { ok: true, cmd } : { ok: false, error: 'invalid' }
 }
 
-// Como interpretGym: el router determinista se ejecuta siempre y Haiku solo con clave y conexión; se combinan con pickCapture.
+// El dispositivo decide si está seguro (O3) o lo recuerda (O1); Haiku solo para lo demás (con clave y conexión) y se combina con pickCapture.
 export async function interpretCapture(text: string, ctx: CaptureCtx, key: string | null, online: boolean, fetchImpl?: typeof fetch): Promise<CaptureCommand> {
-  const parsed = routeCapture(text, ctx)
-  if (parsed.kind === 'other-day' || deviceSure(parsed, ctx)) return parsed
+  const { cmd, done } = localCapture(text, ctx)
+  if (done) return cmd
   const ai = key && online ? await askCapture(text, ctx, key, fetchImpl) : null
-  const c = pickCapture(ai?.ok ? ai.cmd : null, parsed, ctx)
+  const c = pickCapture(ai?.ok ? ai.cmd : null, cmd, ctx)
   return ai && !ai.ok ? { ...c, aiError: ai.error } : c
 }

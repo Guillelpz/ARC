@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { EXERCISES } from './gym'
 import { TRACKERS } from './trackers'
+import type { Memo } from './memory'
 import { routeCapture, type CaptureCtx } from './capture'
 import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretGym } from './haiku'
 
@@ -133,5 +134,29 @@ describe('captura', () => {
       await run(t, f)
       expect(f, t).toHaveBeenCalledTimes(1)
     }
+  })
+  describe('memoria', () => {
+    const mctx = (memo: Memo): CaptureCtx => ({ ...ctx, memo })
+    const burg: Memo = [{ k: 'burguer', kind: 'tracker', id: 'burgers' }]
+    const legs: Memo = [{ k: 'maquina piernas', kind: 'gym', id: 'leg-press' }]
+    test('memoria lista: no llama a fetch', async () => {
+      const f = mock(() => ok(reply(newAlta)))
+      const r = await interpretCapture('ate a burguer', mctx(burg), KEY, true, f)
+      expect(f).not.toHaveBeenCalled()
+      expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'memory' })
+    })
+    test('memoria incompleta con clave: 1 llamada; si falla (500), la memoria con aiError', async () => {
+      const f = mock(() => ok({}, 500))
+      const r = await interpretCapture('máquina de piernas 100', mctx(legs), KEY, true, f)
+      expect(f).toHaveBeenCalledTimes(1)
+      expect(r).toMatchObject({ kind: 'gym', source: 'memory', aiError: 'http', draft: { exerciseId: 'leg-press', weight: 100 } })
+    })
+    test('memoria incompleta sin clave: el comando de la memoria', async () => {
+      const f = mock(() => ok(reply(newAlta)))
+      const r = await interpretCapture('máquina de piernas 100', mctx(legs), null, true, f)
+      expect(f).not.toHaveBeenCalled()
+      expect(r).toMatchObject({ kind: 'gym', source: 'memory' })
+      expect(r).not.toHaveProperty('aiError')
+    })
   })
 })

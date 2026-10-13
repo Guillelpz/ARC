@@ -12,7 +12,7 @@ export type GymDraft = {
 }
 // (HaikuError se define aquí y `haiku.ts` lo reexporta: así `voice.ts` no importa de `haiku.ts`, que sí importa de este módulo.)
 export type HaikuError = 'auth' | 'rate' | 'bad-request' | 'http' | 'network' | 'timeout' | 'refusal' | 'invalid'
-export type VoiceCommand = { kind: 'gym'; text: string; draft: GymDraft; source: 'ai' | 'parser'; aiError?: HaikuError }
+export type VoiceCommand = { kind: 'gym'; text: string; draft: GymDraft; source: 'ai' | 'parser' | 'memory'; aiError?: HaikuError }
 
 export const MAX_VOICE_SETS = 10
 export const VOICE_MAX_CHARS = 200
@@ -128,10 +128,10 @@ const RE_NUM = new RegExp(`${NOT_NUM}\\d+(?:\\.\\d+)?${NOT_NUM_AFTER}`, 'g')
 const r2 = (x: number) => Math.round(x * 100) / 100
 
 // Texto dictado → borrador. `exercises` son las activas; `defaultUnit` es la preferencia del gym (kg por defecto).
-export function parseGym(text: string, exercises: Exercise[], defaultUnit: WeightUnit): GymDraft {
+export function parseGym(text: string, exercises: Exercise[], defaultUnit: WeightUnit, forceId?: string): GymDraft {
   let t = normalizeVoice(text)
-  const m = matchExercise(t, exercises)
-  if (m) t = t.replace(aliasRe(m.alias), ' ') // el 45 de «Press 45 grados» no cuenta
+  const m = forceId ? { id: forceId, alias: '' } : matchExercise(t, exercises)
+  if (m && m.alias !== '') t = t.replace(aliasRe(m.alias), ' ') // el 45 de «Press 45 grados» no cuenta
   const unresolved = UNRESOLVED.test(t)
   const ex = m ? exercises.find(e => e.id === m.id) : undefined
   const body = ex?.kind === 'bodyweight'

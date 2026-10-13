@@ -1,3 +1,4 @@
+import type { Memo } from './memory'
 import type { Branch, Confidence, Exercise, Tracker, WeightUnit } from './types'
 import { STOPWORDS, classify, exactTracker, isValidName, isValidUnit, matchTracker, normalizeText, trackerName } from './classify'
 import { fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type HaikuError, type VoiceCommand } from './voice'
@@ -16,14 +17,14 @@ export type NewHabit = {
   confidence: Confidence; reason: string
   archivedDup?: string  // nombre del archivado con el mismo nombre
 }
-export type Src = { text: string; source: 'ai' | 'parser'; aiError?: HaikuError }
+export type Src = { text: string; source: 'ai' | 'parser' | 'memory'; aiError?: HaikuError }
 export type CaptureCommand =
   | VoiceCommand
   | Src & { kind: 'tracker'; trackerId: string; amount: number | null; said: Measure | null; problem: Problem | null }
   | Src & { kind: 'new'; habit: NewHabit; said: Measure | null }
   | Src & { kind: 'other-day' }
   | Src & { kind: 'unknown' }
-export type CaptureCtx = { exercises: Exercise[]; trackers: Tracker[] /* activos */; all: Tracker[] /* incl. archivados */; unit: WeightUnit }
+export type CaptureCtx = { exercises: Exercise[]; trackers: Tracker[] /* activos */; all: Tracker[] /* incl. archivados */; unit: WeightUnit; memo?: Memo }
 
 export const UNIT_WORDS: Record<Family, string[]> = {
   min: 'min mins minuto minutos minute minutes'.split(' '),
