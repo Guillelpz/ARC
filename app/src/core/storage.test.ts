@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, GYM_KEY, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, EMPTY_FOOD, FOOD_KEY, GYM_KEY, readFood, saveFood, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -60,7 +60,7 @@ describe('loadAll', () => {
   beforeEach(unlockStorage)
   test('store vacío', () => {
     const s = fakeStore()
-    expect(loadAll(s, D)).toEqual({ events: [], custom: EMPTY_CUSTOM, gym: EMPTY_GYM, problems: [] })
+    expect(loadAll(s, D)).toEqual({ events: [], custom: EMPTY_CUSTOM, gym: EMPTY_GYM, food: EMPTY_FOOD, problems: [] })
     expect(s.writes()).toBe(0)
   })
   test('datos válidos', () => {
@@ -117,7 +117,7 @@ describe('exportBackup / parseBackup', () => {
   const exp = (o: object = {}) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: EMPTY_CUSTOM, ...o })
   test('roundtrip', () => {
     const r = parseBackup(exportBackup(SEED_EVENTS, custom as never, '2026-10-08T00:00:00Z'))
-    expect(r).toEqual({ events: SEED_EVENTS, custom, gym: null, dropped: 0, fixed: 0 })
+    expect(r).toEqual({ events: SEED_EVENTS, custom, gym: null, food: null, dropped: 0, fixed: 0 })
   })
   test('rechaza ajenos', () => {
     expect(parseBackup(exp({ app: 'otro' }))).toBeNull()
@@ -196,7 +196,7 @@ describe('restaurar copia', () => {
   beforeEach(unlockStorage)
   test('R1 readLast', () => {
     expect(readLast(fakeStore())).toBe('none')
-    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, gym: null, dropped: 0, fixed: 0 })
+    expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good]) }))).toEqual({ events: [good], custom: null, gym: null, food: null, dropped: 0, fixed: 0 })
     expect(readLast(fakeStore({ [L(EV)]: '{roto' }))).toBe('unreadable')
     expect(readLast(fakeStore({ [L(EV)]: JSON.stringify([good, null]) }))).toMatchObject({ dropped: 1 })
   })
@@ -431,6 +431,75 @@ describe('módulo Gym', () => {
     expect(parseBackup(raw({ log: [null] }))?.dropped).toBe(1)
   })
   test('GS6 isDataKey', () => { expect(isDataKey(GYM_KEY)).toBe(true); expect(isDataKey('otra')).toBe(false) })
+})
+
+describe('módulo Comida', () => {
+  const FK = FOOD_KEY
+  const ent = { id: 'e1', occurredAt: '2026-10-07T10:00:00', name: 'Arroz blanco cocido', kcal: 195, p: 4, c: 42.3, f: 0.4, foodId: 'rice-white-cooked', base: 'g', qty: 150, via: 'voice' }
+  const quick = { id: 'e2', occurredAt: '2026-10-07T11:00:00', name: 'Añadido rápido', kcal: 1000, qty: 0 }
+  const fu = { id: 'u1', undoes: 'e1', occurredAt: '2026-10-07T10:00:00' }
+  const food = { id: 'food-1', name: 'Mi tarta', base: 'g', kcal: 300, p: 5, c: 40, f: 12, servings: [{ name: 'Trozo', qty: 80 }], aliases: ['pastel'], source: 'off', ref: '123' }
+  const goal = { from: '2026-10-01', kcal: 2000, p: 20, c: 50, f: 30 }
+  const meal = { id: 'meal-1', name: 'Desayuno', items: [{ foodId: 'egg', qty: 100, serving: { name: 'Unidad', n: 2 } }] }
+  beforeEach(unlockStorage)
+  test('FD9 readFood: roundtrip, campos desconocidos y reparaciones', () => {
+    const data = { log: [ent, quick, fu, { ...ent, id: 'e3', futuro: 1 }], foods: [food, { ...food, id: 'food-2', extra: true }], goals: [goal], meals: [meal], futuro: { a: 1 } }
+    expect(readFood(JSON.parse(JSON.stringify(data)))).toEqual({ data, dropped: 0, fixed: 0 })
+    expect(readFood({})!.data).toEqual({ log: [], foods: [] })
+    const bad = [{ ...ent, id: 'a', kcal: -1 }, { ...ent, id: 'b', qty: 0 }, { ...ent, id: 'c', qty: 2001 }, { ...ent, id: 'd', name: '' }, { ...ent, id: 'f', base: 'kg' }, { ...ent, id: 'g', p: 3000 }, { ...ent, id: 'h', occurredAt: '2026-10-07' }, { ...ent, id: 'i', serving: { name: 'x', n: 60 } }, null]
+    const r = readFood({ log: [ent, ...bad] })!
+    expect(r.data.log).toEqual([ent]); expect(r.dropped).toBe(bad.length)
+    const f = readFood({ foods: [{ ...food, id: 'food-9', servings: [{ name: 'a', qty: 5 }, { name: '', qty: 5 }], aliases: ['x', ''], archived: 'si', source: 3 }, food, { ...food, id: 'sin-prefijo' }, { ...food, id: 'food-3', kcal: 901 }, { ...food, id: 'food-4', name: '  ' }] })!
+    expect(f.data.foods).toHaveLength(2); expect(f.data.foods[0]).toEqual({ ...food, id: 'food-9', servings: [{ name: 'a', qty: 5 }], aliases: ['x'], source: undefined, archived: undefined })
+    expect(f.fixed).toBe(4); expect(f.dropped).toBe(3)
+    expect(readFood({ foods: [{ ...food, servings: [{ name: '', qty: 0 }], aliases: [] }] })!.data.foods[0]).not.toHaveProperty('servings')
+    const g = readFood({ goals: [goal, { ...goal, from: '2026-10-05', p: 30 }, { ...goal, from: '2026-10-06', kcal: 700 }, { ...goal, from: '2026-10-02', kcal: 2100.5 }, { ...goal, from: '2026-10-01', kcal: 2500 }, 'x'] })!
+    expect(g.data.goals).toEqual([{ ...goal, kcal: 2500 }]); expect(g.dropped).toBe(4); expect(g.fixed).toBe(1)
+    expect(readFood({ goals: 5 })).toMatchObject({ dropped: 1 })
+    const items = [{ foodId: 'a', qty: 0 }, { foodId: '', qty: 5 }, { foodId: 'b', qty: 5 }, 'x']
+    const m = readFood({ meals: [{ ...meal, items }, { ...meal, id: 'meal-2', items: [] }, { ...meal, id: 'x-1' }, meal, meal, { ...meal, name: ' ', id: 'meal-9' }] })!
+    expect(m.data.meals).toEqual([{ ...meal, items: [{ foodId: 'b', qty: 5 }] }]); expect(m.fixed).toBe(3); expect(m.dropped).toBe(5)
+    const dup = readFood({ foods: [food, { ...food, name: 'otra' }], meals: [meal, { ...meal, name: 'otra' }] })!
+    expect(dup.data.foods).toHaveLength(1); expect(dup.data.meals).toHaveLength(1); expect(dup.dropped).toBe(2)
+    expect(readFood({ log: 'x' })).toBeNull(); expect(readFood({ foods: {} })).toBeNull(); expect(readFood([])).toBeNull(); expect(readFood('x')).toBeNull()
+    expect(readFood({ __proto__: { x: 1 }, log: [] })!.data).toEqual({ log: [], foods: [] })
+  })
+  test('loadAll con la comida corrupta: backup y aviso; el resto intacto', () => {
+    const s = fakeStore({ [EV]: JSON.stringify([good]), [FK]: '{roto' })
+    const r = loadAll(s, D)
+    expect(r.food).toEqual(EMPTY_FOOD); expect(r.events).toEqual([good])
+    expect(r.problems).toEqual([{ key: FK, dropped: null, fixed: 0, backupKey: BK(FK) }]); expect(s.m.get(BK(FK))).toBe('{roto')
+    expect(loadAll(fakeStore(), D).food).toEqual(EMPTY_FOOD)
+    expect(loadAll(fakeStore({ [FK]: JSON.stringify({ log: [ent, null], foods: [] }) }), D).problems[0]).toMatchObject({ key: FK, dropped: 1 })
+  })
+  test('clave bloqueada: saveFood devuelve null', () => {
+    const s = fakeStore({ [FK]: '{roto' }, true)
+    expect(loadAll(s, D).problems[0].backupKey).toBeNull()
+    expect(saveFood(EMPTY_FOOD, s)).toBeNull()
+    unlockStorage(); expect(saveFood(EMPTY_FOOD, fakeStore())).toBe(true); expect(saveFood(EMPTY_FOOD, fakeStore({}, true))).toBe(false)
+  })
+  test('backupCurrent / readLast / restoreLast incluyen la comida', () => {
+    const d1 = { log: [ent], foods: [] }
+    const s = fakeStore({ [FK]: JSON.stringify(d1), [`${FK}.backup.last`]: 'viejo' })
+    expect(backupCurrent(s)).toBe(true)
+    expect(s.m.get(`${FK}.backup.last`)).toBe(JSON.stringify(d1)); expect(s.m.get(`${FK}.backup.prev`)).toBe('viejo')
+    expect(hasLastBackup(fakeStore({ [`${FK}.backup.last`]: 'x' }))).toBe(true)
+    s.m.set(FK, JSON.stringify(EMPTY_FOOD))
+    const r = readLast(s)
+    expect(r).toMatchObject({ events: null, custom: null, gym: null, food: d1 })
+    expect(restoreLast(r as never, s)).toBe(true)
+    expect(s.m.get(FK)).toBe(JSON.stringify(d1)); expect(s.m.get(`${FK}.backup.last`)).toBe(JSON.stringify(EMPTY_FOOD))
+    expect(readLast(fakeStore({ [`${FK}.backup.last`]: '[]' }))).toBe('unreadable')
+  })
+  test('FD10 export/parse: con food, sin food (null) e ilegible', () => {
+    const d1 = { log: [ent, quick, fu], foods: [food], goals: [goal], meals: [meal] }
+    expect(parseBackup(exportBackup([], EMPTY_CUSTOM, 'x', undefined, d1 as never))?.food).toEqual(d1)
+    expect(parseBackup(exportBackup([], EMPTY_CUSTOM, 'x'))?.food).toBeNull()
+    const raw = (fd: unknown) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: EMPTY_CUSTOM, food: fd })
+    expect(parseBackup(raw('roto'))).toBeNull()
+    expect(parseBackup(raw({ log: [null] }))?.dropped).toBe(1)
+    expect(isDataKey(FK)).toBe(true)
+  })
 })
 
 describe('clave de Anthropic y ajustes de voz (T3)', () => {

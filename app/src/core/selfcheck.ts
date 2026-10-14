@@ -5,7 +5,7 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { parseBackup, parseCustom, readGym } from './storage'
+import { exportBackup, parseBackup, parseCustom, readFood, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
@@ -748,6 +748,19 @@ export function runSelfCheck() {
       parseServings('1,3') === 1.25 && parseServings('0.1') === null && parseServings('51') === null && parseKcal('1000') === 1000 && parseKcal('0') === null && parseKcal('10001') === null &&
       parseMacro('') === undefined && parseMacro('12,34') === 12.3 && parseMacro('x') === null && parsePct('30') === 30 && parsePct('101') === null && parsePct('3.5') === null &&
       fmtKcal(1640) === '1.640' && fmtKcal(999) === '999' && fmtKcal(12345.4) === '12.345', 'FD17 parsers y fmtKcal')
+
+    // FD9, FD10 — persistencia de la comida
+    {
+      const fo = { id: 'food-1', name: 'Mi tarta', base: 'g', kcal: 300, p: 5, c: 40, f: 12, servings: [{ name: 'Trozo', qty: 80 }], source: 'off' }
+      const dat = { log: [{ ...en('e1', 195), via: 'voice' }, { id: 'u1', undoes: 'e1', occurredAt: `${fd}T10:00:00` }], foods: [fo], futuro: { a: 1 }, goals: [{ from: fd, kcal: 2000, p: 20, c: 50, f: 30 }], meals: [{ id: 'meal-1', name: 'Desayuno', items: [{ foodId: 'egg', qty: 100 }] }] }
+      const r9 = readFood(JSON.parse(JSON.stringify(dat)))
+      const bad9 = readFood({ log: [en('ok', 1), { ...en('b1', 1), kcal: -1 }, { ...en('b2', 1), qty: 0 }, null], foods: [{ ...fo, servings: [{ name: 'a', qty: 5 }, { name: '', qty: 5 }] }, fo, { ...fo, id: 'sin' }],
+        goals: [{ from: fd, kcal: 2000, p: 20, c: 50, f: 20 }], meals: [{ id: 'meal-1', name: 'a', items: [{ foodId: 'x', qty: 1 }] }, { id: 'meal-1', name: 'b', items: [{ foodId: 'x', qty: 1 }] }] })
+      ok(r9 !== null && r9.dropped === 0 && r9.fixed === 0 && JSON.stringify(r9.data) === JSON.stringify(dat) && bad9?.data.log.length === 1 && bad9.data.foods.length === 1 && bad9.data.foods[0].servings?.length === 1 &&
+        !bad9.data.goals && bad9.data.meals?.length === 1 && bad9.dropped === 7 && bad9.fixed === 1 && readFood('x') === null && readFood({ log: 3 }) === null, 'FD9 readFood')
+      const bk = parseBackup(exportBackup([], { trackers: [], proposals: [] }, 'x', undefined, dat as FoodData)), raw = (f: unknown) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: { trackers: [], proposals: [] }, food: f })
+      ok(JSON.stringify(bk?.food) === JSON.stringify(dat) && parseBackup(exportBackup([], { trackers: [], proposals: [] }, 'x'))?.food === null && parseBackup(raw('roto')) === null && parseBackup(raw({ log: [null] }))?.dropped === 1, 'FD10 copias con comida')
+    }
 
     // FD6-FD8, FD16 — Dieta en vivo
     {
