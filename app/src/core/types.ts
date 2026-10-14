@@ -182,5 +182,6 @@ export type FoodGoal = { from: string; kcal: number; p: number; c: number; f: nu
 export type MealItem = { foodId: string; qty: number; serving?: { name: string; n: number } }
 export type Meal = { id: string; name: string; items: MealItem[] } // 'meal-<uuid>'; name 1..40; 1..20 ítems
 export type FoodData = { log: FoodLogEntry[]; foods: Food[]; goals?: FoodGoal[]; meals?: Meal[] }
+export type DietChange = 1 | -1 | 0 // efecto en Dieta de un cambio: +1 entra en rango, −1 sale, 0 nada
 export type FoodDay = Nutrients & { entries: number } // suma de entradas vivas
 export type FoodWeek = { monday: string; days: number; avg: Nutrients | null; goal: number | null; inRange: number; current: boolean }

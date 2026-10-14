@@ -1,4 +1,4 @@
-import type { ActivityEvent, Food, FoodData, FoodDay, FoodEntry, FoodGoal, FoodLogEntry, FoodUndo, Nutrients, Portion } from './types'
+import type { ActivityEvent, DietChange, Food, FoodBase, FoodData, FoodDay, FoodEntry, FoodGoal, FoodLogEntry, FoodUndo, Nutrients, Portion } from './types'
 import { CATALOG } from './foodCatalog'
 import { addDays, clampAmount, dayTotal, undoneIds } from './stats'
 import type { Tracker } from './types'
@@ -135,3 +135,13 @@ export const dietDays = (food: FoodData, events: ActivityEvent[]): string[] =>
 export const dietActive = (food: FoodData, events: ActivityEvent[]) => (food.goals?.length ?? 0) > 0 || events.some(e => e.trackerId === DIET_TRACKER)
 // B1: Dieta oculta (archivada solo en lo derivado, sin persistir) mientras no haya objetivo ni eventos
 export const withDiet = (ts: Tracker[], active: boolean): Tracker[] => (active ? ts : ts.map(t => (t.id === DIET_TRACKER ? { ...t, archived: true } : t)))
+
+export const dietNote = (d: DietChange) => (d > 0 ? ' · Día dentro del objetivo: +1 Dieta' : d < 0 ? ' · Fuera del rango: se retira el +1 de Dieta' : '')
+
+// Texto de una cantidad: «150 g», «2 Huevo (100 g)»; añadido rápido (qty 0): vacío
+export const fmtNum = (n: number) => String(n).replace('.', ',')
+export function fmtPortion(p: Portion, base: FoodBase | undefined): string {
+  if (!(p.qty > 0)) return ''
+  const q = `${fmtNum(p.qty)} ${base ?? 'g'}`
+  return p.serving ? `${fmtNum(p.serving.n)} ${p.serving.name} (${q})` : q
+}

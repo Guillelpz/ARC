@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, Exercise, Food, FoodData, FoodEntry, FoodGoal, GymData, GymSet, Portion, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
+import type { ActivityEvent, CustomData, DietChange, Exercise, Food, FoodData, FoodEntry, FoodGoal, GymData, GymSet, Portion, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
@@ -26,6 +26,7 @@ import { editNote, incompleteNote } from './components/voiceNotes'
 import { MeView } from './components/MeView'
 import type { VoiceMissing } from './components/voiceNotes'
 import { GymView } from './components/GymView'
+import { FoodView } from './components/FoodView'
 import type { Gain } from './components/TrackerCard'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT, UpdateBanner } from './components/UpdateBanner'
@@ -222,7 +223,7 @@ export default function App() {
   // Comida: toda la lógica está en core/food.ts; cada handler guarda el cambio y su `dietSync` juntos (§7.3)
   const dietTracker = () => trackers.find(t => t.id === DIET_TRACKER)!
   // días ya apuntados: Dieta puede sumar o restar; `diet` = signo del neto (+1 entra en rango, −1 sale, 0 nada)
-  function syncDiet(next: FoodData, days: string[]): 1 | -1 | 0 {
+  function syncDiet(next: FoodData, days: string[]): DietChange {
     setFood(next)
     const evs = dietSync(events, next, days, today, uuid)
     if (!evs.length) return 0
@@ -230,27 +231,26 @@ export default function App() {
     const net = evs.reduce((n, e) => n + e.amount, 0)
     return net > 0 ? 1 : net < 0 ? -1 : 0
   }
-  function addFoodEntry(f: Food, p: Portion, day: string): { id: string; diet: 1 | -1 | 0 } {
+  function addFoodEntry(f: Food, p: Portion, day: string): { id: string; diet: DietChange } {
     if (day > today) day = today
     const e = makeEntry(f, p, uuid(), nowStamp(day))
     return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
   }
-  function addQuick(input: { kcal: number; p?: number; c?: number; f?: number; name?: string }, day: string): { id: string; diet: 1 | -1 | 0 } {
+  function addQuick(input: { kcal: number; p?: number; c?: number; f?: number; name?: string }, day: string): { id: string; diet: DietChange } {
     if (day > today) day = today
     const e: FoodEntry = quickEntry(input, uuid(), nowStamp(day))
     return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
   }
-  function undoFood(ids: string[]): { undone: number; diet: 1 | -1 | 0 } {
+  function undoFood(ids: string[]): { undone: number; diet: DietChange } {
     const us = undoEntries(food.log, ids, uuid)
     if (!us.length) return { undone: 0, diet: 0 }
     return { undone: us.length, diet: syncDiet({ ...food, log: [...food.log, ...us] }, us.map(u => u.occurredAt.slice(0, 10))) }
   }
   // El objetivo rige desde hoy; los días pasados conservan el suyo (con el primer objetivo rige hacia atrás: T3 de la spec)
-  function saveFoodGoal(g: Omit<FoodGoal, 'from'>): 1 | -1 | 0 {
+  function saveFoodGoal(g: Omit<FoodGoal, 'from'>): DietChange {
     const next = { ...food, goals: setFoodGoal(food.goals, g, today) }
     return syncDiet(next, dietDays(next, events))
   }
-  void [addFoodEntry, addQuick, undoFood, saveFoodGoal, liveEntries] // ponytail: los usa FoodView (T6 del ciclo 29); se quita esta línea entonces
 
   const r2 = (x: number) => Math.round(x * 100) / 100
   const gymTracker = () => trackers.find(t => t.id === GYM_TRACKER)!
@@ -500,6 +500,7 @@ export default function App() {
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onSaveGoal={saveFoodGoal} onBack={() => goTo('me')} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}

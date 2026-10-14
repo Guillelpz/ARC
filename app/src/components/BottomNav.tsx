@@ -1,6 +1,6 @@
 import { House, Moon, Shield, Sparkles, User, Users, type LucideIcon } from 'lucide-react'
 
-export type Screen = 'home' | 'hero' | 'villain' | 'new' | 'party' | 'me' | 'gym'
+export type Screen = 'home' | 'hero' | 'villain' | 'new' | 'party' | 'me' | 'gym' | 'food'
 
 const ITEMS: { screen: Screen; label: string; Icon: LucideIcon }[] = [
   { screen: 'home', label: 'Inicio', Icon: House },
