@@ -31,8 +31,8 @@ export function FoodQty({ food, initial, onAdd, onCancel }: Props) {
     onAdd(serving ? { qty, serving: { name: serving.name, n } } : { qty })
   }
   return (
-    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-hero-border p-3" noValidate aria-label={`Cantidad de ${food.name}`}>
-      <h3 className="text-sm font-semibold">{food.name}</h3>
+    <form onSubmit={submit} className="flex flex-col gap-3 rounded-lg border border-hero-border p-3" noValidate aria-labelledby="food-qty-title">
+      <h3 id="food-qty-title" className="text-sm font-semibold">{food.name}</h3>
       <div className="flex gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <label htmlFor="food-qty" className="text-xs font-medium">Cantidad</label>

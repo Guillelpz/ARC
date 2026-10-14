@@ -145,3 +145,35 @@ test('A-C3 resultado de un hábito existente', async () => {
     expect(await serious()).toEqual([])
   } finally { noSpeech() }
 })
+
+const openFood = () => { go('Yo'); fireEvent.click(screen.getByRole('button', { name: /^Comida/ })) }
+
+test('A-FD1 Comida vacía (formulario del objetivo)', async () => {
+  render(<App />); openFood()
+  expect(screen.getByRole('heading', { level: 1, name: 'Comida' })).toBeTruthy()
+  expect(await serious()).toEqual([])
+})
+
+test('A-FD2 Comida con objetivo, entradas y estado del rango', async () => {
+  render(<App />); openFood()
+  fireEvent.change(screen.getByLabelText(/^Calorías al día/), { target: { value: '2000' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar objetivo' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Añadido rápido' }))
+  fireEvent.change(screen.getByLabelText(/^Calorías \(kcal\)/), { target: { value: '1900' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir' }))
+  fireEvent.change(screen.getByLabelText('Buscar alimento'), { target: { value: 'huevo' } })
+  fireEvent.click(screen.getByRole('button', { name: /^Huevo/ }))
+  fireEvent.click(screen.getByRole('button', { name: 'Añadir' }))
+  expect(screen.getByRole('region', { name: 'Diario' })).toBeTruthy()
+  expect(await serious()).toEqual([])
+})
+
+test('A-FD3 Comida con resultados de búsqueda y el panel de cantidad', async () => {
+  render(<App />); openFood()
+  fireEvent.change(screen.getByLabelText('Buscar alimento'), { target: { value: 'a' } })
+  expect(screen.getAllByRole('button', { name: /kcal\/100/ }).length).toBeGreaterThan(1)
+  expect(await serious()).toEqual([])
+  fireEvent.click(screen.getAllByRole('button', { name: /kcal\/100/ })[0])
+  expect(screen.getByLabelText('Cantidad')).toBeTruthy()
+  expect(await serious()).toEqual([])
+})
