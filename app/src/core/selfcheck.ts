@@ -4,12 +4,13 @@ import { allTrackers, logGoal, setGoal, setLimit, TRACKERS, unitFor } from './tr
 import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly, history, localDate, mondayOf, streak, todaySummary, total, undoneIds, weekly } from './stats'
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
-import { buttonLabel, classify, createTracker, editTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
+import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
 import { parseBackup, parseCustom, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
+import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
 import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
-import { captureFromAI, captureNorm, convNote, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -636,6 +637,50 @@ export function runSelfCheck() {
     ok(f('medité 10 minutos') === 'new/Medité/duration/10/baja' && f('hice 20 flexiones') === 'new/Flexiones/count/20/baja' && f('3 vasos de agua') === 'new/Agua/custom:vasos/3/media' &&
       f('ajedrez 1 hora') === 'new/Ajedrez/duration/60/baja/dup:Ajedrez' && !isReady(routeCapture('ajedrez 1 hora', ctx), ctx), 'CV10 nombre del hábito nuevo')
     ok(captureNorm('una hora') === '1 hora' && captureNorm('half an hour') === '30 min' && isOtherDay(captureNorm('el viernes')) && !isOtherDay(captureNorm('esta mañana')), 'CV11 captureNorm e isOtherDay')
+    {
+      const ex = (t: string) => exactTracker(captureNorm(t), ctx.trackers, ALL_UNITS)?.id
+      const two = [mk('Cold shower', 'count'), mk('Hot shower', 'count')]
+      ok(ex('Read 50 pages of the name of the wind') === 'reading' && ex('corrí 5 km') === 'running' && ex('fui al gimnasio') === 'gym' && ex('ate a burguer') === undefined &&
+        ex('lectur') === undefined && exactTracker('shower 10 min', two) === undefined, 'CV12 exactTracker')
+      const sure = (t: string) => deviceSure(routeCapture(t, ctx), ctx)
+      ok(['80kg bench press 5 reps', 'Read 50 pages of the name of the wind', 'corrí 30 minutos'].every(sure) &&
+        !['press banca 80', 'ate a burguer', 'grounding 30 min', 'ayer leí 20 páginas'].some(sure), 'CV13 deviceSure')
+    }
+    // MC1–MC5 — memoria de frases
+    {
+      ok(memoKey('Read 50 pages of the name of the wind') === 'read name wind' && memoKey('Read 30 pages of the name of the wind') === 'read name wind' &&
+        ['ate a burguer', 'eat a burguer', 'burguer'].every(t => memoKey(t) === 'burguer') &&
+        memoKey('la máquina de piernas 100 10') === 'maquina piernas' && memoKey('máquina de piernas 120 kilos 8 repeticiones') === 'maquina piernas' &&
+        memoKey('30') === null && memoKey('ayer leí 20 páginas') === null, 'MC1 memoKey')
+      const aiTrk = (text: string, id: string, source: 'ai' | 'parser' | 'memory' = 'ai'): CaptureCommand => ({ kind: 'tracker', text, source, trackerId: id, amount: 1, said: null, problem: null })
+      const same = [] as Memo
+      const m1 = learn(same, aiTrk('burguer', 'beer'))
+      const m2 = learn(m1, aiTrk('ate a burguer', 'burgers'))
+      const many = Array.from({ length: MEMO_MAX + 1 }, (_, i) => 'zq' + String.fromCharCode(97 + Math.floor(i / 26), 97 + i % 26)).reduce<Memo>((m, k) => learn(m, aiTrk(k, 'beer')), [])
+      const old = learn(learn(learn([], aiTrk('alpha', 'beer')), aiTrk('bravo', 'beer')), aiTrk('alpha', 'beer', 'memory'))
+      ok(learn(same, aiTrk('burguer', 'beer', 'parser')) === same && m1.length === 1 && m2.length === 1 && m2[0].id === 'burgers' &&
+        many.length === MEMO_MAX && !many.some(e => e.k === 'zqaa') && old[old.length - 1].k === 'alpha' &&
+        forget(m2, 'burguer').length === 0 && forget(m2, 'zzzz yyyy') === m2, 'MC2 learn/forget')
+      const good = { v: 1, entries: [{ k: 'a', kind: 'gym', id: 'x' }] }
+      const big = { v: 1, entries: Array.from({ length: 250 }, (_, i) => ({ k: `k${i}`, kind: 'tracker', id: 'x' })) }
+      const dirty = readMemo({ v: 1, entries: [{ k: 'a', kind: 'otro', id: 'x' }, { k: '', kind: 'gym', id: 'x' }, { k: 'b', kind: 'gym', id: 5 }, { k: 'c', kind: 'gym', id: 'x' }, { k: 'c', kind: 'tracker', id: 'y' }] })
+      const bigR = readMemo(big)
+      ok(readMemo(null).length === 0 && readMemo('x').length === 0 && readMemo({ v: 2, entries: [] }).length === 0 && readMemo(good).length === 1 &&
+        dirty.length === 1 && dirty[0].kind === 'tracker' && bigR.length === MEMO_MAX && bigR[0].k === 'k50', 'MC3 readMemo')
+      const mctx = (memo?: Memo, extra: Partial<CaptureCtx> = {}): CaptureCtx => ({ ...ctx, memo, ...extra })
+      const gm: Memo = [{ k: 'maquina piernas', kind: 'gym', id: 'leg-press' }, { k: 'barra alta', kind: 'gym', id: 'pull-up' }, { k: 'bread', kind: 'tracker', id: 'reading' }, { k: 'viejo', kind: 'tracker', id: 'custom-Ajedrez' }]
+      const g1 = recall('máquina de piernas 120 kilos 8', mctx(gm)), g2 = recall('barra alta 12', mctx(gm)), t1 = recall('bread 20 pages', mctx(gm))
+      ok(g1?.kind === 'gym' && g1.source === 'memory' && g1.draft.exerciseId === 'leg-press' && g1.draft.weight === 120 && g1.draft.reps === 8 && isComplete(g1.draft, EXERCISES) &&
+        g2?.kind === 'gym' && g2.draft.weight === 0 && g2.draft.reps === 12 && isComplete(g2.draft, EXERCISES) &&
+        t1?.kind === 'tracker' && t1.trackerId === 'reading' && t1.amount === 40 && recall('viejo 10 min', mctx(gm)) === null && recall('bread 20 pages', mctx()) === null &&
+        recall('máquina de piernas 120 8', mctx(gm, { exercises: EXERCISES.filter(e => e.id !== 'leg-press') })) === null, 'MC4 recall')
+      const lc = (t: string, memo?: Memo) => localCapture(t, mctx(memo))
+      const a = lc('ayer leí 20 páginas'), b = lc('80kg bench press 5 reps'), c = lc('ate a burguer'), d = lc('ate a burguer', [{ k: 'burguer', kind: 'tracker', id: 'burgers' }])
+      const e = lc('máquina de piernas 100', gm), f2 = lc('ate a burguer', [{ k: 'burguer', kind: 'tracker', id: 'custom-Ajedrez' }])
+      ok(a.done && a.cmd.kind === 'other-day' && b.done && b.cmd.source === 'parser' && !c.done && c.cmd.source === 'parser' &&
+        d.done && d.cmd.source === 'memory' && d.cmd.kind === 'tracker' && d.cmd.trackerId === 'burgers' && d.cmd.amount === 1 &&
+        !e.done && e.cmd.source === 'memory' && !f2.done && f2.cmd.source === 'parser', 'MC5 localCapture')
+    }
     // CV6 (combinación) y CV8 — captureFromAI
     {
       const ai: CaptureCommand = { kind: 'new', text: 'x', source: 'ai', habit: { name: 'Zumba', branch: 'hero', type: 'count', amount: 1, confidence: 'alta', reason: 'r' }, said: null }

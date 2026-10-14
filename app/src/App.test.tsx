@@ -1327,3 +1327,55 @@ test('U-C7 Deshacer un hábito recién creado lo archiva y anula el registro', a
   expect(screen.getByRole('heading', { name: 'Archivadas' })).toBeTruthy()
   expect(screen.getByRole('button', { name: 'Reactivar Grounding' })).toBeTruthy()
 })
+
+// ---- Memoria de la captura (ciclo 28) ----
+const MEMO = 'life-rpg-capture-memo-v1'
+const legPress = { kind: 'gym', otherDay: false, exerciseId: 'leg-press', weight: 100, weightUnit: 'none', reps: 10, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+  name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }
+const memoEntries = () => (JSON.parse(localStorage.getItem(MEMO) ?? '{"entries":[]}') as { entries: { k: string }[] }).entries
+
+test('U-M1 lo que Haiku resolvió se recuerda: la frase siguiente no llama a fetch', async () => {
+  ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn().mockImplementation(() => Promise.resolve(aiReply(legPress)))
+  vi.stubGlobal('fetch', f)
+  try {
+    render(<App />)
+    dictateHome('la máquina de piernas 100 10')
+    expect(await screen.findByText(/^Registrado: Prensa · 100 kg × 10/)).toBeTruthy()
+    expect(memoEntries().map(e => e.k)).toEqual(['maquina piernas'])
+    setVoz('máquina de piernas 120 8'); fireEvent.click(btn('Dictar'))
+    expect(await screen.findByText(/^Registrado: Prensa · 120 kg × 8/)).toBeTruthy()
+    expect(f).toHaveBeenCalledTimes(1)
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-M2 Deshacer olvida la frase y la siguiente vuelve a llamar a fetch', async () => {
+  ackVoice(); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn().mockImplementation(() => Promise.resolve(aiReply(legPress)))
+  vi.stubGlobal('fetch', f)
+  try {
+    render(<App />)
+    dictateHome('la máquina de piernas 100 10')
+    await screen.findByText(/^Registrado: Prensa · 100 kg × 10/)
+    fireEvent.click(btn('Deshacer'))
+    await screen.findByText(/^Deshecho:/)
+    expect(memoEntries()).toEqual([])
+    setVoz('máquina de piernas 120 8'); fireEvent.click(btn('Dictar'))
+    await screen.findByText(/^Registrado: Prensa/)
+    expect(f).toHaveBeenCalledTimes(2)
+  } finally { vi.unstubAllGlobals() }
+})
+
+test('U-M3 «Borrar todo» vacía la memoria y conserva la clave de IA; la copia no los lleva', () => {
+  localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  localStorage.setItem(MEMO, JSON.stringify({ v: 1, entries: [{ k: 'maquina piernas', kind: 'gym', id: 'leg-press' }] }))
+  render(<App />)
+  fireEvent.click(btn('Cargar ejemplo'))
+  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar todo'))
+  expect(confirm).toHaveBeenCalled()
+  expect(localStorage.getItem(MEMO)).toBeNull()
+  expect(localStorage.getItem('life-rpg-ai-key-v1')).toBe(KEY2)
+  const text = exportBackup([], { trackers: [], proposals: [] } as never, 'x')
+  expect(text).not.toContain(KEY2); expect(text).not.toContain('maquina')
+})

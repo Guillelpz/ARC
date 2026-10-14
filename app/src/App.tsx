@@ -5,7 +5,8 @@ import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
-import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { forget, learn } from './core/memory'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
 import type { CaptureCommand, NewHabit } from './core/capture'
 import { TYPE_DEFAULTS, createTracker } from './core/classify'
@@ -268,7 +269,9 @@ export default function App() {
   const activeExercises = allExercises(gym.exercises).filter(x => !x.archived)
   const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setGymFrom('home'); setFocusGym(false); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
-    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg' }, loadAiKey(), navigator.onLine !== false)
+    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo() }, loadAiKey(), navigator.onLine !== false)
+  const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
+  const forgetCapture = (text: string) => { const m = loadMemo(), n = forget(m, text); if (n !== m) saveMemo(n) }
 
   const undo = (t: Tracker, e: ActivityEvent) => add(t, -e.amount, e.occurredAt.slice(0, 10), e)
 
@@ -338,6 +341,7 @@ export default function App() {
     if (!window.confirm('¿Borrar todos tus registros y misiones nuevas? No se puede deshacer. Exporta una copia antes si quieres conservarlos.')) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
+    clearMemo()
     setEvents([]); setCustom(EMPTY_CUSTOM); setGym(EMPTY_GYM); setToast(null); setGain(null); setOvertake(null); setRecord(null)
   }
 
@@ -432,7 +436,7 @@ export default function App() {
       {screen === 'new' && (
         newMode === 'capture'
           ? <CaptureView key={capture.key} start={capture.start} onConsumed={() => setCapture(c => ({ ...c, start: { mode: 'idle' } }))} ack={voiceAck} onAck={ackVoice}
-              trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
+              trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onLearn={learnCapture} onForget={forgetCapture} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
               onGymEdit={d => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg'))} onGymIncomplete={(d, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing))}
               onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }} />
           : <UnknownView key={manualText} initialText={manualText} trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />

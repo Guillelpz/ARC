@@ -35,6 +35,8 @@ type Props = {
   onGoToMissions: (b: Branch) => void
   onManual: (text: string) => void
   onBusy: (busy: boolean) => void
+  onLearn: (cmd: CaptureCommand) => void
+  onForget: (text: string) => void
 }
 type Mode = 'idle' | 'privacy' | 'listening' | 'processing' | 'text'
 type Res =
@@ -95,6 +97,7 @@ export function CaptureView(props: Props) {
       case 'gym':
         if (isComplete(cmd.draft, r.exercises)) {
           const s = r.onSaveGym(cmd)
+          r.onLearn(cmd)
           setRes({ k: 'gym', cmd, ...s }); setMode('idle'); focusMic()
         } else {
           setMode('idle')
@@ -108,7 +111,7 @@ export function CaptureView(props: Props) {
         if (!tr) { setRes({ k: 'unknown' }); setMode('idle'); focusMic(); return }
         const ev = cmd.amount !== null && cmd.problem === null ? r.onAdd(tr.id, cmd.amount) : null
         setMode('idle')
-        if (ev) { setRes({ k: 'trk', text: cmd.text, t: tr, ev, note: convNote(cmd.said, cmd.amount) }); focusMic() }
+        if (ev) { r.onLearn(cmd); setRes({ k: 'trk', text: cmd.text, t: tr, ev, note: convNote(cmd.said, cmd.amount) }); focusMic() }
         else setRes({ k: 'form', text: cmd.text, t: tr, problem: cmd.problem, amount: cmd.amount })
         return
       }
@@ -155,12 +158,14 @@ export function CaptureView(props: Props) {
   function undoGym() {
     if (res?.k !== 'gym') return
     const r = ref.current.onUndoGym(res.ids)
+    ref.current.onForget(res.cmd.text)
     const nm = exercises.find(x => x.id === res.cmd.draft.exerciseId)?.name ?? 'ejercicio', n = res.ids.length
     setRes({ k: 'undone', text: `Deshecho: ${n} ${n === 1 ? 'serie' : 'series'} de ${nm}.${r.retracted ? ' Sesión de Gym retirada.' : ''}` }); focusMic()
   }
   function editGym() {
     if (res?.k !== 'gym') return
     ref.current.onUndoGym(res.ids)
+    ref.current.onForget(res.cmd.text)
     const d = res.cmd.draft
     setRes(null)
     ref.current.onGymEdit(d)
@@ -168,11 +173,13 @@ export function CaptureView(props: Props) {
   function undoTracker() {
     if (res?.k !== 'trk') return
     ref.current.onUndoEvent(res.t, res.ev)
+    ref.current.onForget(res.text) // ponytail: deshacer después desde la pantalla de misiones no olvida la frase
     setRes({ k: 'undone', text: `Deshecho: +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)} en ${res.t.name}.` }); focusMic()
   }
   function editTracker() {
     if (res?.k !== 'trk') return
     ref.current.onUndoEvent(res.t, res.ev)
+    ref.current.onForget(res.text)
     setRes({ k: 'form', text: res.text, t: res.t, problem: null, amount: res.ev.amount })
   }
   function applyAmount(n: number) {
@@ -208,7 +215,7 @@ export function CaptureView(props: Props) {
     }
   }, [])
   const busy = mode === 'processing'
-  const aiNote = res?.k === 'gym' && res.cmd.source === 'parser' && (res.cmd.aiError === 'auth' || res.cmd.aiError === 'rate')
+  const aiNote = res?.k === 'gym' && res.cmd.source !== 'ai' && (res.cmd.aiError === 'auth' || res.cmd.aiError === 'rate')
   const statusText = mode === 'privacy' ? 'Aviso de privacidad de la voz'
     : mode === 'listening' ? 'Escuchando'
     : busy ? 'Procesando…'

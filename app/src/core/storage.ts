@@ -2,6 +2,7 @@ import type { ActivityEvent, CustomData, Exercise, GoalLogEntry, Goals, GymData,
 import { defaultGoal, isFixedVillain } from './trackers'
 import { mondayOf } from './stats'
 import { EMPTY_GYM } from './gym'
+import { readMemo, type Memo } from './memory'
 
 const KEY = 'life-rpg-demo-v1'
 const CUSTOM_KEY = 'life-rpg-custom-v1'
@@ -347,6 +348,22 @@ export function saveAiKey(key: string, store: Pick<Storage, 'setItem'> = localSt
 }
 export function clearAiKey(store: Pick<Storage, 'removeItem'> = localStorage): boolean {
   try { store.removeItem(AI_KEY); return true } catch { return false }
+}
+
+// Memoria de frases de la captura (caché de este dispositivo, M-B): fuera de copias, fusión, backupCurrent y «Recuperar»; «Borrar todo» la vacía.
+export const MEMO_KEY = 'life-rpg-capture-memo-v1'
+export function loadMemo(store: Pick<Storage, 'getItem'> = localStorage): Memo {
+  try {
+    const raw = store.getItem(MEMO_KEY)
+    return raw === null ? [] : readMemo(JSON.parse(raw))
+  } catch { return [] }
+}
+// Si falla (cuota) devuelve false y no se avisa: es una caché.
+export function saveMemo(m: Memo, store: Pick<Storage, 'setItem'> = localStorage): boolean {
+  try { store.setItem(MEMO_KEY, JSON.stringify({ v: 1, entries: m })); return true } catch { return false }
+}
+export function clearMemo(store: Pick<Storage, 'removeItem'> = localStorage): boolean {
+  try { store.removeItem(MEMO_KEY); return true } catch { return false }
 }
 
 // ponytail: persist() es una petición; el navegador puede ignorarla (Safari borra tras 7 días sin uso). La garantía real es exportar.
