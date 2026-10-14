@@ -5,7 +5,7 @@ import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
-import { DIET_TRACKER, dietActive, dietDays, dietSync, liveEntries, makeEntry, quickEntry, setFoodGoal, undoEntries, withDiet } from './core/food'
+import { DIET_TRACKER, dayTotals, dietActive, dietDays, dietSync, liveEntries, goalOn, makeEntry, quickEntry, setFoodGoal, undoEntries, withDiet } from './core/food'
 import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveFood, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { forget, learn } from './core/memory'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
@@ -57,9 +57,9 @@ export default function App() {
   const [food, setFood] = useState<FoodData>(loaded.food)
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
-  const [focusGym, setFocusGym] = useState(false) // true al volver de Gym: el foco va a su tarjeta en «Yo»
-  const [focusHoy, setFocusHoy] = useState(false) // true al volver de Gym abierto desde «Hoy»: el foco va al encabezado «Hoy»
-  const [gymFrom, setGymFrom] = useState<'me' | 'home'>('me')
+  const [focusCard, setFocusCard] = useState<'gym' | 'food' | null>(null) // al volver de un módulo abierto desde «Yo»: el foco va a su tarjeta
+  const [focusHoy, setFocusHoy] = useState(false) // true al volver de un módulo abierto desde «Hoy»: el foco va al encabezado «Hoy»
+  const [moduleFrom, setModuleFrom] = useState<'me' | 'home'>('me') // desde dónde se abrió Gym o Comida
   const [gymPrefill, setGymPrefill] = useState<{ draft: GymDraft; note: string } | null>(null) // borrador de la voz en «Hoy» que abre Gym prerrellenado
   const [newMode, setNewMode] = useState<'capture' | 'manual'>('capture') // pantalla «Nuevo»: captura por voz o formulario a mano
   const [manualText, setManualText] = useState('')
@@ -156,6 +156,10 @@ export default function App() {
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const weeks = useMemo(() => branchWeekly(events, trackers, today), [events, trackers, today])
   const gymToday = useMemo(() => gymDay(gym.log, today), [gym.log, today])
+  const foodToday = useMemo(() => {
+    const goal = goalOn(food.goals, today), kcal = dayTotals(food.log, today)
+    return goal || kcal.entries > 0 ? { kcal: Math.round(kcal.kcal), goal: goal?.kcal ?? null } : null
+  }, [food.log, food.goals, today])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
     () => PARTIES.map(p => derivePartyState(p, events, today, trackers, custom.proposals)),
@@ -172,12 +176,14 @@ export default function App() {
     if (captureBusy.current && screen === 'new' && newMode === 'capture') return // ya escucha o procesa: solo se navega
     const start: CaptureStart = voiceAck ? beginListen() : { mode: 'privacy' }
     setCapture(c => ({ key: c.key + 1, start })); setNewMode('capture')
-    setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go('new')
+    setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new')
   }
-  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go('new') }
-  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go(s) }
-  const openGym = (from: 'me' | 'home') => { setGymFrom(from); goTo('gym') }
-  const backFromGym = () => { setGymPrefill(null); if (gymFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusGym(true); go('me') } }
+  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new') }
+  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go(s) }
+  const openGym = (from: 'me' | 'home') => { setModuleFrom(from); goTo('gym') }
+  const openFood = (from: 'me' | 'home') => { setModuleFrom(from); goTo('food') }
+  const backFromGym = () => { setGymPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('gym'); go('me') } }
+  const backFromFood = () => { if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
   function push(evs: ActivityEvent[], t: Tracker, list = trackers) {
@@ -307,7 +313,7 @@ export default function App() {
   }) }))
 
   const activeExercises = allExercises(gym.exercises).filter(x => !x.archived)
-  const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setGymFrom('home'); setFocusGym(false); setFocusHoy(false); go('gym') }
+  const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
     interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo() }, loadAiKey(), navigator.onLine !== false)
   const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
@@ -479,7 +485,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} foodToday={foodToday} onOpenFood={() => openFood('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
@@ -498,17 +504,17 @@ export default function App() {
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
-      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
+      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
-      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onSaveGoal={saveFoodGoal} onBack={() => goTo('me')} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onSaveGoal={saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
       {record && !toast && !overtake && <RecordBanner r={record} />}
       <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={goTo} />
-      {stale ? <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
-        : update && <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
+      {stale ? <UpdateBanner tone={screen === 'hero' || screen === 'gym' || screen === 'food' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
+        : update && <UpdateBanner tone={screen === 'hero' || screen === 'gym' || screen === 'food' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
     </>
   )
 }
