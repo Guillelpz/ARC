@@ -150,3 +150,37 @@ export type GymRecords = { maxWeight: GymSet | null; best1rm: { set: GymSet; kg:
 export type WeekBest = { monday: string; kg: number | null; current: boolean } // kg: mejor 1RM estimado de la semana, en kg; null = sin dato
 export type GroupVolume = { group: MuscleGroup; label: string; sets: number; kg: number; prevSets: number; prevKg: number }
 export type GymDay = { sets: number; exercises: number } // series vivas de un día y ejercicios distintos
+
+// Comida (ver docs/TECH_SPEC-food.md §5)
+export type FoodBase = 'g' | 'ml'
+export type Nutrients = { kcal: number; p: number; c: number; f: number } // p/c/f en g
+export type Serving = { name: string; qty: number } // qty en g o ml de la base, (0, 2000]
+// Valores por 100 de `base`. kcal 0..900, p/c/f 0..100.
+export type Food = Nutrients & {
+  id: string            // catálogo: kebab estable (nunca empieza por 'food-'); propios: 'food-<uuid>'
+  name: string          // 1..40
+  base: FoodBase
+  servings?: Serving[]  // 0..5
+  aliases?: string[]    // 0..10, 1..40 c/u
+  source?: string       // catálogo: 'usda' | 'bedca'; propios: ausente = 'user' (≤ 20)
+  ref?: string          // fdcId, código BEDCA o código de barras (≤ 100)
+  archived?: boolean    // solo propios
+}
+export type Portion = { qty: number; serving?: { name: string; n: number } } // qty en g/ml (0, 2000]; serving.n 0.25..50 → qty = n·serving.qty
+export type FoodEntry = Partial<Omit<Nutrients, 'kcal'>> & Portion & {
+  id: string
+  occurredAt: string    // 'YYYY-MM-DDTHH:mm:ss'
+  name: string          // instantánea, 1..60
+  kcal: number          // 0..20000, 1 decimal
+  foodId?: string       // ausente = añadido rápido
+  base?: FoodBase       // presente si hay foodId
+  via?: string          // ausente = a mano; 'meal' (ciclo 30); fase 3: 'voice'
+}
+export type FoodUndo = { id: string; undoes: string; occurredAt: string } // occurredAt = el de la entrada
+export type FoodLogEntry = FoodEntry | FoodUndo
+export type FoodGoal = { from: string; kcal: number; p: number; c: number; f: number } // kcal entero 800..10000; % enteros que suman 100
+export type MealItem = { foodId: string; qty: number; serving?: { name: string; n: number } }
+export type Meal = { id: string; name: string; items: MealItem[] } // 'meal-<uuid>'; name 1..40; 1..20 ítems
+export type FoodData = { log: FoodLogEntry[]; foods: Food[]; goals?: FoodGoal[]; meals?: Meal[] }
+export type FoodDay = Nutrients & { entries: number } // suma de entradas vivas
+export type FoodWeek = { monday: string; days: number; avg: Nutrients | null; goal: number | null; inRange: number; current: boolean }

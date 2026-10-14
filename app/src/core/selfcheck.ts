@@ -11,6 +11,9 @@ import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, 
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
 import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { CATALOG } from './foodCatalog'
+import { allFoods, dayTotals, fmtKcal, fold, frequentFoods, goalOn, inRange, kcalRange, lastPortion, makeEntry, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal } from './food'
+import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -704,6 +707,47 @@ export function runSelfCheck() {
       ok(sch.properties.exerciseId.enum.join() === 'a,none' && sch.properties.trackerId.enum.join() === 'b,none' && sch.required.length === 17 && sch.required.every(k => k in sch.properties) &&
         sch.additionalProperties === false && !pr.includes('Ajedrez') && !pr.includes('<b>') && pr.includes('<habitos>') && pr.includes('reading: Reading · HERO · min'), 'CV9 esquema y prompt')
     }
+  }
+
+  // FD — módulo Comida
+  {
+    const fd = DEMO_DATE, fdY = addDays(DEMO_DATE, -1)
+    const arroz = CATALOG.find(f => f.id === 'rice-white-cooked')!
+    const cat = CATALOG, uniq = (xs: string[]) => new Set(xs).size === xs.length
+    ok(cat.length >= 100 && cat.length <= 150 && uniq(cat.map(f => f.id)) && cat.every(f => /^[a-z0-9-]+$/.test(f.id) && !f.id.startsWith('food-')) && uniq(cat.map(f => fold(f.name))) &&
+      cat.every(f => [f.kcal, f.p, f.c, f.f].every(x => Number.isFinite(x) && x >= 0) && f.kcal <= 900 && f.p + f.c + f.f <= 100 && Math.abs(f.kcal - (4 * f.p + 4 * f.c + 9 * f.f)) <= Math.max(20, 0.12 * f.kcal) &&
+        (f.source === 'usda' || f.source === 'bedca') && !!f.ref && (f.source !== 'usda' || /^\d+$/.test(f.ref!)) && (f.servings ?? []).every(s => s.qty > 0) && uniq((f.servings ?? []).map(s => s.name))), 'FD1 catálogo coherente')
+    const fe = makeEntry({ ...arroz, kcal: 130 }, { qty: 100, serving: { name: 'Unidad', n: 2 } }, 'e', `${fd}T10:00:00`)
+    ok(portion({ ...arroz, kcal: 130 }, 150).kcal === 195 && fe.qty === 100 && fe.serving?.n === 2 && fe.name === arroz.name && fe.foodId === arroz.id && fe.base === 'g' && fe.kcal === 130 &&
+      !('via' in fe) && quickEntry({ kcal: 300 }, 'q', `${fd}T10:00:00`).name === 'Añadido rápido' && quickEntry({ kcal: 300 }, 'q', `${fd}T10:00:00`).qty === 0, 'FD2 portion/makeEntry')
+    const en = (id: string, kcal: number, day = fd, o: Partial<FoodEntry> = {}): FoodEntry => ({ id, occurredAt: `${day}T10:00:00`, name: 'x', kcal, qty: 100, p: 5, c: 10, f: 2, foodId: 'rice-white-cooked', base: 'g', ...o })
+    const log3: FoodLogEntry[] = [en('a', 100), en('b', 200), { id: 'u', undoes: 'b', occurredAt: `${fd}T10:00:00` }, quickEntry({ kcal: 300 }, 'q', `${fd}T11:00:00`), en('o', 500, fdY)]
+    const t3 = dayTotals(log3, fd)
+    ok(t3.kcal === 400 && t3.p === 5 && t3.c === 10 && t3.f === 2 && t3.entries === 2 && dayTotals(log3, fdY).kcal === 500 && dayTotals([], fd).entries === 0, 'FD3 dayTotals')
+    const g0: FoodGoal[] = [{ from: '2026-10-05', kcal: 2000, p: 20, c: 50, f: 30 }], g1 = setFoodGoal(g0, { kcal: 2200, p: 20, c: 50, f: 30 }, '2026-10-08'), g2 = setFoodGoal(g1, { kcal: 2400, p: 20, c: 50, f: 30 }, '2026-10-08')
+    ok(goalOn(g0, '2026-09-01')?.kcal === 2000 && goalOn(g1, fd)?.kcal === 2000 && goalOn(g1, '2026-10-08')?.kcal === 2200 && goalOn(g1, '2026-12-01')?.kcal === 2200 && g2.length === 2 && g2[1].kcal === 2400 && g1.length === 2 && g0.length === 1 && goalOn([], fd) === null &&
+      goalOn(undefined, fd) === null, 'FD4 goalOn/setFoodGoal')
+    const gd = (k: number, goal = 2200): FoodData => ({ log: [en('z', k)], foods: [], goals: [{ from: fd, kcal: goal, p: 20, c: 50, f: 30 }] })
+    ok(kcalRange(2200).min === 1980 && kcalRange(2200).max === 2420 && kcalRange(1990).min === 1791 && kcalRange(1990).max === 2189 && kcalRange(2000).min === 1800 && kcalRange(2000).max === 2200 &&
+      inRange(gd(1800, 2000), fd) && inRange(gd(2200, 2000), fd) && !inRange(gd(1799, 2000), fd) && !inRange(gd(2201, 2000), fd) && inRange(gd(1980), fd) && !inRange(gd(1979), fd) && !inRange({ log: [en('z', 2000)], foods: [] }, fd), 'FD5 kcalRange/inRange')
+    const mine = (id: string, name: string, o: Partial<Food> = {}): Food => ({ id, name, base: 'g', kcal: 100, p: 1, c: 1, f: 1, ...o })
+    const sf = (q: string, custom: Food[] = []) => searchFoods(q, allFoods(custom)).map(f => f.name)
+    const own = [mine('food-1', 'Arroz casero'), mine('food-2', 'Arroz viejo', { archived: true }), mine('food-3', 'Tarta de arroz')]
+    const ord = searchFoods('arroz', [mine('food-a', 'Pan de arroz'), mine('food-b', 'Arroz'), mine('food-c', 'Arroz con leche'), mine('food-d', 'Tortitas de arroz tostadas'), mine('food-e', 'Sopa de arroz y pollo')])
+    ok(sf('platano')[0] === 'Plátano' && sf('PLÁTANO ')[0] === 'Plátano' && sf('papa')[0].startsWith('Patata') && sf('judias verdes')[0] === 'Judías verdes' && sf('').length === 0 && sf('  ').length === 0 &&
+      ord.map(f => f.id).join() === 'food-b,food-c,food-a,food-d,food-e' && !sf('arroz', own).includes('Arroz viejo') && sf('arroz', own).indexOf('Arroz casero') < sf('arroz', own).indexOf('Arroz blanco cocido') &&
+      searchFoods('a', allFoods([]), 5).length === 5 && searchFoods('a', allFoods([])).length <= 20 && sf('zzzz').length === 0, 'FD12 searchFoods')
+    const l13: FoodLogEntry[] = [en('1', 100, '2026-10-01', { foodId: 'egg', qty: 50 }), en('2', 100, '2026-10-03', { foodId: 'oats', qty: 40 }), en('3', 100, '2026-10-03', { foodId: 'apple', qty: 90, serving: { name: 'Unidad', n: 0.5 } }),
+      en('4', 100, '2026-10-05', { foodId: 'egg', qty: 100, serving: { name: 'Unidad', n: 2 } }), en('5', 100, '2026-10-06', { foodId: 'milk-whole', qty: 250 }), { id: 'u5', undoes: '5', occurredAt: '2026-10-06T10:00:00' },
+      en('6', 100, '2026-08-01', { foodId: 'banana', qty: 120 }), quickEntry({ kcal: 50 }, 'q', '2026-10-06T12:00:00')]
+    const rc = recentFoods(l13), fr = frequentFoods(l13, fd)
+    ok(rc.map(r => r.foodId).join() === 'egg,apple,oats,banana' && rc[0].last.qty === 100 && rc[0].last.serving?.n === 2 && recentFoods(l13, 2).length === 2 && !rc.some(r => r.foodId === 'milk-whole') &&
+      fr.map(r => r.foodId).join() === 'egg,apple,oats' && !fr.some(r => r.foodId === 'banana') && lastPortion(l13, 'apple')?.serving?.n === 0.5 && lastPortion(l13, 'milk-whole') === null &&
+      frequentFoods(l13, '2026-10-30').map(r => r.foodId).join() === 'egg,apple,oats' && frequentFoods(l13, '2026-11-20').length === 0, 'FD13 recientes/frecuentes')
+    ok(parseQty('150,5') === 150.5 && parseQty('150.55') === 150.6 && parseQty('0') === null && parseQty('2001') === null && parseQty('2000') === 2000 && parseQty('x') === null && parseQty(' 12 ') === 12 &&
+      parseServings('1,3') === 1.25 && parseServings('0.1') === null && parseServings('51') === null && parseKcal('1000') === 1000 && parseKcal('0') === null && parseKcal('10001') === null &&
+      parseMacro('') === undefined && parseMacro('12,34') === 12.3 && parseMacro('x') === null && parsePct('30') === 30 && parsePct('101') === null && parsePct('3.5') === null &&
+      fmtKcal(1640) === '1.640' && fmtKcal(999) === '999' && fmtKcal(12345.4) === '12.345', 'FD17 parsers y fmtKcal')
   }
 
   console.info('[selfcheck] done')
