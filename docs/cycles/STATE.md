@@ -1,12 +1,12 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–22 cerrados e implementados; sus specs y documentos de ciclo se eliminaron el 2026-10-12 (están en el historial de git).
+Ver `docs/WORKFLOW.md`. Ciclos 1–28 cerrados e implementados. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–27 el 2026-10-15; todos están en el historial de git. Se conserva `cycle-28/` como entrada del siguiente ciclo.
 
 ## En curso
 
-- Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
-- Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
-- Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
+- Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`, en el historial de git). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
+- Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
+- Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
 ## Ciclo 28 — Menos llamadas a Haiku en la captura por voz
@@ -22,7 +22,7 @@ Aprobado por el usuario el 2026-10-14 (pasos 1-2 omitidos). Motivo: rapidez (res
 
 ## Ciclo 27 — Captura rápida por voz: gym, hábito existente o hábito nuevo
 
-Arrancado por el usuario el 2026-10-13 tras una evaluación de viabilidad en el chat (pasos 1-2 omitidos; decisiones C1-C9 aprobadas, no se reabren). Rama `cycle-27`; spec en `docs/TECH_SPEC-captura-voz.md`.
+Arrancado por el usuario el 2026-10-13 tras una evaluación de viabilidad en el chat (pasos 1-2 omitidos; decisiones C1-C9 aprobadas, no se reabren). Rama `cycle-27` (spec eliminada, en el historial de git).
 
 - **Objetivo:** pulsar «+» → escucha en el mismo toque → transcribe → decide y registra. Ejemplos de aceptación: «80kg bench press 5 reps» → serie de Gym; «Read 50 pages of the name of the wind» → Reading +100 min; «ate a burguer» / «eat a burguer» / «burguer» → Burgers +1; «grounding 30 min» → propuesta de hábito nuevo (rama evaluada, medido en tiempo, 30 min).
 - **C1 Entradas:** el «+» de Inicio (entre HERO y VILLAIN, hoy navega a `new`) y la pestaña «Nuevo» abren la captura con el micro ya activo (el reconocimiento debe arrancar dentro del gesto: iOS). Queda «Escribir a mano» para el flujo actual de `UnknownView`. El botón «Dictar serie» de Inicio pasa a ser la captura general; el de Gym sigue solo para series.
@@ -37,7 +37,7 @@ Arrancado por el usuario el 2026-10-13 tras una evaluación de viabilidad en el 
 
 ## Ciclo 26 — Registro de series de Gym por voz
 
-Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pasos 1-2 omitidos; no se reabren). Rama `cycle-26`; spec en `docs/TECH_SPEC-voz-gym.md`.
+Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pasos 1-2 omitidos; no se reabren). Rama `cycle-26` (spec eliminada, en el historial de git).
 
 - **Alcance:** solo series de Gym («80 kg press banca 5 reps»). Otros trackers por voz («he corrido 5 km»), en un ciclo posterior; el comando se diseña para poder crecer.
 - **V1 Voz:** Web Speech API; un toque en el micro y empieza a escuchar, se para al detectar silencio. Se acepta que el audio pase por Google/Apple, con aviso la primera vez. Sin soporte (Firefox) o sin conexión → campo de texto. El usuario usa **iPhone**: verificar la Web Speech API en la PWA instalada en iOS antes o al principio de la spec.
@@ -46,11 +46,11 @@ Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pa
 - **V4 Parser:** español e inglés, con sinónimos/alias por ejercicio. Con unidad, gana la unidad; sin unidad, el número mayor es el peso; peso corporal con un solo número → repeticiones. Varias series («3x5», «3 series de 5», «3 sets of 5»). kg por defecto; lbs/libras/pounds se guardan en lbs.
 - **V5 Guardado:** guarda directamente y luego se revisa: aviso con lo oído y lo registrado, «Deshacer» de todas las series del comando y «Editar» (deshacer + formulario prerrellenado). Si no reconoce el ejercicio o faltan las repeticiones, no guarda: abre el formulario prerrellenado. Sesión automática y récords como hoy.
 
-**Ejecución:** tech-lead (`docs/TECH_SPEC-voz-gym.md`: verificación previa en iPhone/PWA, parser ES/EN en `core/` con asserts nuevos, Haiku 5.5 con clave en Ajustes y structured outputs, guardar y revisar, micro en Gym y «Hoy», tests UI/a11y/e2e con APIs simuladas) → **okay del usuario** (resumen ≤15 líneas + decisiones abiertas) → implementer en `cycle-26` → reviewer (máx. 2 vueltas) → merge `--no-ff` con build/lint/test/e2e → push a `main` → cycle-analyst.
+**Ejecución:** tech-lead (spec: verificación previa en iPhone/PWA, parser ES/EN en `core/` con asserts nuevos, Haiku 5.5 con clave en Ajustes y structured outputs, guardar y revisar, micro en Gym y «Hoy», tests UI/a11y/e2e con APIs simuladas) → **okay del usuario** (resumen ≤15 líneas + decisiones abiertas) → implementer en `cycle-26` → reviewer (máx. 2 vueltas) → merge `--no-ff` con build/lint/test/e2e → push a `main` → cycle-analyst.
 
 **Decisiones de spec aprobadas (2026-10-12), todas las recomendadas (§13 de la spec):** A `fetch` directo, sin SDK; B prueba en iPhone con `vite preview` + túnel `cloudflared` (o Pages con okay); C plan B en iOS = el botón abre el campo de texto y se dicta con el teclado, solo donde falle según la prueba; D «Borrar todo» no toca la clave; E sin unidad dicha → preferencia del gym (kg por defecto). El usuario pide hacerlo todo seguido y hará la prueba del iPhone al final: T8 (`KEYBOARD_ON_IOS`) se queda en `'never'` con caída al texto tras error de voz hasta que la prueba dé resultado.
 
-**Estado:** **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`). T8 (`KEYBOARD_ON_IOS`) pendiente de la prueba del usuario en iPhone, ya posible en la PWA de Pages (checklist en `docs/DEPLOY.md`). El workflow vuelve a pausa.
+**Estado:** **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 (`KEYBOARD_ON_IOS`) pendiente de la prueba del usuario en iPhone, ya posible en la PWA de Pages (checklist en `docs/DEPLOY.md`). El workflow vuelve a pausa.
 
 ## Ciclo 25 — Gym: progreso, volumen, rutinas y «Hoy»
 
@@ -60,7 +60,7 @@ No aprobadas en este ciclo: P24.6 (nivel Gym), P24.9 (sobrecarga), P24.11 (tempo
 
 Decisiones de spec aprobadas (2026-10-12), todas las recomendadas: la sesión automática se recrea al deshacer/«−» con series vivas, también al importar y fusionar; «Recuperar» con copia sin gym conserva las series y recrea sesiones con aviso; las rutinas se fusionan (conflicto → local + aviso); «Hoy» muestra «Gym · N series · M ejercicios»; «Volver» desde Gym abierto desde «Hoy» → Inicio con foco en «Hoy».
 
-**Estado:** **cerrado** (merge 0766842, push a origin; análisis en `cycle-25/analysis.md`). El workflow vuelve a pausa hasta que el usuario lo reactive.
+**Estado:** **cerrado** (merge 0766842, push a origin; análisis en `cycle-25/analysis.md`, en el historial de git). El workflow vuelve a pausa hasta que el usuario lo reactive.
 
 ## Ciclo 24 — Módulo Gym (preparado)
 
@@ -89,7 +89,7 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 - Salto −/+ de **2,5 kg / 5 lbs**; catálogo de 21 ejercicios **sin plancha**.
 - P24.6-P24.12 pospuestas.
 
-**Estado:** **cerrado** (merge 4da4d02, push a origin; análisis en `cycle-24/analysis.md`). El workflow vuelve a pausa hasta que el usuario lo reactive.
+**Estado:** **cerrado** (merge 4da4d02, push a origin; análisis en `cycle-24/analysis.md`, en el historial de git). El workflow vuelve a pausa hasta que el usuario lo reactive.
 
 ## Decisiones vigentes del usuario
 
