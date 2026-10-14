@@ -8,10 +8,11 @@ export const TRACKERS: Tracker[] = [
   { id: 'reading', name: 'Reading', branch: 'hero', type: 'duration', unit: 'min', increment: 30, buttonLabel: '+30 min', xpPerUnit: 1, weeklyGoal: 120 },
   { id: 'beer', name: 'Beer', branch: 'villain', type: 'count', unit: 'unidades', increment: 1, buttonLabel: '+1', xpPerUnit: 15 },
   { id: 'burgers', name: 'Burgers', branch: 'villain', type: 'count', unit: 'unidades', increment: 1, buttonLabel: '+1', xpPerUnit: 20 },
+  { id: 'dieta', name: 'Dieta', branch: 'hero', type: 'count', unit: 'días', increment: 1, buttonLabel: '+1 día', xpPerUnit: 30, weeklyGoal: 5 }, // al final: no cambia los índices de TRACKERS
 ]
 
 // ponytail: singular solo para las unidades de las fijas y por defecto; las unidades propias se quedan como están. Ampliar el Map si hace falta.
-const SINGULAR = new Map([['sesiones', 'sesión'], ['clases', 'clase'], ['unidades', 'unidad']])
+const SINGULAR = new Map([['sesiones', 'sesión'], ['clases', 'clase'], ['unidades', 'unidad'], ['días', 'día']])
 export const unitFor = (n: number, unit: string) => (Math.abs(n) === 1 ? SINGULAR.get(unit) ?? unit : unit)
 
 export const defaultGoal = (id: string): number | undefined => TRACKERS.find(t => t.id === id)?.weeklyGoal

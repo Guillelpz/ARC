@@ -1,6 +1,7 @@
-import type { Food, FoodData, FoodDay, FoodEntry, FoodGoal, FoodLogEntry, FoodUndo, Nutrients, Portion } from './types'
+import type { ActivityEvent, Food, FoodData, FoodDay, FoodEntry, FoodGoal, FoodLogEntry, FoodUndo, Nutrients, Portion } from './types'
 import { CATALOG } from './foodCatalog'
-import { addDays } from './stats'
+import { addDays, clampAmount, dayTotal, undoneIds } from './stats'
+import type { Tracker } from './types'
 
 export const EMPTY_FOOD: FoodData = { log: [], foods: [] }
 export const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/\s+/g, ' ')
@@ -108,3 +109,29 @@ export function frequentFoods(log: FoodLogEntry[], today: string, n = 8): { food
   const order = [...first.keys()]
   return order.sort((a, b) => count.get(b)! - count.get(a)! || order.indexOf(a) - order.indexOf(b)).slice(0, n).map(id => ({ foodId: id, last: portionOf(first.get(id)!) }))
 }
+
+// Dieta (F8): día con kcal entre el 90 % y el 110 % del objetivo ⇒ +1 automático. Como `ensureAuto`/`retractAuto` del gym, pero propio.
+export const DIET_TRACKER = 'dieta'
+export const dietAutoRe = (day: string) => new RegExp(`^dieta-auto-${day}(-\\d+)?$`)
+export function dietSync(events: ActivityEvent[], food: FoodData, days: string[], today: string, newId: () => string): ActivityEvent[] {
+  const out: ActivityEvent[] = []
+  for (const day of [...new Set(days)].filter(d => d <= today).sort()) {
+    const re = dietAutoRe(day), acc = () => [...events, ...out]
+    if (inRange(food, day)) {
+      if (dayTotal(acc(), DIET_TRACKER, day) !== 0) continue
+      const n = acc().filter(e => re.test(e.id)).length + 1
+      out.push({ id: n === 1 ? `dieta-auto-${day}` : `dieta-auto-${day}-${n}`, trackerId: DIET_TRACKER, amount: 1, occurredAt: `${day}T12:00:00` })
+    } else {
+      const undone = undoneIds(acc()), autos = acc().filter(e => re.test(e.id) && e.amount > 0 && !undone.has(e.id)).reverse()
+      for (const a of autos)
+        if (clampAmount(acc(), DIET_TRACKER, day, -1) === -1) out.push({ id: newId(), trackerId: DIET_TRACKER, amount: -1, occurredAt: a.occurredAt, undoes: a.id })
+    }
+  }
+  return out
+}
+// días con alguna entrada del log (vivas o no) o con eventos dieta-auto-*; ordenados
+export const dietDays = (food: FoodData, events: ActivityEvent[]): string[] =>
+  [...new Set([...food.log.map(e => e.occurredAt.slice(0, 10)), ...events.flatMap(e => { const m = /^dieta-auto-(\d{4}-\d{2}-\d{2})/.exec(e.id); return m ? [m[1]] : [] })])].sort()
+export const dietActive = (food: FoodData, events: ActivityEvent[]) => (food.goals?.length ?? 0) > 0 || events.some(e => e.trackerId === DIET_TRACKER)
+// B1: Dieta oculta (archivada solo en lo derivado, sin persistir) mientras no haya objetivo ni eventos
+export const withDiet = (ts: Tracker[], active: boolean): Tracker[] => (active ? ts : ts.map(t => (t.id === DIET_TRACKER ? { ...t, archived: true } : t)))
