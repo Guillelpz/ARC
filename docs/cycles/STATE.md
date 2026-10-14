@@ -9,6 +9,29 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–28 cerrados e implementados. Las specs y docu
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
+## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
+
+Arrancado por el usuario el 2026-10-15 (pasos 1-2 omitidos; decisiones F1-F12 aprobadas en el chat, no se reabren). El tech-lead divide en fases/ciclos (`docs/TECH_SPEC-food.md`). Fases siguientes, **fuera de este alcance**: integraciones con apps/bases de comida (fase 2, investigación) y registro por voz (fase 3). El modelo de datos debe dejarlas encajar sin migraciones.
+
+- **F1 Pantalla:** «Comida» (paleta HERO), tarjeta en «Yo» junto a Gym, como el módulo Gym (registrar datos a mano: «arroz 100 g», «1000 kcal»). Formato inspirado en MyFitnessPal. Sin party.
+- **F2 Alimentos:** catálogo integrado de ~100-150 alimentos básicos con valores por 100 g (fuentes públicas: USDA FoodData Central, dominio público, contrastado con BEDCA; **no** datos de MyFitnessPal: API cerrada y base propietaria) + alimentos propios del usuario (crear, archivar, reactivar, como los ejercicios propios). Nombres en español (dejar sitio para alias EN de la fase de voz).
+- **F3 Diario:** lista única por día (sin desayuno/comida/cena), selector de día sin futuro, «Deshacer» por entrada; datos de solo añadir como `GymSet`/`GymUndo`.
+- **F4 Añadido rápido:** «1000 kcal» a secas, macros opcionales.
+- **F5 Cantidad:** g/ml por defecto + raciones opcionales por alimento («1 huevo = 60 g»).
+- **F6 Nutrientes:** kcal, proteína, carbohidratos y grasa (nada más).
+- **F7 Objetivo:** manual, kcal + reparto en % de P/C/G (gramos derivados). Sin datos corporales ni TDEE.
+- **F8 RPG:** tracker HERO fijo nuevo «Dieta» con +1 automático el día cumplido (kcal entre el 90 % y el 110 % del objetivo); **en vivo**: aparece en cuanto entra en rango (XP y toast como siempre) y se retira si se sale (pasarse o deshacer), patrón `gym-auto-<día>`. Reglas de XP existentes; el módulo no da XP propia.
+- **F9 Extras que entran:** recientes/frecuentes (arriba del buscador, última cantidad prerrellenada); platos guardados (como rutinas: «Mi desayuno» = varios alimentos, añadir de un toque); resumen semanal (media kcal/macros vs objetivo + gráfico 8 semanas, SVG propio como Progreso del gym).
+- **F10 Pospuestos:** copiar día anterior, fibra/azúcar/sal, agua, comidas separadas, TDEE.
+- **F11 «Hoy»:** fila «Comida · 1.640 / 2.200 kcal» que abre la pantalla Comida (volver → Inicio con foco en «Hoy», como Gym).
+- **F12 Datos:** clave propia en localStorage, en export/import, backups, `restoreLast` y fusión (`mergeLog`); copias antiguas sin comida siguen importándose y fusionándose. Sin dependencias de runtime, sin backend. Push a `main` tras cada ciclo cerrado.
+
+**Ejecución:** tech-lead (spec + fases) → okay del usuario (resumen ≤15 líneas + decisiones abiertas) → implementer `cycle-29` (y siguientes si hay varias fases) → reviewer → merge `--no-ff` → push → cycle-analyst.
+
+**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food.md`, ciclos 29 (núcleo) y 30 (propios, platos, resumen semanal), seguidos; decisiones A1, B1, C1, D1, E1 (las recomendadas).
+
+**Estado:** ciclo 29 en implementación (rama `cycle-29`).
+
 ## Ciclo 28 — Menos llamadas a Haiku en la captura por voz
 
 Aprobado por el usuario el 2026-10-14 (pasos 1-2 omitidos). Motivo: rapidez (respuesta instantánea frente a 1-2 s), uso sin conexión y menos datos enviados; el coste ya es bajo (~0,0002 $ por frase).
