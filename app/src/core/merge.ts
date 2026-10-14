@@ -1,5 +1,6 @@
-import type { ActivityEvent, CustomData, GoalLogEntry, GymData, GymEntry, Proposal, Tracker } from './types'
+import type { ActivityEvent, CustomData, FoodData, FoodEntry, FoodGoal, FoodLogEntry, GoalLogEntry, GymData, GymEntry, Proposal, Tracker } from './types'
 import { EMPTY_GYM, isUndo as isGymUndo } from './gym'
+import { EMPTY_FOOD, isFoodUndo } from './food'
 import { defaultGoal, isFixedVillain, TRACKERS } from './trackers'
 
 export type MergeResult = {
@@ -13,15 +14,23 @@ export type MergeResult = {
   setsAdded: number // entradas de log del gym añadidas (incluye renombradas)
   exercisesAdded: number
   routinesAdded: number
+  food: FoodData
+  foodAdded: number // entradas de log de comida añadidas (incluye renombradas)
+  foodsAdded: number
+  mealsAdded: number
+  goalsAdded: number
   conflicts: string[] // nombres locales donde la copia difiere; se mantiene lo local
   changed: boolean
 }
-type Side = { events: ActivityEvent[]; custom: CustomData; gym?: GymData }
+type Side = { events: ActivityEvent[]; custom: CustomData; gym?: GymData; food?: FoodData | null }
 
 const same = (a: ActivityEvent, b: ActivityEvent) => a.trackerId === b.trackerId && a.amount === b.amount && a.occurredAt === b.occurredAt
 const sameEntry = (a: GymEntry, b: GymEntry) => isGymUndo(a) || isGymUndo(b)
   ? isGymUndo(a) && isGymUndo(b) && a.undoes === b.undoes && a.occurredAt === b.occurredAt
   : a.exerciseId === b.exerciseId && a.weight === b.weight && a.unit === b.unit && a.reps === b.reps && a.occurredAt === b.occurredAt
+const sameFood = (a: FoodLogEntry, b: FoodLogEntry) => isFoodUndo(a) || isFoodUndo(b)
+  ? isFoodUndo(a) && isFoodUndo(b) && a.undoes === b.undoes && a.occurredAt === b.occurredAt
+  : JSON.stringify([a.name, a.kcal, a.p, a.c, a.f, a.qty, a.serving, a.foodId, a.occurredAt]) === JSON.stringify([(b as FoodEntry).name, (b as FoodEntry).kcal, (b as FoodEntry).p, (b as FoodEntry).c, (b as FoodEntry).f, (b as FoodEntry).qty, (b as FoodEntry).serving, (b as FoodEntry).foodId, b.occurredAt])
 const sig = (t: Tracker) => JSON.stringify([t.name, t.increment, t.weeklyGoal ?? null, t.weeklyLimit ?? null, !!t.archived, t.branch, t.type, t.unit, t.xpPerUnit])
 
 // ponytail: (1) lo borrado con «Borrar todo», importar o restoreLast y que sigue en la copia vuelve: sin servidor ni fecha de
@@ -85,6 +94,24 @@ export function mergeBackup(local: Side, incoming: Side): MergeResult {
   if (routines.length > 0) gym.routines = routines
   else delete gym.routines
 
+  // comida: log como el gym; alimentos y platos por id (conflicto → gana el local); objetivos por `from`
+  const lf = local.food ?? EMPTY_FOOD, inf = incoming.food ?? EMPTY_FOOD
+  const fl = mergeLog<FoodLogEntry>(lf.log, inf.log, sameFood, isFoodUndo)
+  const lfo = new Map(lf.foods.map(x => [x.id, x])), newFoods = inf.foods.filter(x => !lfo.has(x.id))
+  const foodConflicts: string[] = []
+  const fsig = (x: FoodData['foods'][number]) => JSON.stringify([x.name, x.base, x.kcal, x.p, x.c, x.f, !!x.archived])
+  for (const x of inf.foods) { const l = lfo.get(x.id); if (l && fsig(l) !== fsig(x)) foodConflicts.push(l.name) }
+  const lm = new Map((lf.meals ?? []).map(m => [m.id, m])), newMeals = (inf.meals ?? []).filter(m => !lm.has(m.id))
+  for (const m of inf.meals ?? []) { const l = lm.get(m.id); if (l && JSON.stringify([l.name, l.items]) !== JSON.stringify([m.name, m.items])) foodConflicts.push(l.name) }
+  const lgo = new Map((lf.goals ?? []).map(g => [g.from, g])), newGoals: FoodGoal[] = (inf.goals ?? []).filter(g => !lgo.has(g.from))
+  const gsig = (g: FoodGoal) => JSON.stringify([g.kcal, g.p, g.c, g.f])
+  if ((inf.goals ?? []).some(g => { const l = lgo.get(g.from); return l && gsig(l) !== gsig(g) })) foodConflicts.push('Objetivo de calorías')
+  const food: FoodData = { ...lf, log: fl.list, foods: [...lf.foods, ...newFoods] }
+  const goals = [...(lf.goals ?? []), ...newGoals].sort((a, b) => a.from.localeCompare(b.from))
+  if (goals.length > 0) food.goals = goals; else delete food.goals
+  const meals = [...(lf.meals ?? []), ...newMeals]
+  if (meals.length > 0) food.meals = meals; else delete food.meals
+
   const lc = local.custom, ic = incoming.custom
   const localById = new Map(lc.trackers.map(t => [t.id, t]))
   const conflicts: string[] = []
@@ -113,7 +140,8 @@ export function mergeBackup(local: Side, incoming: Side): MergeResult {
   if (custom.goals && Object.keys(custom.goals).length === 0) delete custom.goals
   if (custom.limits && Object.keys(custom.limits).length === 0) delete custom.limits
   return {
-    events, custom, added, existing, renamed, trackersAdded: newTrackers.length, conflicts: [...conflicts, ...exConflicts, ...rtConflicts], gym, setsAdded: gl.added, exercisesAdded: newEx.length, routinesAdded: newRt.length,
-    changed: added > 0 || gl.added > 0 || newEx.length > 0 || newRt.length > 0 || newTrackers.length > 0 || newProps.length > 0 || newLog.length > 0,
+    events, custom, added, existing, renamed, trackersAdded: newTrackers.length, conflicts: [...conflicts, ...exConflicts, ...rtConflicts, ...foodConflicts], gym, setsAdded: gl.added, exercisesAdded: newEx.length, routinesAdded: newRt.length,
+    food, foodAdded: fl.added, foodsAdded: newFoods.length, mealsAdded: newMeals.length, goalsAdded: newGoals.length,
+    changed: fl.added > 0 || newFoods.length > 0 || newMeals.length > 0 || newGoals.length > 0 || added > 0 || gl.added > 0 || newEx.length > 0 || newRt.length > 0 || newTrackers.length > 0 || newProps.length > 0 || newLog.length > 0,
   }
 }

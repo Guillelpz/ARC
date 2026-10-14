@@ -414,6 +414,27 @@ export function runSelfCheck() {
     ok(dup.setsAdded === 0 && dup.gym.log.length === 2, 'GY12 deshacer duplicado = ya estaba')
   }
 
+  // FD11 — comida en la fusión
+  {
+    const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }, d = DEMO_DATE
+    const fl = (id: string, kcal: number): FoodEntry => ({ id, occurredAt: `${d}T10:00:00`, name: 'Arroz', kcal, qty: 100, p: 3, c: 20, f: 1, foodId: 'rice-white-cooked', base: 'g' })
+    const fo = (kcal: number) => ({ id: 'food-1', name: 'Mi tarta', base: 'g' as const, kcal, p: 5, c: 40, f: 12 })
+    const ml = { id: 'meal-1', name: 'Desayuno', items: [{ foodId: 'egg', qty: 100 }] }
+    const g1 = { from: '2026-10-01', kcal: 2000, p: 20, c: 50, f: 30 }
+    const lf: FoodData = { log: [fl('a', 195)], foods: [fo(300)], goals: [g1], meals: [ml] }
+    const L = { events: [] as ActivityEvent[], custom: cu, food: lf }
+    const inc = { events: [] as ActivityEvent[], custom: cu, food: { log: [fl('a', 250), { id: 'u1', undoes: 'a', occurredAt: `${d}T10:00:00` }, fl('b', 80)], foods: [fo(999), { ...fo(100), id: 'food-2', name: 'Otra' }],
+      goals: [{ ...g1, kcal: 2500 }, { ...g1, from: '2026-09-01' }], meals: [{ ...ml, items: [] }, { ...ml, id: 'meal-2' }] } as FoodData }
+    const before = JSON.stringify([L, inc]), m = mergeBackup(L, inc)
+    ok(m.food.log.map(x => x.id).join() === 'a,a~2,u1,b' && (m.food.log[2] as { undoes: string }).undoes === 'a~2' && m.foodAdded === 3 && m.foodsAdded === 1 && m.mealsAdded === 1 && m.goalsAdded === 1 &&
+      m.food.foods.map(x => x.id).join() === 'food-1,food-2' && m.food.foods[0].kcal === 300 && m.food.goals?.map(g => `${g.from}:${g.kcal}`).join() === '2026-09-01:2000,2026-10-01:2000' && m.food.meals?.map(x => x.id).join() === 'meal-1,meal-2' &&
+      m.conflicts.includes('Mi tarta') && m.conflicts.includes('Desayuno') && m.conflicts.includes('Objetivo de calorías') && m.changed && JSON.stringify([L, inc]) === before, 'FD11 fusión: colisión id~2, conflictos y sin mutar')
+    const again = mergeBackup({ ...L, food: m.food }, inc)
+    const none = mergeBackup(L, { events: [], custom: cu }), onlyGoal = mergeBackup(L, { events: [], custom: cu, food: { log: [], foods: [], goals: [{ ...g1, from: '2026-09-15' }] } })
+    ok(again.foodAdded === 0 && again.foodsAdded === 0 && again.mealsAdded === 0 && again.goalsAdded === 0 && !again.changed && JSON.stringify(none.food) === JSON.stringify(lf) && !none.changed && none.foodAdded === 0 &&
+      onlyGoal.changed && onlyGoal.goalsAdded === 1 && !mergeBackup({ events: [], custom: cu }, { events: [], custom: cu }).food.goals, 'FD11 idempotente, copia sin comida, solo objetivos')
+  }
+
   // GY6–GY10, GY13 — sesión automática
   {
     const D = DEMO_DATE, P = '2026-10-05'
