@@ -8,8 +8,9 @@ import { ProgressBar } from './ProgressBar'
 import { SaveFailBanner } from './SaveFailBanner'
 import { FoodAdd, type FoodOpen } from './FoodAdd'
 import { FoodPending } from './FoodPending'
+import { FoodVoiceLog, type FoodVoiceCmd } from './FoodVoiceLog'
 import { foodById } from '../core/food'
-import type { FoodItem } from '../core/foodVoice'
+import type { FoodItem, VoiceAdd } from '../core/foodVoice'
 import type { FoodNet } from './FoodBarcode'
 import { FoodGoalCard } from './FoodGoalCard'
 import { FoodMeals } from './FoodMeals'
@@ -33,6 +34,13 @@ type Props = {
   onExport: () => void
   net: FoodNet
   prefill?: { heard: string; items: FoodItem[] } // ítems de la voz que no se pudieron guardar solos
+  voice: {
+    ack: boolean
+    onAck: () => void
+    onInterpret: (text: string) => Promise<FoodVoiceCmd>
+    onSave: (adds: VoiceAdd[], day: string) => { ids: string[]; created: string[]; diet: DietChange }
+    onUndo: (ids: string[], archive: string[]) => { undone: number; diet: DietChange }
+  }
 }
 
 // Lo que `FoodAdd` abre para revisar un ítem pendiente
@@ -42,9 +50,10 @@ function openFor(i: FoodItem, key: number, own: Food[]): FoodOpen {
   return { key, kind: 'search', query: i.k === 'pending' ? i.query : i.said }
 }
 
-export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport, net, prefill }: Props) {
+export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport, net, prefill, voice }: Props) {
   const [day, setDay] = useState(today)
   const [pending, setPending] = useState<FoodItem[]>(() => prefill?.items ?? [])
+  const [heard, setHeard] = useState(() => prefill?.heard ?? '')
   const [open, setOpen] = useState<FoodOpen | null>(() => (prefill?.items.length === 1 ? openFor(prefill.items[0], 1, food.foods) : null)) // con uno solo se abre directamente
   const reviewing = useRef<FoodItem | null>(prefill?.items.length === 1 ? prefill.items[0] : null)
   const review = (i: FoodItem) => { reviewing.current = i; setOpen(o => openFor(i, (o?.key ?? 0) + 1, food.foods)) }
@@ -52,6 +61,8 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
   const settle = () => { const r = reviewing.current; reviewing.current = null; if (r) setPending(p => p.filter(x => x !== r)) }
   const addEntry: Props['onAddEntry'] = (f, p, d) => { const r = onAddEntry(f, p, d); settle(); return r }
   const addQuick: Props['onAddQuick'] = (i, d) => { const r = onAddQuick(i, d); settle(); return r }
+  // «Completar»/«Editar» del dictado: los ítems pasan a «Por voz: pendiente» (con uno solo se abre directamente)
+  const addPending = (items: FoodItem[], h: string) => { setPending(items); setHeard(h); if (items.length === 1) review(items[0]) }
   const [status, setStatus] = useState('')
   const diaryRef = useRef<HTMLHeadingElement>(null)
   const rows = useRef(new Map<string, HTMLButtonElement>())
@@ -105,7 +116,11 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
         </section>
 
         <FoodGoalCard goal={todayGoal} onSave={onSaveGoal} />
-        {prefill && pending.length > 0 && <FoodPending heard={prefill.heard} items={pending} own={food.foods} onReview={review} onRemove={i => setPending(p => p.filter(x => x !== i))} />}
+        {pending.length > 0 && <FoodPending heard={heard} items={pending} own={food.foods} onReview={review} onRemove={i => setPending(p => p.filter(x => x !== i))} />}
+        <section aria-labelledby="food-voice" className={card}>
+          <h2 id="food-voice" className="text-base font-semibold">Por voz</h2>
+          <FoodVoiceLog day={day} today={today} own={food.foods} ack={voice.ack} onAck={voice.onAck} onInterpret={voice.onInterpret} onSave={voice.onSave} onUndo={voice.onUndo} onPending={addPending} />
+        </section>
         <FoodAdd key={open?.key ?? 0} open={open} food={food} day={day} today={today} onAdd={addEntry} onQuick={addQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} net={net} />
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>
 
