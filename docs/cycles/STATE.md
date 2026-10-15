@@ -29,7 +29,9 @@ Arrancado por el usuario el 2026-10-15. Decisiones del usuario, que no se reabre
 
 **Ejecución:** tech-lead (`docs/TECH_SPEC-food-voice.md`, partido en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, en cada ciclo.
 
-**Estado:** paso 4 (tech-lead).
+**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food-voice.md`; ciclos 36 (parser y captura sin IA), 37 («Dictar» en Comida), 38 (Haiku y memoria), seguidos; decisiones A1-A9 las recomendadas.
+
+**Estado:** ciclo 36 en implementación (rama `cycle-36`).
 
 ## Ciclo 31 — Comida fase 2: investigar integraciones (+ extraer `useFood`)
 
