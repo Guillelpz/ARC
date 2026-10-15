@@ -11,6 +11,7 @@ vi.mock('./image', () => ({ downscale: vi.fn() })) // la foto no se decodifica e
 
 // La suite completa corre en paralelo: con carga, el 1 s por defecto de findBy* se queda corto (U-C1 fallaba ~1 de cada 6).
 configure({ asyncUtilTimeout: 3000 })
+vi.setConfig({ testTimeout: 20000 }) // el 5 s por defecto de cada test también se queda corto con la suite en paralelo (U-C2, U-FV4)
 const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
 beforeEach(() => {
@@ -1230,7 +1231,7 @@ test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto
   ackVoice(); setVoz('ate a burguer'); render(<App />)
   go('Nuevo')
   expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad · \+20 VILLAIN XP$/)).toBeTruthy()
-  expect(net('burgers')).toBe(1)
+  await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   fireEvent.click(btn('Editar'))
   const q = screen.getByLabelText('Cantidad (unidades)') as HTMLInputElement
   expect(q.value).toBe('1'); expect(document.activeElement).toBe(q)
@@ -1855,7 +1856,7 @@ test('U-FV4 «comí una hamburguesa»: Burgers +1 y el botón «Apuntar también
   ackVoice(); setVoz('comí una hamburguesa'); render(<App />)
   fireEvent.click(btn('Dictar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad/)).toBeTruthy()
-  expect(net('burgers')).toBe(1)
+  await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   expect(btn('Apuntar también en Comida')).toBeTruthy()
   expect(foodLive()).toHaveLength(0)
 })
@@ -1880,7 +1881,7 @@ test('U-FV4b «Apuntar también en Comida» abre Comida con la hamburguesa pendi
   fireEvent.click(btn('Apuntar también en Comida'))
   expect(await screen.findByRole('heading', { level: 1, name: 'Comida' })).toBeTruthy()
   expect(screen.getByRole('heading', { level: 3, name: 'Hamburguesa de ternera cocinada' })).toBeTruthy()
-  expect(net('burgers')).toBe(1)
+  await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   expect(foodLive()).toHaveLength(0)
 })
 
@@ -1934,4 +1935,81 @@ test('U-FV7b «Dictar comida» con un alimento sin cantidad: pasa a «Por voz: p
   fireEvent.click(btn('Completar en Comida'))
   expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
   expect(foodLive()).toHaveLength(1)
+})
+
+// --- Comida por voz con Haiku y memoria (ciclo 38). La API se simula: nunca se llama a la real. ---
+const capFood = (foods: unknown[]) => aiReply({ kind: 'food', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+  name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '', foods })
+const calamares = { name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', base: 'g', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 }
+
+test('U-FV9 con clave, «un bocadillo de calamares»: chip «Estimación» y nada guardado hasta «Apuntar»', async () => {
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  const f = stubFetch(() => Promise.resolve(capFood([calamares])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Estimación', { selector: 'span' })).toBeTruthy()
+  expect(screen.getByText('Bocadillo de calamares · 1 Ración (200 g) · 520 kcal')).toBeTruthy()
+  expect(screen.getByText('Revisa la propuesta: no se ha apuntado nada.')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0); expect(f).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: /^Apuntar Bocadillo de calamares/ }))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 520 kcal')).toBeTruthy()
+  expect(foodLive().map(e => [e.name, e.via, e.kcal])).toEqual([['Bocadillo de calamares (200 g)', 'voice', 520]])
+  expect((foodStored().foods as unknown[]).length).toBe(0) // sin la casilla, no se crea un propio (A4)
+})
+
+test('U-FV10 «Guardar también como alimento propio»: propio con source estimate y Deshacer lo archiva', async () => {
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  stubFetch(() => Promise.resolve(capFood([calamares])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'Guardar también como alimento propio' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Apuntar Bocadillo de calamares/ }))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 520 kcal')).toBeTruthy()
+  const own = foodStored().foods as { id: string; source: string; archived?: boolean }[]
+  expect(own).toHaveLength(1); expect(own[0].source).toBe('estimate'); expect(own[0].id.startsWith('food-')).toBe(true)
+  expect(foodLive().map(e => [e.name, e.via])).toEqual([['Bocadillo de calamares', 'voice']])
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: 1 alimento (520 kcal).')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0)
+  expect((foodStored().foods as { archived?: boolean }[])[0].archived).toBe(true)
+})
+
+test('U-FV11 memoria: la segunda frase igual se resuelve sin llamar a Haiku', async () => {
+  ackVoice(); withKey(); setVoz('el arroz de siempre 200 g')
+  const arroz = { ...calamares, name: 'arroz blanco', amount: 200, unit: 'g', servingWord: '', typicalQty: null, kcal100: 130, p100: 3, c100: 28, f100: 0 }
+  const f = stubFetch(() => Promise.resolve(capFood([arroz])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 260 kcal')).toBeTruthy()
+  expect(f).toHaveBeenCalledTimes(1)
+  fireEvent.click(btn('Cerrar'))
+  fireEvent.click(btn('Dictar'))
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(2))
+  expect(f).toHaveBeenCalledTimes(1)
+})
+
+test('U-FV12 «Editar» una estimación abre Comida en «Revisar alimento» con la marca «Estimación»', async () => {
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  stubFetch(() => Promise.resolve(capFood([calamares])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  await screen.findByText('Estimación', { selector: 'span' })
+  fireEvent.click(btn('Editar'))
+  expect(await screen.findByRole('heading', { name: 'Revisar alimento' })).toBeTruthy()
+  expect(screen.getByText('Estimación', { selector: 'span' })).toBeTruthy()
+  expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Bocadillo de calamares')
+  expect(foodLive()).toHaveLength(0)
+})
+
+test('U-FV13 doble clic en «Apuntar» de «Dictar comida» guarda una sola vez (también el +1 de Dieta)', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [], foods: [], goals: [{ from: '2026-10-01', kcal: 800, p: 30, c: 40, f: 30 }] }))
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  stubFetch(() => Promise.resolve(capFood([{ ...calamares, kcal100: 400 }])))
+  render(<App />); openFood()
+  fireEvent.click(btn('Dictar comida'))
+  const ap = await screen.findByRole('button', { name: /^Apuntar Bocadillo de calamares/ })
+  act(() => { ap.click(); ap.click() }) // los dos en el mismo lote: ambos ven el mismo `done`
+  await screen.findByText(/^Registrado en Comida: 1 alimento · 800 kcal/)
+  expect(foodLive()).toHaveLength(1)
+  await vi.waitFor(() => expect(net('dieta')).toBe(1))
 })

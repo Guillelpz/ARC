@@ -5,6 +5,7 @@ import { allFoods, dietNote, fmtKcal, fmtPortion, foodById, frequentFoods, lastP
 import { Segmented } from './Segmented'
 import { FoodQty } from './FoodQty'
 import { FoodCustom } from './FoodCustom'
+import type { FoodDraft } from '../core/off'
 import { FoodBarcode, type FoodNet } from './FoodBarcode'
 import { FoodLabel } from './FoodLabel'
 import { card, field, primary, secondary } from './foodStyle'
@@ -14,6 +15,7 @@ type Quick = { kcal: number; p?: number; c?: number; f?: number; name?: string }
 export type FoodOpen = { key: number } & (
   | { kind: 'qty'; food: Food; portion: Portion | null }
   | { kind: 'search'; query: string }
+  | { kind: 'review'; draft: FoodDraft } // estimación de Haiku: «Revisar alimento» con la marca «Estimación»
   | { kind: 'quick'; kcal: number; name: string })
 type Props = {
   open?: FoodOpen | null
@@ -36,9 +38,10 @@ export function FoodAdd({ open, food, day, today, onAdd, onQuick, onCreate, onAr
   const [tab, setTab] = useState<'recent' | 'frequent'>('recent')
   const [picked, setPicked] = useState<Food | null>(open?.kind === 'qty' ? open.food : null)
   const [seed, setSeed] = useState<Portion | null>(open?.kind === 'qty' ? open.portion : null) // ración propuesta por la voz, solo para el primer alimento
-  const [panel, setPanel] = useState<null | 'create' | 'barcode' | 'label'>(null) // un solo panel abierto; abrir uno cierra `picked`
+  const [reviewDraft, setReviewDraft] = useState<FoodDraft | null>(open?.kind === 'review' ? open.draft : null)
+  const [panel, setPanel] = useState<null | 'create' | 'barcode' | 'label'>(open?.kind === 'review' ? 'create' : null) // un solo panel abierto; abrir uno cierra `picked`
   const [createName, setCreateName] = useState('') // nombre prerrellenado de «Crear alimento»
-  const openCreate = (name: string) => { setPicked(null); setCreateName(name); setPanel('create') }
+  const openCreate = (name: string) => { setPicked(null); setCreateName(name); setReviewDraft(null); setPanel('create') }
   const [quickOpen, setQuickOpen] = useState(open?.kind === 'quick')
   const [q, setQ] = useState({ kcal: open?.kind === 'quick' ? String(open.kcal) : '', p: '', c: '', f: '', name: open?.kind === 'quick' && open.name !== 'Añadido rápido' ? open.name : '' })
   const [qErr, setQErr] = useState('')
@@ -74,7 +77,7 @@ export function FoodAdd({ open, food, day, today, onAdd, onQuick, onCreate, onAr
   }
   const create = (input: Omit<Food, 'id'>) => {
     const f = onCreate(input)
-    setPanel(null); setQuery(''); setPicked(f)
+    setPanel(null); setReviewDraft(null); setQuery(''); setPicked(f)
     onStatus(`Alimento creado: ${f.name}`)
   }
   const reactivate = (f: Food) => {
@@ -112,7 +115,7 @@ export function FoodAdd({ open, food, day, today, onAdd, onQuick, onCreate, onAr
         <input id="food-search" ref={searchRef} type="search" autoComplete="off" value={query} onChange={e => { setQuery(e.target.value); setPicked(null) }} className={field} />
       </div>
       {panel === 'create'
-        ? <FoodCustom key="create" initialName={createName} custom={food.foods} onCreate={create} onReactivate={reactivate} onCancel={() => { setPanel(null); searchRef.current?.focus() }} />
+        ? <FoodCustom key="create" initialName={createName} custom={food.foods} draft={reviewDraft ?? undefined} onCreate={create} onReactivate={reactivate} onCancel={() => { setPanel(null); setReviewDraft(null); searchRef.current?.focus() }} />
         : panel === 'barcode'
         ? <FoodBarcode net={net} custom={food.foods} onPick={f => { setPanel(null); setQuery(''); setPicked(f) }} onReactivate={reactivate} onCreate={create} onStatus={onStatus} onClose={() => { setPanel(null); searchRef.current?.focus() }} onLabel={() => setPanel('label')} />
         : panel === 'label'

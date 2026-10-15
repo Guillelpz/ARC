@@ -4,7 +4,7 @@ import { TRACKERS } from './trackers'
 import type { Memo } from './memory'
 import { routeCapture, type CaptureCtx } from './capture'
 import { askLabel } from './label'
-import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretGym, postHaiku } from './haiku'
+import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretFood, interpretGym, postHaiku } from './haiku'
 
 const KEY = 'sk-ant-test-0000000000000000'
 const reply = (o: unknown, extra: Record<string, unknown> = {}) => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(o) }], ...extra })
@@ -136,7 +136,7 @@ describe('captura', () => {
     const [url, init] = f.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('https://api.anthropic.com/v1/messages')
     const body = JSON.parse(init.body as string)
-    expect(body.model).toBe('claude-haiku-5-5'); expect(body.max_tokens).toBe(400)
+    expect(body.model).toBe('claude-haiku-5-5'); expect(body.max_tokens).toBe(1000)
     expect(body.thinking).toEqual({ type: 'disabled' })
     expect(body.output_config.format.schema.properties.exerciseId.enum).toEqual([...EXERCISES.map(e => e.id), 'none'])
     expect(body.output_config.format.schema.properties.trackerId.enum).toEqual([...act.map(t => t.id), 'none'])
@@ -201,5 +201,78 @@ describe('captura', () => {
       expect(r).toMatchObject({ kind: 'gym', source: 'memory' })
       expect(r).not.toHaveProperty('aiError')
     })
+  })
+})
+
+describe('comida (ciclo 38)', () => {
+  const act = TRACKERS
+  const ctx: CaptureCtx = { exercises: EXERCISES, trackers: act, all: act, unit: 'kg' }
+  const item = { name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', base: 'g', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 }
+  const cap = { kind: 'food', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+    name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '', foods: [item] }
+  const own = [{ id: 'food-1', name: 'Mi tarta', base: 'g' as const, kcal: 300, p: 3, c: 40, f: 10 }]
+
+  test('H-FV1 O3: «200 g de arroz» no llama a fetch (captura y Dictar comida)', async () => {
+    const f = mock(() => ok(reply(cap)))
+    const a = await interpretCapture('200 g de arroz', ctx, KEY, true, f), b = await interpretFood('200 g de arroz', [], KEY, true, [], f)
+    expect(f).not.toHaveBeenCalled()
+    expect(a).toMatchObject({ kind: 'food', source: 'parser' }); expect(b).toMatchObject({ kind: 'food', source: 'parser' })
+  })
+  test('H-FV2 «comí un bocadillo» sí llama, y la estimación llega sin guardar', async () => {
+    const f = mock(() => ok(reply(cap)))
+    const r = await interpretCapture('comí un bocadillo de calamares', ctx, KEY, true, f)
+    expect(f).toHaveBeenCalledTimes(1)
+    expect(r).toMatchObject({ kind: 'food', source: 'ai', items: [{ k: 'estimate', draft: { source: 'estimate', kcal: 260 }, portion: { qty: 200 } }] })
+  })
+  test('H-FV3 el cuerpo lleva foods en el esquema, max_tokens 1000, los propios y no la clave', async () => {
+    const f = mock(() => ok(reply(cap)))
+    await interpretCapture('comí un bocadillo', { ...ctx, foods: own }, KEY, true, f)
+    const body = JSON.parse((f.mock.calls[0] as [string, RequestInit])[1].body as string)
+    expect(body.max_tokens).toBe(1000)
+    expect(body.output_config.format.schema.required).toContain('foods')
+    expect(body.output_config.format.schema.properties.foods.items.required).toHaveLength(10)
+    expect(body.messages[0].content).toContain('<propios>\nMi tarta\n</propios>')
+    expect(body.system).toContain('foods')
+    expect(JSON.stringify(body)).not.toContain(KEY)
+  })
+  test('H-FV4 askFood usa 800 tokens y su esquema; un 500 deja el parser con aiError', async () => {
+    const f = mock(() => ok(reply({ otherDay: false, foods: [item] })))
+    const r = await interpretFood('comí un bocadillo de calamares', own, KEY, true, [], f)
+    const body = JSON.parse((f.mock.calls[0] as [string, RequestInit])[1].body as string)
+    expect(body.max_tokens).toBe(800)
+    expect(body.output_config.format.schema.required).toEqual(['otherDay', 'foods'])
+    expect(body.messages[0].content).toContain('<frase>comí un bocadillo de calamares</frase>')
+    expect(r).toMatchObject({ kind: 'food', source: 'ai', items: [{ k: 'estimate' }] })
+    const bad = await interpretFood('un bocadillo', own, KEY, true, [], mock(() => ok({}, 500)))
+    expect(bad).toMatchObject({ kind: 'food', source: 'parser', aiError: 'http' })
+  })
+  test('H-FV4b Haiku con otherDay o foods inválidos', async () => {
+    expect(await interpretFood('un bocadillo', own, KEY, true, [], mock(() => ok(reply({ otherDay: true, foods: [] }))))).toMatchObject({ kind: 'other-day', source: 'ai' })
+    expect(await interpretFood('un bocadillo', own, KEY, true, [], mock(() => ok(reply({ otherDay: false, foods: [{ ...item, unit: 'galones' }] }))))).toMatchObject({ source: 'parser', aiError: 'invalid' })
+    expect(await interpretFood('un bocadillo', own, KEY, true, [], mock(() => ok(reply({ otherDay: false, foods: [] }))))).toMatchObject({ kind: 'unknown', source: 'ai' })
+  })
+  test('H-FV5 sin clave u offline no llama a fetch', async () => {
+    const f = mock(() => ok(reply(cap)))
+    const a = await interpretFood('comí un bocadillo', own, null, true, [], f), b = await interpretFood('comí un bocadillo', own, KEY, false, [], f)
+    const c = await interpretCapture('comí un bocadillo', ctx, null, true, f)
+    expect(f).not.toHaveBeenCalled()
+    expect(a).toMatchObject({ kind: 'food', source: 'parser' }); expect(b).toEqual(a); expect(c.kind).toBe('food'); expect(a).not.toHaveProperty('aiError')
+  })
+  test('«Dictar comida» con otro día no llama a fetch', async () => {
+    const f = mock(() => ok(reply(cap)))
+    expect(await interpretFood('ayer un bocadillo', own, KEY, true, [], f)).toMatchObject({ kind: 'other-day', source: 'parser' })
+    expect(f).not.toHaveBeenCalled()
+  })
+  test('O1: una frase de comida recordada y lista no llama a fetch; sin cantidad sí', async () => {
+    const f = mock(() => ok(reply(cap)))
+    const memo: Memo = [{ k: 'arroz', kind: 'food', id: 'rice-white-cooked' }]
+    const r = await interpretFood('arroz 300 g', [], KEY, true, memo, f)
+    expect(f).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ kind: 'food', source: 'parser' }) // «arroz 300 g» ya es deviceSure
+    const m = await interpretFood('arroz de todos los dias 300 g', [], KEY, true, [{ k: 'arroz todos dias', kind: 'food', id: 'rice-white-cooked' }], f)
+    expect(f).not.toHaveBeenCalled()
+    expect(m).toMatchObject({ kind: 'food', source: 'memory', items: [{ foodId: 'rice-white-cooked', portion: { qty: 300 } }] })
+    await interpretFood('arroz de todos los dias', [], KEY, true, [{ k: 'arroz todos dias', kind: 'food', id: 'rice-white-cooked' }], f)
+    expect(f).toHaveBeenCalledTimes(1)
   })
 })

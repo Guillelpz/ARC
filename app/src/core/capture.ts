@@ -1,7 +1,7 @@
 import type { Memo } from './memory'
 import type { Branch, Confidence, Exercise, Food, Tracker, WeightUnit } from './types'
 import { STOPWORDS, classify, exactHits, exactTracker, isValidName, isValidUnit, matchTracker, normalizeText, trackerName } from './classify'
-import { FOOD_UNIT_SET, foodReady, looksLikeFood, parseFoodVoice, type FoodItem } from './foodVoice'
+import { FOOD_UNIT_SET, foodItemsFromAI, foodReady, itemReady, looksLikeFood, parseFoodVoice, type FoodItem } from './foodVoice'
 import { fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type HaikuError, type VoiceCommand } from './voice'
 
 export const PAGE_MIN = 2        // 1 página = 2 min (solo en Reading)
@@ -198,7 +198,7 @@ export function isReady(c: CaptureCommand, ctx: CaptureCtx): boolean {
   }
 }
 
-const KINDS = ['gym', 'tracker', 'new', 'none'] as const
+const KINDS = ['gym', 'tracker', 'food', 'new', 'none'] as const
 const AMOUNT_UNITS = ['min', 'h', 'km', 'pages', 'count', 'other', 'none'] as const
 const TYPES = ['count', 'distance', 'duration', 'custom'] as const
 const oneOf = <T extends string>(v: unknown, xs: readonly T[]): v is T => xs.includes(v as T)
@@ -223,10 +223,14 @@ export function captureFromAI(o: unknown, text: string, ctx: CaptureCtx): Captur
     const draft = fromAI({ exerciseId: x.exerciseId, weight: x.weight, unit: x.weightUnit, reps: x.reps, sets: x.sets }, ctx.exercises, ctx.unit)
     return draft ? { kind: 'gym', text, source: 'ai', draft } : null
   }
+  // foods ausente = [] (tolerante); presente pero inválido → null (manda el parser)
+  const foods = x.foods === undefined ? [] : foodItemsFromAI(x.foods, ctx.foods ?? [])
+  if (foods === null) return null
+  if (x.kind === 'food') return foods.length ? { ...src, kind: 'food', items: foods, rest: '' } : { ...src, kind: 'unknown' }
   const ms: Measure[] = x.amount === null ? [] : [{ value: x.amount, family: x.amountUnit === 'none' ? null : x.amountUnit, word: normalizeText(x.unitWord) }]
   if (x.kind === 'tracker') {
     const t = active.find(a => a.id === x.trackerId)
-    return t ? { ...src, kind: 'tracker', trackerId: t.id, ...resolveAmount(t, ms) } : null
+    return t ? { ...src, kind: 'tracker', trackerId: t.id, ...resolveAmount(t, ms), ...(foods.length ? { food: foods } : {}) } : null
   }
   const name = trackerName(x.name.trim().replace(/\s+/g, ' '))
   if (!isValidName(name) || (x.type === 'custom' && !isValidUnit(x.customUnit))) return null
@@ -240,8 +244,11 @@ export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, c
   if (ai?.kind === 'other-day') return ai
   if (parsed.kind === 'other-day') return parsed
   if (!ai) return parsed
-  // ponytail: hasta que Haiku sepa de comida (ciclo 38), si el parser reconoce alimentos y la IA solo ve un hábito nuevo o nada, manda el parser
-  if (parsed.kind === 'food' && (ai.kind === 'new' || ai.kind === 'unknown')) return parsed
+  // ponytail: Haiku ya conoce la comida (kind «food»), pero si el parser casó un alimento del catálogo o propio (no solo un «pendiente» sin nombre) y la IA
+  // ve un hábito nuevo o nada, manda el parser: un «new» con confianza alta se crearía solo como hábito («arroz»). Se retira cuando haya datos de uso real que no lo pidan.
+  if (parsed.kind === 'food' && (ai.kind === 'new' || ai.kind === 'unknown') && parsed.items.some(i => i.k !== 'pending')) return parsed
+  // comida de las dos: la IA, salvo que el parser tenga más ítems listos (su cantidad es exacta)
+  if (ai.kind === 'food' && parsed.kind === 'food') return parsed.items.filter(itemReady).length > ai.items.filter(itemReady).length ? parsed : ai
   if (ai.kind === 'gym' && parsed.kind === 'gym') {
     const { draft, source } = pickDraft(ai.draft, parsed.draft, ctx.exercises)
     return { kind: 'gym', text: ai.text, draft, source }
@@ -251,7 +258,7 @@ export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, c
 }
 
 // Comida del día elegido (Comida → «Dictar»): solo entiende comida. Otro día → no guarda (A7); sin nada reconocible → unknown.
-// ponytail: sin Haiku hasta el ciclo 38; no pasa por hábitos ni gym.
+// Es el respaldo determinista de `interpretFood` (haiku.ts, con Haiku y memoria); no pasa por hábitos ni gym.
 export function localFood(text: string, own: Food[]): Extract<CaptureCommand, { kind: 'food' | 'other-day' | 'unknown' }> {
   const src: Src = { text, source: 'parser' }
   if (isOtherDay(captureNorm(text))) return { ...src, kind: 'other-day' }

@@ -11,6 +11,7 @@ import { FoodPending } from './FoodPending'
 import { FoodVoiceLog, type FoodVoiceCmd } from './FoodVoiceLog'
 import { foodById } from '../core/food'
 import type { FoodItem, VoiceAdd } from '../core/foodVoice'
+import type { CaptureCommand } from '../core/capture'
 import type { FoodNet } from './FoodBarcode'
 import { FoodGoalCard } from './FoodGoalCard'
 import { FoodMeals } from './FoodMeals'
@@ -40,12 +41,15 @@ type Props = {
     onInterpret: (text: string) => Promise<FoodVoiceCmd>
     onSave: (adds: VoiceAdd[], day: string) => { ids: string[]; created: string[]; diet: DietChange }
     onUndo: (ids: string[], archive: string[]) => { undone: number; diet: DietChange }
+    onLearn: (cmd: CaptureCommand) => void
+    onForget: (text: string) => void
   }
 }
 
 // Lo que `FoodAdd` abre para revisar un ítem pendiente
 function openFor(i: FoodItem, key: number, own: Food[]): FoodOpen {
   if (i.k === 'quick') return { key, kind: 'quick', kcal: i.kcal, name: i.name }
+  if (i.k === 'estimate') return { key, kind: 'review', draft: { ...i.draft, servings: i.draft.servings ?? [], source: 'estimate' } }
   if (i.k === 'food') { const f = foodById(i.foodId, own); if (f) return { key, kind: 'qty', food: f, portion: i.portion } }
   return { key, kind: 'search', query: i.k === 'pending' ? i.query : i.said }
 }
@@ -119,7 +123,7 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
         {pending.length > 0 && <FoodPending heard={heard} items={pending} own={food.foods} onReview={review} onRemove={i => setPending(p => p.filter(x => x !== i))} />}
         <section aria-labelledby="food-voice" className={card}>
           <h2 id="food-voice" className="text-base font-semibold">Por voz</h2>
-          <FoodVoiceLog day={day} today={today} own={food.foods} ack={voice.ack} onAck={voice.onAck} onInterpret={voice.onInterpret} onSave={voice.onSave} onUndo={voice.onUndo} onPending={addPending} />
+          <FoodVoiceLog day={day} today={today} own={food.foods} ack={voice.ack} onAck={voice.onAck} onInterpret={voice.onInterpret} onSave={voice.onSave} onUndo={voice.onUndo} onPending={addPending} onLearn={voice.onLearn} onForget={voice.onForget} />
         </section>
         <FoodAdd key={open?.key ?? 0} open={open} food={food} day={day} today={today} onAdd={addEntry} onQuick={addQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} net={net} />
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>

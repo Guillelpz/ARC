@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { CircleAlert, Keyboard, Mic } from 'lucide-react'
 import type { DietChange, Food } from '../core/types'
 import { dietNote } from '../core/food'
-import { itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
+import { isConfirmable, itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
 import type { CaptureCommand } from '../core/capture'
 import { VOICE_MAX_CHARS } from '../core/voice'
 import { dayLabel } from '../core/stats'
@@ -12,7 +12,7 @@ import { VT } from './voiceTone'
 import { VoicePrivacy } from './VoicePrivacy'
 import { noApiText, offlineText, speechErrorText } from './voiceErrors'
 import { FoodVoiceCard } from './FoodVoiceCard'
-import { foodCount, foodStatus, kcalOf } from './foodVoiceText'
+import { confirmDone, foodCount, foodStatus, kcalOf } from './foodVoiceText'
 
 export type FoodVoiceCmd = Extract<CaptureCommand, { kind: 'food' | 'other-day' | 'unknown' }>
 type Props = {
@@ -25,8 +25,10 @@ type Props = {
   onSave: (adds: VoiceAdd[], day: string) => { ids: string[]; created: string[]; diet: DietChange }
   onUndo: (ids: string[], archive: string[]) => { undone: number; diet: DietChange }
   onPending: (items: FoodItem[], heard: string) => void // «Completar»/«Editar»: pasan a «Por voz: pendiente»
+  onLearn: (cmd: CaptureCommand) => void // O1: frase de un alimento guardado solo
+  onForget: (text: string) => void // «Deshacer»/«Editar»
 }
-type Done = { cmd: Extract<FoodVoiceCmd, { kind: 'food' }>; ids: string[]; saved: FoodItem[]; pending: FoodItem[]; diet: DietChange; day: string }
+type Done = { cmd: Extract<FoodVoiceCmd, { kind: 'food' }>; ids: string[]; created: string[]; saved: FoodItem[]; pending: FoodItem[]; diet: DietChange; undone: null; day: string }
 type Mode = 'idle' | 'privacy' | 'listening' | 'processing' | 'saved' | 'undone' | 'text'
 
 export const FOOD_OTHER_DAY = 'Para otro día, cámbialo en el selector y dicta sin decir el día.'
@@ -68,9 +70,10 @@ export function FoodVoiceLog(props: Props) {
     setText('')
     if (cmd.kind !== 'food') { setMessage(cmd.kind === 'other-day' ? FOOD_OTHER_DAY : UNKNOWN); setMode('idle'); focusMic(); return } // A7: otro día no guarda
     const ready = cmd.items.filter(itemReady), pending = cmd.items.filter(i => !itemReady(i))
-    if (!ready.length) { setMode('idle'); r.onPending(cmd.items, cmd.text); return } // nada que guardar: Comida lo completa
+    if (!ready.length && !pending.some(isConfirmable)) { setMode('idle'); r.onPending(cmd.items, cmd.text); return } // nada que guardar ni que confirmar: Comida lo completa
     const s = r.onSave(voiceAdds(ready, r.own), r.day)
-    setDone({ cmd, ids: s.ids, saved: ready, pending, diet: s.diet, day: r.day }); setMode('saved'); focusMic()
+    if (pending.length === 0) r.onLearn(cmd)
+    setDone({ cmd, ids: s.ids, created: s.created, saved: ready, pending, diet: s.diet, undone: null, day: r.day }); setMode('saved'); focusMic()
   }
 
   async function listen() {
@@ -102,15 +105,24 @@ export function FoodVoiceLog(props: Props) {
 
   function undo() {
     if (!done) return
-    const r = ref.current.onUndo(done.ids, [])
+    const r = ref.current.onUndo(done.ids, done.created)
+    ref.current.onForget(done.cmd.text)
     setUndone(`Deshecho: ${foodCount(done.ids.length)} (${kcalOf(done.saved, own)} kcal).${dietNote(r.diet)}`)
     setDone(null); setMode('undone'); focusMic()
   }
   function edit() {
     if (!done) return
-    if (done.ids.length) ref.current.onUndo(done.ids, [])
+    if (done.ids.length) ref.current.onUndo(done.ids, done.created)
+    ref.current.onForget(done.cmd.text)
     setDone(null); setMode('idle')
     ref.current.onPending(done.cmd.items, done.cmd.text) // todos los ítems vuelven como pendientes
+  }
+  // «Apuntar» de una estimación o ración propuesta: guarda en el día elegido y suma sus ids al mismo «Deshacer»
+  const confirmed = useRef(new Set<FoodItem>()) // `done` es el del render: un segundo clic rápido no debe guardar dos veces
+  function confirm(item: FoodItem, asOwn: boolean) {
+    if (!done || confirmed.current.has(item)) return
+    confirmed.current.add(item)
+    setDone(confirmDone(done, item, asOwn, ref.current.own, adds => ref.current.onSave(adds, done.day)))
   }
   function complete() { if (done) { const d = done; setDone({ ...d, pending: [] }); ref.current.onPending(d.pending, d.cmd.text) } }
   function close() { setDone(null); setMode('idle'); focusMic() }
@@ -123,6 +135,7 @@ export function FoodVoiceLog(props: Props) {
     : mode === 'saved' && done ? `${foodStatus({ ...done, undone: null }, own)} (${dayWord}).`
     : mode === 'undone' ? undone
     : message ?? ''
+  const aiNote = mode === 'saved' && done && done.cmd.source !== 'ai' && (done.cmd.aiError === 'auth' || done.cmd.aiError === 'rate')
   const visible = busy || mode === 'saved' || mode === 'undone' || message !== null
 
   return (
@@ -143,9 +156,10 @@ export function FoodVoiceLog(props: Props) {
         <p role="status" className={visible ? `flex items-start gap-2 text-sm ${mode === 'saved' ? 'font-semibold' : ''} ${t.text}` : 'sr-only'}>
           {message !== null && mode !== 'saved' && <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />}{statusText}
         </p>
+        {aiNote && <p className={`text-sm ${t.muted}`}>La IA no está disponible (clave rechazada o sin saldo): interpretado en el dispositivo.</p>}
         {mode === 'saved' && done && (
           <FoodVoiceCard tone="hero" heard={done.cmd.text} saved={done.saved} pending={done.pending} rest={done.cmd.rest} own={own}
-            onUndo={done.ids.length ? undo : undefined} onComplete={complete} onEdit={edit} onClose={close} />
+            onUndo={done.ids.length ? undo : undefined} onConfirm={confirm} onComplete={complete} onEdit={edit} onClose={close} />
         )}
       </div>
       {mode === 'text' && (

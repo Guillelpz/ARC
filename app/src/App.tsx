@@ -297,7 +297,7 @@ export default function App() {
   const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
     interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo(), foods: food.foods }, loadAiKey(), navigator.onLine !== false)
-  const interpretFd = (text: string) => interpretFood(text, food.foods)
+  const interpretFd = (text: string) => interpretFood(text, food.foods, loadAiKey(), navigator.onLine !== false, loadMemo())
   const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
   const forgetCapture = (text: string) => { const m = loadMemo(), n = forget(m, text); if (n !== m) saveMemo(n) }
 
@@ -488,7 +488,7 @@ export default function App() {
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
-      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} prefill={foodPrefill ?? undefined} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretFd, onSave: foodHandlers.addVoice, onUndo: foodHandlers.undoVoice }}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} prefill={foodPrefill ?? undefined} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretFd, onSave: foodHandlers.addVoice, onUndo: foodHandlers.undoVoice, onLearn: learnCapture, onForget: forgetCapture }}
         net={{ online: navigator.onLine !== false, hasKey: aiKey.hint !== null, ack: foodAck, onAck: ackFood, lookupEan: ean => (navigator.onLine === false ? Promise.resolve({ kind: 'error', error: 'network' }) : fetchOff(ean)), readLabel }} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}

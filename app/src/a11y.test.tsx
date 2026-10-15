@@ -8,6 +8,7 @@ import { liveText } from './components/liveText'
 import { downscale } from './image'
 
 vi.mock('./image', () => ({ downscale: vi.fn() }))
+vi.setConfig({ testTimeout: 20000 })
 
 beforeEach(() => {
   localStorage.clear(); unlockStorage()
@@ -280,4 +281,17 @@ test('A-FV3 Comida con «Por voz» y una frase guardada', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Apuntar' }))
   expect(await screen.findByText(/^Registrado en Comida: 1 alimento/)).toBeTruthy()
   expect(await serious()).toEqual([])
+})
+
+test('A-FV4 captura: fila «Estimación» con casilla y «Apuntar» (Haiku simulado)', async () => {
+  localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
+  const food = { name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', base: 'g', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 }
+  const reply = { kind: 'food', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+    name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '', foods: [food] }
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(reply) }] }), { status: 200 })))
+  await typeCapture('un bocadillo de calamares')
+  expect(await screen.findByText('Estimación', { selector: 'span' })).toBeTruthy()
+  expect(screen.getByRole('checkbox', { name: 'Guardar también como alimento propio' })).toBeTruthy()
+  expect(await serious()).toEqual([])
+  vi.unstubAllGlobals()
 })

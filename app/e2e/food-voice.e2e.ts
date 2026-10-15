@@ -87,3 +87,34 @@ test('E-FV2 «Dictar comida» en Comida con el selector en «Ayer»: queda en ay
   await expect(page.getByRole('region', { name: 'Diario' }).getByText('Nada apuntado este día.')).toBeVisible()
   expect(calls).toHaveLength(0)
 })
+
+test('E-FV3 con clave y Haiku interceptado: «Estimación» a 320 px, nada guardado hasta «Apuntar», axe', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await fakeSpeech(page)
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('life-rpg-voice-v1')) localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
+    localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
+  })
+  const food = { name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', base: 'g', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 }
+  const reply = { kind: 'food', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+    name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '', foods: [food] }
+  let calls = 0
+  await page.route('https://api.anthropic.com/**', route => {
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST' }
+    if (route.request().method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
+    calls++
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(reply) }] }) })
+  })
+  await page.goto('./')
+  await say(page, 'un bocadillo de calamares')
+  await page.getByRole('button', { name: 'Apuntar por voz' }).click()
+  await expect(page.getByText('Estimación', { exact: true })).toBeVisible()
+  await expect(page.getByText('Revisa la propuesta: no se ha apuntado nada.')).toBeVisible()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await axe(page, 'fila Estimación')
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('life-rpg-food-v1') ?? '{"log":[]}').log.length)).toBe(0)
+  await page.getByRole('button', { name: /^Apuntar Bocadillo de calamares/ }).click()
+  await expect(page.getByText(/^Registrado en Comida: 1 alimento · 520 kcal/)).toBeVisible()
+  expect(calls).toBe(1)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+})
