@@ -1,6 +1,6 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–37 cerrados e implementados; ciclo 38 en implementación (rama `cycle-38`). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–38 cerrados e implementados; workflow en pausa. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15; todos están en el historial de git.
 
 ## En curso
 
@@ -27,11 +27,11 @@ Arrancado por el usuario el 2026-10-15. Decisiones del usuario, que no se reabre
   - Sin dependencias nuevas.
   - La API real nunca se llama en tests.
 
-**Ejecución:** tech-lead (`docs/TECH_SPEC-food-voice.md`, partido en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, en cada ciclo.
+**Ejecución:** tech-lead (`TECH_SPEC-food-voice.md`, eliminada al cerrar; partido en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, en cada ciclo.
 
-**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food-voice.md`; ciclos 36 (parser y captura sin IA), 37 («Dictar» en Comida), 38 (Haiku y memoria), seguidos; decisiones A1-A9 las recomendadas.
+**Spec aprobada (2026-10-15):** `TECH_SPEC-food-voice.md` (eliminada al cerrar la fase 3); ciclos 36 (parser y captura sin IA), 37 («Dictar» en Comida), 38 (Haiku y memoria), seguidos; decisiones A1-A9 las recomendadas.
 
-**Estado:** ciclo 36 **cerrado** (merge 358c197; review APROBADO, 2 menores; análisis en `cycle-36/analysis.md`). Ciclo 37 («Dictar» en Comida) **cerrado** (merge c39b7f3; review APROBADO, 3 menores; análisis en `cycle-37/analysis.md`). Ciclo 38 (Haiku y memoria) **en implementación** (rama `cycle-38`).
+**Estado:** ciclo 36 **cerrado** (merge 358c197; review APROBADO, 2 menores; análisis en `cycle-36/analysis.md`). Ciclo 37 («Dictar» en Comida) **cerrado** (merge c39b7f3; review APROBADO, 3 menores; análisis en `cycle-37/analysis.md`). Ciclo 38 (Haiku y memoria) **cerrado** (merge 4fd082c; review APROBADO en 2.ª vuelta; análisis en `cycle-38/analysis.md`). **Fase 3 de Comida cerrada** (módulo Comida completo, fases 1-3). Workflow en pausa; spec y análisis del ciclo 37 eliminados (historial de git).
 
 ## Ciclo 31 — Comida fase 2: investigar integraciones (+ extraer `useFood`)
 
