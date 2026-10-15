@@ -7,6 +7,7 @@ import { DayPicker } from './DayPicker'
 import { ProgressBar } from './ProgressBar'
 import { SaveFailBanner } from './SaveFailBanner'
 import { FoodAdd } from './FoodAdd'
+import type { FoodNet } from './FoodBarcode'
 import { FoodGoalCard } from './FoodGoalCard'
 import { FoodMeals } from './FoodMeals'
 import { FoodWeek } from './FoodWeek'
@@ -27,9 +28,10 @@ type Props = {
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
+  net: FoodNet
 }
 
-export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport }: Props) {
+export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport, net }: Props) {
   const [day, setDay] = useState(today)
   const [status, setStatus] = useState('')
   const diaryRef = useRef<HTMLHeadingElement>(null)
@@ -84,7 +86,7 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
         </section>
 
         <FoodGoalCard goal={todayGoal} onSave={onSaveGoal} />
-        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} />
+        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} net={net} />
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>
 
         <FoodMeals food={food} day={day} onSave={onSaveMeal} onDelete={onDeleteMeal} onAdd={onAddMeal} onUndo={onUndo} />

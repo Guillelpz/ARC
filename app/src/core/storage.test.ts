@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, EMPTY_FOOD, FOOD_KEY, GYM_KEY, readFood, saveFood, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { FOOD_PRIVACY_KEY, loadFoodPrivacy, saveFoodPrivacy, MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, EMPTY_FOOD, FOOD_KEY, GYM_KEY, readFood, saveFood, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -562,5 +562,23 @@ describe('memoria de la captura', () => {
     expect(backupCurrent(s)).toBe(true)
     expect([...s.m.keys()].some(k => k.startsWith(MEMO_KEY + '.backup'))).toBe(false)
     expect(exportBackup([good], EMPTY_CUSTOM, 'x', EMPTY_GYM)).not.toContain('burguer')
+  })
+})
+
+describe('avisos de privacidad de Comida (32.2)', () => {
+  test('carga, guarda y corrupta -> {}', () => {
+    const s = fakeStore()
+    expect(loadFoodPrivacy(s)).toEqual({})
+    expect(saveFoodPrivacy({ off: '2026-10-15T10:00:00.000Z', label: '2026-10-16T10:00:00.000Z' }, s)).toBe(true)
+    expect(loadFoodPrivacy(s)).toEqual({ off: '2026-10-15T10:00:00.000Z', label: '2026-10-16T10:00:00.000Z' })
+    for (const raw of ['5', '[]', '{"off":3}', '{roto']) expect(loadFoodPrivacy(fakeStore({ [FOOD_PRIVACY_KEY]: raw }))).toEqual({})
+  })
+  test('fuera de datos, copias y backupCurrent', () => {
+    expect(isDataKey(FOOD_PRIVACY_KEY)).toBe(false)
+    const s = fakeStore({ [EV]: JSON.stringify([good]), [FOOD_PRIVACY_KEY]: '{"off":"x"}' })
+    expect(backupCurrent(s)).toBe(true)
+    expect([...s.m.keys()].filter(k => k.includes('backup')).every(k => !k.includes('food-privacy'))).toBe(true)
+    const text = exportBackup([good], EMPTY_CUSTOM, 'x', EMPTY_GYM)
+    expect(text).not.toContain('food-privacy'); expect(text).not.toContain('"off"')
   })
 })

@@ -192,3 +192,28 @@ test('A-FD4 Comida: crear alimento, plato guardado y resumen semanal', async () 
   fireEvent.click(screen.getByRole('button', { name: 'Añadir ración' }))
   expect(await serious()).toEqual([])
 })
+
+// --- Comida: Open Food Facts (ciclo 32) ---
+const offReply = (o: unknown) => vi.fn(() => Promise.resolve(new Response(JSON.stringify(o), { status: 200 })))
+const openBarcode = () => { openFood(); fireEvent.click(screen.getByRole('button', { name: 'Código de barras' })) }
+
+test('A-FI1 código de barras: aviso y campo', async () => {
+  vi.stubGlobal('fetch', offReply({}))
+  render(<App />); openBarcode()
+  expect(await serious()).toEqual([])
+  fireEvent.click(screen.getByRole('button', { name: 'Entendido' }))
+  expect(await serious()).toEqual([])
+  vi.unstubAllGlobals()
+})
+
+test('A-FI2 revisión con atribución y aviso de coherencia', async () => {
+  localStorage.setItem('life-rpg-food-privacy-v1', JSON.stringify({ off: 'x' }))
+  vi.stubGlobal('fetch', offReply({ status: 1, product: { product_name: 'Raro', nutriments: { 'energy-kcal_100g': 400, proteins_100g: 10, carbohydrates_100g: 10, fat_100g: 5 } } }))
+  render(<App />); openBarcode()
+  fireEvent.change(screen.getByRole('textbox', { name: 'Código de barras' }), { target: { value: '8480000118837' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Buscar' }))
+  expect(await screen.findByText('Las kcal no cuadran con los macros. Revisa la etiqueta.')).toBeTruthy()
+  expect(screen.getByRole('link', { name: /Open Food Facts/ })).toBeTruthy()
+  expect(await serious()).toEqual([])
+  vi.unstubAllGlobals()
+})

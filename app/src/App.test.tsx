@@ -1607,3 +1607,115 @@ test('U-FD12 resumen semanal: media sobre días con registros y lista equivalent
   expect(items[6]).toMatch(/: media 3\.000 kcal en 1 día · objetivo 2\.000 · 0 en rango$/)
   expect(items[0]).toMatch(/: sin registros$/)
 })
+
+// --- Comida: Open Food Facts (ciclo 32). Ningún test llama a la red: fetch siempre simulado. ---
+const PK = 'life-rpg-food-privacy-v1', EAN = '8480000118837'
+const ack = () => localStorage.setItem(PK, JSON.stringify({ off: '2026-10-07T10:00:00.000Z' }))
+const offJson = (product: unknown, status = 200) => Promise.resolve(new Response(JSON.stringify(product), { status, headers: { 'content-type': 'application/json' } }))
+const yogur = { status: 1, product: { product_name_es: 'Yogur natural', brands: 'Hacendado, Mercadona', nutriments: { 'energy-kcal_100g': 61.4, proteins_100g: 3.46, carbohydrates_100g: 4.7, fat_100g: 3.3 }, serving_quantity: 125, quantity: '4 x 125 g' } }
+const stubFetch = (impl: () => Promise<Response>) => { const f = vi.fn(impl); vi.stubGlobal('fetch', f); return f }
+const openBarcode = () => { openFood(); fireEvent.click(btn('Código de barras')) }
+const searchEan = (v = EAN) => { fireEvent.change(screen.getByRole('textbox', { name: 'Código de barras' }), { target: { value: v } }); fireEvent.click(btn('Buscar')) }
+const own = (o: Record<string, unknown>) => ({ id: 'food-1', name: 'Mi yogur', base: 'g', kcal: 60, p: 3, c: 5, f: 3, ref: EAN, source: 'off', ...o })
+afterEach(() => { vi.unstubAllGlobals() })
+
+test('U-FI1 aviso de OFF la primera vez, persistido; la segunda va directo', () => {
+  const f = stubFetch(() => offJson(yogur))
+  render(<App />); openBarcode()
+  expect(screen.getByRole('heading', { name: 'Privacidad del código de barras' })).toBeTruthy()
+  expect(screen.getByText(/licencia ODbL/)).toBeTruthy()
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'Privacidad del código de barras' }))
+  fireEvent.click(btn('Entendido'))
+  expect(screen.getByRole('textbox', { name: 'Código de barras' })).toBeTruthy()
+  expect(JSON.parse(localStorage.getItem(PK)!).off).toMatch(/^\d{4}-/)
+  fireEvent.click(btn('Cancelar'))
+  fireEvent.click(btn('Código de barras'))
+  expect(screen.queryByRole('heading', { name: 'Privacidad del código de barras' })).toBeNull()
+  expect(screen.getByRole('textbox', { name: 'Código de barras' })).toBeTruthy()
+  expect(f).not.toHaveBeenCalled()
+})
+
+test('U-FI2 EAN no válido: error y sin fetch', () => {
+  ack(); const f = stubFetch(() => offJson(yogur))
+  render(<App />); openBarcode()
+  searchEan('8480000118838')
+  expect(screen.getByRole('alert').textContent).toBe('Revisa el código: son 8 o 13 cifras.')
+  expect(f).not.toHaveBeenCalled()
+})
+
+test('U-FI3 encontrado: revisión prerrellenada con atribución, guardar, cantidad y añadir', async () => {
+  ack(); const f = stubFetch(() => offJson(yogur))
+  render(<App />); openBarcode(); searchEan()
+  expect(await screen.findByRole('heading', { name: 'Revisar alimento' })).toBeTruthy()
+  expect((f.mock.calls[0] as unknown as [string])[0]).toContain(`/product/${EAN}.json`)
+  expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Yogur natural (Hacendado)')
+  expect((screen.getByLabelText(/^Calorías \(kcal\)/) as HTMLInputElement).value).toBe('61')
+  expect((document.getElementById('food-c-p') as HTMLInputElement).value).toBe('3,5')
+  const link = screen.getByRole('link', { name: /Open Food Facts/ })
+  expect(link.getAttribute('href')).toBe(`https://world.openfoodfacts.org/product/${EAN}`)
+  expect(link.getAttribute('rel')).toBe('noopener noreferrer')
+  fireEvent.click(btn('Guardar'))
+  expect(screen.getByRole('heading', { name: 'Yogur natural (Hacendado)' })).toBeTruthy()
+  expect(screen.getByRole('link', { name: /Open Food Facts/ })).toBeTruthy()
+  fireEvent.click(btn('Añadir'))
+  expect(diary().getByText('Yogur natural (Hacendado)')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().foods).toMatchObject([{ name: 'Yogur natural (Hacendado)', source: 'off', ref: EAN, kcal: 61, servings: [{ name: 'Ración', qty: 125 }] }]))
+  expect(foodStored().log).toHaveLength(1)
+})
+
+test('U-FI4 EAN ya propio: sin fetch; archivado, «Reactivar»', async () => {
+  ack(); const f = stubFetch(() => offJson(yogur))
+  localStorage.setItem(FD, JSON.stringify({ log: [], foods: [own({})] }))
+  render(<App />); openBarcode(); searchEan()
+  expect(screen.getByText('Ya lo tienes: Mi yogur')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: 'Mi yogur' })).toBeTruthy()
+  expect(f).not.toHaveBeenCalled()
+  cleanup()
+  localStorage.setItem(FD, JSON.stringify({ log: [], foods: [own({ archived: true })] }))
+  render(<App />); openBarcode(); searchEan()
+  expect(screen.getByText('Ya lo tienes, archivado')).toBeTruthy()
+  fireEvent.click(btn('Reactivar'))
+  expect(screen.getByRole('heading', { name: 'Mi yogur' })).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().foods[0].archived).toBeUndefined())
+  expect(f).not.toHaveBeenCalled()
+})
+
+test('U-FI5 no encontrado, 503 y sin conexión: alternativas; «Crear a mano» guarda el ref', async () => {
+  ack(); let status = 404
+  const f = stubFetch(() => offJson(status === 404 ? { status: 0 } : {}, status))
+  render(<App />); openBarcode(); searchEan()
+  expect((await screen.findByRole('alert')).textContent).toBe('Open Food Facts no tiene este código.')
+  expect(screen.getByText('Con una clave de Anthropic en Ajustes puedes leer la etiqueta con una foto.')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'Reintentar' })).toBeNull()
+  status = 503; fireEvent.click(btn('Buscar'))
+  await screen.findByText('Open Food Facts ha respondido algo inesperado.')
+  expect(btn('Reintentar')).toBeTruthy()
+  expect(f).toHaveBeenCalledTimes(2)
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  fireEvent.click(btn('Buscar'))
+  expect(screen.getByText('Sin conexión. Puedes crearlo a mano')).toBeTruthy()
+  expect(f).toHaveBeenCalledTimes(2)
+  fireEvent.click(btn('Crear a mano'))
+  expect(screen.getByRole('heading', { name: 'Crear alimento' })).toBeTruthy()
+  type('Nombre', 'Mi yogur'); type(/^Calorías \(kcal\)/, '60'); fieldv('p', '3'); fieldv('c', '5'); fieldv('f', '3')
+  fireEvent.click(btn('Guardar'))
+  await vi.waitFor(() => expect(foodStored().foods).toMatchObject([{ name: 'Mi yogur', ref: EAN }]))
+  expect(foodStored().foods[0].source).toBeUndefined()
+  online.mockRestore()
+})
+
+test('U-FI6 ficha incompleta: campos vacíos marcados y mensaje', async () => {
+  ack(); stubFetch(() => offJson({ status: 1, product: { product_name: 'Raro', nutriments: { 'energy-kcal_100g': 100 } } }))
+  render(<App />); openBarcode(); searchEan()
+  expect(await screen.findByText(/no tiene todos los valores/)).toBeTruthy()
+  expect((screen.getByLabelText(/^Calorías \(kcal\)/) as HTMLInputElement).getAttribute('aria-invalid')).toBeNull()
+  for (const k of ['p', 'c', 'f']) {
+    const el = document.getElementById('food-c-' + k) as HTMLInputElement
+    expect(el.value).toBe(''); expect(el.getAttribute('aria-invalid')).toBe('true')
+  }
+})
+
+test('U-FI13 «Exportar copia» no contiene el aviso de OFF', () => {
+  ack(); render(<App />)
+  expect(exportBackup([], { trackers: [], proposals: [] } as never, 'x')).not.toContain(PK)
+})

@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
-import { CircleAlert, Plus } from 'lucide-react'
+import { CircleAlert, Plus, ScanBarcode } from 'lucide-react'
 import type { DietChange, Food, FoodData, Portion } from '../core/types'
 import { allFoods, dietNote, fmtKcal, fmtPortion, foodById, frequentFoods, lastPortion, parseKcal, parseMacro, portion, recentFoods, searchFoods } from '../core/food'
 import { Segmented } from './Segmented'
 import { FoodQty } from './FoodQty'
 import { FoodCustom } from './FoodCustom'
+import { FoodBarcode, type FoodNet } from './FoodBarcode'
 import { card, field, primary, secondary } from './foodStyle'
 
 type Quick = { kcal: number; p?: number; c?: number; f?: number; name?: string }
@@ -17,16 +18,19 @@ type Props = {
   onCreate: (f: Omit<Food, 'id'>) => Food
   onArchive: (id: string, archived: boolean) => void
   onStatus: (text: string) => void // «Añadido: …», lo anuncia la región status de FoodView
+  net: FoodNet
 }
 
 const isOwn = (f: Food) => f.id.startsWith('food-')
 const defaultPortion = (f: Food, last: Portion | null): Portion => last ?? (f.servings?.[0] ? { qty: f.servings[0].qty, serving: { name: f.servings[0].name, n: 1 } } : { qty: 100 })
 
-export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive, onStatus }: Props) {
+export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive, onStatus, net }: Props) {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'recent' | 'frequent'>('recent')
   const [picked, setPicked] = useState<Food | null>(null)
-  const [creating, setCreating] = useState<string | null>(null) // null = cerrado; si no, nombre prerrellenado
+  const [panel, setPanel] = useState<null | 'create' | 'barcode'>(null) // un solo panel abierto; abrir uno cierra `picked`
+  const [createName, setCreateName] = useState('') // nombre prerrellenado de «Crear alimento»
+  const openCreate = (name: string) => { setPicked(null); setCreateName(name); setPanel('create') }
   const [quickOpen, setQuickOpen] = useState(false)
   const [q, setQ] = useState({ kcal: '', p: '', c: '', f: '', name: '' })
   const [qErr, setQErr] = useState('')
@@ -61,12 +65,12 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
   }
   const create = (input: Omit<Food, 'id'>) => {
     const f = onCreate(input)
-    setCreating(null); setQuery(''); setPicked(f)
+    setPanel(null); setQuery(''); setPicked(f)
     onStatus(`Alimento creado: ${f.name}`)
   }
   const reactivate = (f: Food) => {
     onArchive(f.id, false)
-    setCreating(null); setQuery(''); setPicked({ ...f, archived: false })
+    setPanel(null); setQuery(''); setPicked({ ...f, archived: false })
     onStatus(`Reactivado: ${f.name}`)
   }
   const archive = (f: Food) => {
@@ -98,15 +102,17 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
         <label htmlFor="food-search" className="text-xs font-medium">Buscar alimento</label>
         <input id="food-search" ref={searchRef} type="search" autoComplete="off" value={query} onChange={e => { setQuery(e.target.value); setPicked(null) }} className={field} />
       </div>
-      {creating !== null
-        ? <FoodCustom key="create" initialName={creating} custom={food.foods} onCreate={create} onReactivate={reactivate} onCancel={() => { setCreating(null); searchRef.current?.focus() }} />
+      {panel === 'create'
+        ? <FoodCustom key="create" initialName={createName} custom={food.foods} onCreate={create} onReactivate={reactivate} onCancel={() => { setPanel(null); searchRef.current?.focus() }} />
+        : panel === 'barcode'
+        ? <FoodBarcode net={net} custom={food.foods} onPick={f => { setPanel(null); setQuery(''); setPicked(f) }} onReactivate={reactivate} onCreate={create} onStatus={onStatus} onClose={() => { setPanel(null); searchRef.current?.focus() }} />
         : picked
         ? <FoodQty key={picked.id} food={picked} initial={defaultPortion(picked, lastPortion(food.log, picked.id))} onAdd={p => add(picked, p)} onCancel={() => { setPicked(null); searchRef.current?.focus() }} />
         : typing
           ? results.length === 0
             ? <div className="flex flex-col items-start gap-2">
                 <p className="text-sm text-hero-muted">Sin resultados para «{query.trim()}». Apunta las calorías con «Añadido rápido».</p>
-                <button type="button" onClick={() => setCreating(query.trim())} className={secondary}><Plus className="size-4" aria-hidden />Crear alimento</button>
+                <button type="button" onClick={() => openCreate(query.trim())} className={secondary}><Plus className="size-4" aria-hidden />Crear alimento</button>
               </div>
             : <ul className="divide-y divide-hero-border rounded-lg border border-hero-border">{results.map(f => item(f))}</ul>
           : (
@@ -122,8 +128,11 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
         <button type="button" onClick={() => setQuickOpen(o => !o)} aria-expanded={quickOpen} aria-controls="food-quick" className={secondary}>
           <Plus className="size-4" aria-hidden />Añadido rápido
         </button>
-        <button type="button" onClick={() => setCreating('')} className={secondary}>
+        <button type="button" onClick={() => openCreate('')} className={secondary}>
           <Plus className="size-4" aria-hidden />Crear alimento
+        </button>
+        <button type="button" onClick={() => { setPicked(null); setPanel('barcode') }} className={secondary}>
+          <ScanBarcode className="size-4" aria-hidden />Código de barras
         </button>
       </div>
       {quickOpen && (
