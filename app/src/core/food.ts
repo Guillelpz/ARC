@@ -7,6 +7,11 @@ export const EMPTY_FOOD: FoodData = { log: [], foods: [] }
 export const fold = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim().replace(/\s+/g, ' ')
 export const allFoods = (custom: Food[]) => [...custom, ...CATALOG] // propios primero
 export const foodById = (id: string, custom: Food[]) => allFoods(custom).find(f => f.id === id)
+// El propio cuyo ref es el EAN (activos primero; si no, archivado); el catálogo nunca tiene EAN
+export function foodByRef(ref: string, custom: Food[]): Food | null {
+  const hits = custom.filter(f => f.ref === ref)
+  return hits.find(f => !f.archived) ?? hits[0] ?? null
+}
 
 const r0 = (x: number) => Math.round(x), r1 = (x: number) => Math.round(x * 10 + 1e-9) / 10
 export const portion = (food: Food, qty: number): Nutrients => ({ kcal: r1(food.kcal * qty / 100), p: r1(food.p * qty / 100), c: r1(food.c * qty / 100), f: r1(food.f * qty / 100) })

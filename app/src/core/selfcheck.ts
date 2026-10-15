@@ -12,7 +12,8 @@ import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type 
 import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
-import { allFoods, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
+import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
+import { kcalCoherent, normEan, parseOff } from './off'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -831,6 +832,28 @@ export function runSelfCheck() {
       ok(off.find(t => t.id === 'dieta')?.archived === true && !TRACKERS.find(t => t.id === 'dieta')?.archived && off.filter(t => t.id !== 'dieta').every(t => TRACKERS.includes(t)) && on === TRACKERS &&
         !act({ log: [], foods: [] }) && !act({ log: [en('x', 1)], foods: [] }) && act({ log: [], foods: [], goals: goal(2000) }) && act({ log: [], foods: [] }, [dev({})]) && !act({ log: [], foods: [] }, [dev({ trackerId: 'gym' })]), 'FD16 withDiet/dietActive')
     }
+  }
+
+  // FI1-FI5, FI7 (ciclo 32) — Open Food Facts por código de barras
+  {
+    const ean = '8480000118837'
+    ok(normEan('8480000118837') === ean && normEan('8480000118838') === null && normEan(' 8480-0001-18837 ') === ean && normEan('96385074') === '96385074' &&
+      normEan('036000291452') === '0036000291452' && normEan('84800001188') === null && normEan('84800001188a7') === null && normEan('') === null, 'FI1 normEan')
+    const pr = (product: Record<string, unknown>) => parseOff({ status: 1, product }, ean)
+    const full = pr({ product_name_es: 'Yogur natural', brands: 'Hacendado, Mercadona', nutriments: { 'energy-kcal_100g': 61.4, proteins_100g: 3.46, carbohydrates_100g: '4,7', fat_100g: 3.3 }, serving_quantity: 125, quantity: '4 x 125 g' })
+    ok(full?.kind === 'found' && full.complete && full.draft.name === 'Yogur natural (Hacendado)' && full.draft.base === 'g' && full.draft.kcal === 61 && full.draft.p === 3.5 && full.draft.c === 4.7 && full.draft.f === 3.3 &&
+      JSON.stringify(full.draft.servings) === '[{"name":"Ración","qty":125}]' && full.draft.source === 'off' && full.draft.ref === ean, 'FI2 parseOff completa')
+    const kc = (n: Record<string, unknown>) => { const r = pr({ nutriments: n }); return r?.kind === 'found' ? r.draft.kcal : undefined }
+    ok(kc({ 'energy-kj_100g': 1674 }) === 400 && kc({ energy_100g: 1674 }) === 400 && kc({ 'energy-kcal_100g': 250, 'energy-kj_100g': 1674 }) === 250, 'FI3 energía en kJ')
+    const none = pr({}), big = pr({ nutriments: { proteins_100g: 60, carbohydrates_100g: 30, fat_100g: 20 } }), long = pr({ product_name: 'Galletas integrales con chocolate negro y avellanas tostadas muy largas' })
+    const dr = (r: ReturnType<typeof parseOff>) => (r?.kind === 'found' ? r.draft : null)
+    ok(none?.kind === 'found' && !none.complete && none.draft.kcal === null && none.draft.p === null && parseOff({ status: 0 }, ean)?.kind === 'not-found' && parseOff('x', ean) === null && parseOff(null, ean) === null &&
+      kc({ 'energy-kcal_100g': 2000 }) === null && dr(big)?.p === null && dr(big)?.c === null && dr(big)?.f === null && dr(pr({ quantity: '1 l' }))?.base === 'ml' &&
+      dr(pr({ quantity: '1 l', serving_size: '1 vaso (250 ml)' }))?.servings[0]?.qty === 250 && dr(long)!.name.length <= 40 && dr(long)!.name === 'Galletas integrales con chocolate negro' && dr(none)!.name === '', 'FI4 incompletas y límites')
+    ok(kcalCoherent({ kcal: 400, p: 10, c: 70, f: 8 }) && !kcalCoherent({ kcal: 400, p: 10, c: 10, f: 5 }) && kcalCoherent({ kcal: 10, p: 0, c: 0, f: 0 }), 'FI5 kcalCoherent')
+    const fo = (id: string, o: Partial<Food> = {}): Food => ({ id, name: id, base: 'g', kcal: 1, p: 0, c: 0, f: 0, ref: ean, ...o })
+    ok(foodByRef(ean, [fo('food-a', { archived: true }), fo('food-b')])?.id === 'food-b' && foodByRef(ean, [fo('food-a', { archived: true })])?.id === 'food-a' &&
+      foodByRef(ean, []) === null && foodByRef('0000000000000', [fo('food-b')]) === null && foodByRef(CATALOG[0].ref!, []) === null, 'FI7 foodByRef')
   }
 
   console.info('[selfcheck] done')
