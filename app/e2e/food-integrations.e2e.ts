@@ -60,3 +60,36 @@ test('E-FI2 sin conexión: alternativas y ninguna petición a OFF', async ({ pag
   await expect(page.getByRole('button', { name: 'Crear a mano' })).toBeVisible()
   expect(seen).toEqual([])
 })
+
+test('E-FI3 foto de la etiqueta con Haiku simulado: revisar, guardar y añadir', async ({ page, context }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await guard(context)
+  await page.addInitScript(() => localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000'))
+  const label = { readable: true, name: 'Galletas', ean: '', per: '100g', servingQty: null, servingUnit: 'none', kcal: 450, kj: null, p: 6, c: 70, f: 16 }
+  const bodies: string[] = []
+  await context.route('https://api.anthropic.com/**', route => {
+    const req = route.request()
+    const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST' }
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors })
+    bodies.push(req.postData() ?? '')
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: cors, body: JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(label) }] }) })
+  })
+  await page.goto('./')
+  await nav(page, 'Yo')
+  await page.getByRole('button', { name: /^Comida/ }).click()
+  await page.getByRole('button', { name: 'Foto de la etiqueta' }).click()
+  await expect(page.getByRole('heading', { name: 'Privacidad de la foto' })).toBeVisible()
+  const chooser = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Entendido' }).click()
+  await (await chooser).setFiles('e2e/fixtures/label.png')
+  await expect(page.getByRole('heading', { name: 'Revisar alimento' })).toBeVisible()
+  await expect(page.getByLabel('Nombre')).toHaveValue('Galletas')
+  expect(await noOverflow(page)).toBe(true)
+  expect(bodies).toHaveLength(1)
+  const sent = JSON.parse(bodies[0]).messages[0].content[0].source
+  expect(sent.media_type).toBe('image/jpeg')
+  expect(sent.data.length).toBeGreaterThan(20)
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Diario' }).getByText('Galletas')).toBeVisible()
+})

@@ -61,12 +61,10 @@ export function FoodLabel({ net, custom, onPick, onReactivate, onCreate, onStatu
   }
   const picker = <input ref={input} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden onChange={e => void onFile(e)} />
 
-  if (!ack) return (
-    <>
-      {picker}
-      <FoodNetPrivacy kind="label" onAccept={() => { net.onAck('label'); choose() }} onCancel={onClose} />
-    </>
-  )
+  // El selector va siempre en la misma posición: si se desmontara al aceptar el aviso, la foto elegida se perdería.
+  return <>{picker}{body()}</>
+  function body() {
+  if (!ack) return <FoodNetPrivacy kind="label" onAccept={() => { net.onAck('label'); choose() }} onCancel={onClose} />
   if (view.t === 'review') {
     const d = view.draft
     return (
@@ -80,7 +78,6 @@ export function FoodLabel({ net, custom, onPick, onReactivate, onCreate, onStatu
 
   return (
     <section aria-labelledby="food-label-title" className="flex flex-col gap-3 rounded-lg border border-hero-border p-3">
-      {picker}
       <h3 id="food-label-title" ref={head} tabIndex={-1} className="text-sm font-semibold outline-none">Foto de la etiqueta</h3>
       <p className="text-sm text-hero-muted">Haz la foto solo de la tabla nutricional, de cerca y con luz. Revisarás los valores antes de guardar.</p>
       <div className="flex flex-wrap gap-2">
@@ -97,4 +94,5 @@ export function FoodLabel({ net, custom, onPick, onReactivate, onCreate, onStatu
       )}
     </section>
   )
+  }
 }
