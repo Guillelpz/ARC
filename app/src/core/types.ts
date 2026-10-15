@@ -174,7 +174,7 @@ export type FoodEntry = Partial<Omit<Nutrients, 'kcal'>> & Portion & {
   kcal: number          // 0..20000, 1 decimal
   foodId?: string       // ausente = añadido rápido
   base?: FoodBase       // presente si hay foodId
-  via?: string          // ausente = a mano; 'meal' (ciclo 30); fase 3: 'voice'
+  via?: string          // ausente = a mano; 'meal' (ciclo 30); 'copy' (ciclo 39); fase 3: 'voice'
 }
 export type FoodUndo = { id: string; undoes: string; occurredAt: string } // occurredAt = el de la entrada
 export type FoodLogEntry = FoodEntry | FoodUndo

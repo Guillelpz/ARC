@@ -165,14 +165,14 @@ describe('captura', () => {
     expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'invalid' })
   })
   test('O3: el dispositivo seguro no llama a fetch', async () => {
-    for (const t of ['Read 50 pages of the name of the wind', '80kg bench press 5 reps', 'corrí 30 minutos', 'ayer leí 20 páginas']) {
+    for (const t of ['corrí 5 km', '80kg bench press 5 reps', 'corrí 30 minutos', 'ayer leí 20 páginas']) {
       const f = mock(() => ok(reply(newAlta)))
       await run(t, f)
       expect(f, t).not.toHaveBeenCalled()
     }
   })
   test('O3: lo aproximado o incompleto sí llama a fetch', async () => {
-    for (const t of ['ate a burguer', 'grounding 30 min', 'press banca 80']) {
+    for (const t of ['ate a burguer', 'grounding 30 min', 'press banca 80', 'Read 50 pages of the name of the wind', 'I ran out of milk']) {
       const f = mock(() => ok(reply(newAlta)))
       await run(t, f)
       expect(f, t).toHaveBeenCalledTimes(1)

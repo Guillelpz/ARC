@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
+import { FoodMeals } from './components/FoodMeals'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT } from './components/UpdateBanner'
@@ -899,6 +900,48 @@ test('U-V0b Probar voz sin API: no disponible', async () => {
   expect(screen.getAllByText('Error: not-supported').length).toBeGreaterThan(0)
 })
 
+async function voiceRun(writeText: ReturnType<typeof vi.fn>) {
+  vi.useRealTimers()
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeSpeech
+  ;(window as unknown as Record<string, unknown>).__voz = '80 kilos press banca 5 repeticiones'
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: 'x' }))
+  localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-XYZ')
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  render(<App />); go('Yo')
+  fireEvent.click(btn('Probar voz'))
+  await screen.findByRole('button', { name: 'Copiar resumen' })
+}
+const voiceCleanup = () => {
+  delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition; delete (window as unknown as Record<string, unknown>).__voz
+  delete (navigator as unknown as Record<string, unknown>).clipboard
+}
+
+test('U-V1 Copiar resumen: copia el resumen sin la clave', async () => {
+  const writeText = vi.fn(() => Promise.resolve())
+  try {
+    await voiceRun(writeText)
+    fireEvent.click(btn('Copiar resumen'))
+    expect(await screen.findByText(/Resumen copiado/)).toBeTruthy()
+    const txt = (writeText.mock.calls[0] as unknown as [string])[0]
+    expect(txt).toContain(navigator.userAgent)
+    for (const k of ['Reconocimiento:', '80 kilos press banca 5 repeticiones', 'KEYBOARD_ON_IOS']) expect(txt).toContain(k)
+    expect(txt).not.toContain('sk-ant-test-XYZ')
+  } finally { voiceCleanup() }
+})
+
+test('U-V2 Copiar resumen: si el portapapeles falla, textarea enfocado', async () => {
+  const writeText = vi.fn(() => Promise.reject(new Error('denied')))
+  try {
+    await voiceRun(writeText)
+    fireEvent.click(btn('Copiar resumen'))
+    const area = await screen.findByLabelText('Resumen de la prueba de voz') as HTMLTextAreaElement
+    expect(screen.getByText(/No se ha podido copiar/)).toBeTruthy()
+    expect(area.value).toContain('Reconocimiento:')
+    expect(area.value).not.toContain('sk-ant-test-XYZ')
+    await vi.waitFor(() => expect(document.activeElement).toBe(area))
+  } finally { voiceCleanup() }
+})
+
 const AIK = 'life-rpg-ai-key-v1', KEY = 'sk-ant-test-0000000000000000'
 const typeKey = (v: string) => fireEvent.change(screen.getByLabelText('Clave'), { target: { value: v } })
 
@@ -1583,6 +1626,9 @@ test('U-FD10 platos: guardar, añadir de un toque, deshacer todo, borrar', async
   expect(screen.getByText(/^Deshecho: 2 entradas del plato/)).toBeTruthy()
   expect(diary().getAllByRole('button', { name: /^Deshacer/ })).toHaveLength(3)
   fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(screen.queryByText('Plato borrado: Comida típica')).toBeNull() // confirm cancelado
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar plato Comida típica'))
   expect(screen.getByText('Plato borrado: Comida típica')).toBeTruthy()
   await vi.waitFor(() => expect(foodStored().meals).toBeUndefined())
 })
@@ -2013,4 +2059,86 @@ test('U-FV13 doble clic en «Apuntar» de «Dictar comida» guarda una sola vez 
   await screen.findByText(/^Registrado en Comida: 1 alimento · 800 kcal/)
   await vi.waitFor(() => expect(foodLive()).toHaveLength(1))
   await vi.waitFor(() => expect(net('dieta')).toBe(1))
+})
+
+// --- Copiar día anterior (ciclo 39) ---
+const yEntry = (id: string, kcal: number, day = '2026-10-06') => ({ id, occurredAt: `${day}T10:00:00`, name: `Plato ${id}`, kcal, qty: 0 })
+const liveFood = () => { const l = foodStored().log as { id: string; undoes?: string; via?: string; occurredAt: string }[]; const u = new Set(l.map(e => e.undoes)); return l.filter(e => !e.undoes && !u.has(e.id)) }
+const copyBtn = () => screen.getByRole('button', { name: 'Copiar día anterior' }) as HTMLButtonElement
+
+test('U-C39-1 copiar día anterior: 2 entradas con via copy, botón desactivado con su motivo', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [yEntry('a', 300), yEntry('b', 500)], foods: [] }))
+  render(<App />); openFood()
+  expect(screen.getByText('Añade lo de ayer: 2 alimentos · 800 kcal')).toBeTruthy()
+  fireEvent.click(copyBtn())
+  expect(screen.getByText('Copiado: 2 alimentos · 800 kcal')).toBeTruthy()
+  expect(copyBtn().disabled).toBe(true)
+  expect(screen.getByText('Ya has copiado el día anterior aquí. Deshaz las copias para volver a copiar.')).toBeTruthy()
+  fireEvent.click(copyBtn())
+  await vi.waitFor(() => expect(liveFood().filter(e => e.occurredAt.startsWith('2026-10-07') && e.via === 'copy')).toHaveLength(2))
+  expect(liveFood()).toHaveLength(4)
+  expect(screen.getByText('800 kcal', { selector: 'p' })).toBeTruthy()
+})
+
+test('U-C39-2 Deshacer retira las copias de un golpe, reactiva el botón y quita el +1 de Dieta', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [yEntry('a', 1000), yEntry('b', 900)], foods: [], goals: [{ from: '2026-10-01', kcal: 2000, p: 20, c: 50, f: 30 }] }))
+  render(<App />); openFood()
+  fireEvent.click(copyBtn())
+  expect(screen.getByText('Copiado: 2 alimentos · 1.900 kcal · Día dentro del objetivo: +1 Dieta')).toBeTruthy()
+  await vi.waitFor(() => expect(stored()).toMatchObject([{ trackerId: 'dieta', amount: 1 }]))
+  fireEvent.click(btn('Deshacer'))
+  expect(screen.getByText(/^Deshecho: 2 entradas copiadas · Fuera del rango: se retira el \+1 de Dieta$/)).toBeTruthy()
+  expect(copyBtn().disabled).toBe(false)
+  await vi.waitFor(() => expect(liveFood()).toHaveLength(2))
+  await vi.waitFor(() => expect(stored().map((e: { amount: number }) => e.amount)).toEqual([1, -1]))
+  expect(document.activeElement).toBe(copyBtn())
+})
+
+test('U-C39-3 sin entradas ayer: botón desactivado; con el selector en ayer copia desde anteayer', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [yEntry('a', 400, '2026-10-05')], foods: [] }))
+  render(<App />); openFood()
+  expect(copyBtn().disabled).toBe(true)
+  expect(screen.getByText('Nada apuntado el día anterior.')).toBeTruthy()
+  fireEvent.click(btn('Ayer'))
+  expect(copyBtn().disabled).toBe(false)
+  fireEvent.click(copyBtn())
+  expect(screen.getByText('Copiado: 1 alimento · 400 kcal')).toBeTruthy()
+  await vi.waitFor(() => expect(liveFood().filter(e => e.via === 'copy').map(e => e.occurredAt.slice(0, 10))).toEqual(['2026-10-06']))
+})
+
+// --- Platos (ciclo 39) ---
+const saveMealAs = (name: string) => {
+  fireEvent.click(btn('Guardar como plato'))
+  fireEvent.click(within(screen.getByRole('group', { name: 'Alimentos del día' })).getByLabelText(/^Arroz blanco cocido/))
+  type('Nombre del plato', name); fireEvent.click(btn('Guardar'))
+}
+
+test('U-ML1 un plato con el nombre de otro plato da error y no se guarda', async () => {
+  render(<App />); openFood()
+  search('arroz'); fireEvent.click(btn(/^Arroz blanco cocido/)); fireEvent.click(btn('Añadir'))
+  saveMealAs('Comida típica')
+  expect(screen.getByText('Plato guardado: Comida típica')).toBeTruthy()
+  saveMealAs(' comida TÍPICA ')
+  expect(screen.getByText('Ya tienes un plato con ese nombre.')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().meals).toHaveLength(1))
+})
+
+test('U-ML2 «Borrar» plato pide confirmación', async () => {
+  render(<App />); openFood()
+  search('arroz'); fireEvent.click(btn(/^Arroz blanco cocido/)); fireEvent.click(btn('Añadir'))
+  saveMealAs('Comida típica')
+  fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(window.confirm).toHaveBeenCalledWith('¿Borrar el plato «Comida típica»? Lo que ya has apuntado no cambia.')
+  expect(screen.queryByText('Plato borrado: Comida típica')).toBeNull()
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(screen.getByText('Plato borrado: Comida típica')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().meals).toBeUndefined())
+})
+
+test('U-ML3 añadir un plato que ya no existe avisa', () => {
+  const food = { log: [], foods: [], meals: [{ id: 'meal-1', name: 'Cena', items: [{ foodId: 'egg', qty: 100 }] }] }
+  render(<FoodMeals food={food} day="2026-10-07" onSave={() => true} onDelete={() => {}} onAdd={() => ({ ids: [], missing: 0, diet: 0, gone: true })} onUndo={() => ({ undone: 0, diet: 0 })} />)
+  fireEvent.click(btn('Añadir plato Cena'))
+  expect(screen.getByText('Ese plato ya no existe.')).toBeTruthy()
 })

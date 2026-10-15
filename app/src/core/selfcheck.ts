@@ -12,7 +12,7 @@ import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type 
 import { CAPTURE_SYSTEM, FOOD_SYSTEM, capturePrompt, captureSchema, foodItemSchema, foodPrompt, foodSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
-import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
+import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, copyDay, hasCopy, makeEntry, mealNameTaken, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, undoEntries, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
 import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
@@ -560,6 +560,14 @@ export function runSelfCheck() {
       const m21 = man('m'), u21 = { id: 'um', trackerId: 'gym', amount: -1, occurredAt: m21.occurredAt, undoes: 'm' }
       ok(get(deriveGame([m21, u21, a1], D), 'gym').xp.xp === get(deriveGame([m21], D), 'gym').xp.xp, 'GY21 XP neta 0 al reponer la sesión')
     }
+    // GY23 (ciclo 39) — rutinas con id repetido en readGym
+    {
+      const rA = { id: 'routine-a', name: 'Push', items: [{ exerciseId: 'bench-press', sets: 3 }] }
+      const rB = { id: 'routine-b', name: 'Pull', items: [{ exerciseId: 'pull-up', sets: 4 }] }
+      const dup = readGym({ log: [], exercises: [], routines: [rA, { ...rA, name: 'Otra' }, rB] })!
+      const clean = readGym({ log: [], exercises: [], routines: [rA, rB] })!
+      ok(JSON.stringify(dup.data.routines) === JSON.stringify([rA, rB]) && dup.dropped === 1 && clean.dropped === 0, 'GY23 readGym: rutinas repetidas, gana la primera')
+    }
     // GY22 — undoMany (deshacer un comando de voz de varias series)
     {
       const D22 = DEMO_DATE, ids22 = () => `u${Math.random()}`
@@ -671,8 +679,15 @@ export function runSelfCheck() {
       ok(ex('Read 50 pages of the name of the wind') === 'reading' && ex('corrí 5 km') === 'running' && ex('fui al gimnasio') === 'gym' && ex('ate a burguer') === undefined &&
         ex('lectur') === undefined && exactTracker('shower 10 min', two) === undefined, 'CV12 exactTracker')
       const sure = (t: string) => deviceSure(routeCapture(t, ctx), ctx)
-      ok(['80kg bench press 5 reps', 'Read 50 pages of the name of the wind', 'corrí 30 minutos'].every(sure) &&
-        !['press banca 80', 'ate a burguer', 'grounding 30 min', 'ayer leí 20 páginas'].some(sure), 'CV13 deviceSure')
+      ok(['80kg bench press 5 reps', 'corrí 30 minutos'].every(sure) &&
+        !['press banca 80', 'ate a burguer', 'grounding 30 min', 'ayer leí 20 páginas', 'Read 50 pages of the name of the wind'].some(sure), 'CV13 deviceSure')
+      // CV14 (ciclo 39) — deviceSure sin palabras ajenas al hábito
+      const cvMemo: Memo = [{ k: 'burguer', kind: 'tracker', id: 'burgers' }]
+      const ranOut = routeCapture('I ran out of milk', ctx)
+      ok(!['I ran out of milk', 'corrí con mi perro'].some(sure) &&
+        ['corrí 5 km', 'comí una hamburguesa', 'drank 3 beers', 'cómics 10 páginas', 'fui al gimnasio'].every(sure) &&
+        ranOut.kind === 'tracker' && ranOut.trackerId === 'running' &&
+        localCapture('ate a burguer', { ...ctx, memo: cvMemo }).done && localCapture('burguer', { ...ctx, memo: cvMemo }).done, 'CV14 deviceSure sin palabras ajenas')
     }
     // MC1–MC5 — memoria de frases
     {
@@ -791,6 +806,39 @@ export function runSelfCheck() {
       const a = wk[6], b = wk[7]
       ok(wk.length === 8 && wk[0].avg === null && wk[0].days === 0 && wk[0].goal === 2000 && a.monday === prevMon && !a.current && a.days === 2 && a.avg?.kcal === 1500 && a.avg.p === 5 && a.goal === 2000 && a.inRange === 1 &&
         b.monday === mon && b.current && b.days === 1 && b.avg?.kcal === 1800 && b.goal === 1800 && b.inRange === 1 && foodWeekly({ log: [], foods: [] }, today15).every(w => w.goal === null && w.avg === null), 'FD14/FD15 foodWeekly')
+    }
+
+    // FD18 (ciclo 39) — copiar el día anterior
+    {
+      let k = 0
+      const nid = () => `c-${++k}`
+      const est = estimateEntry({ name: 'Bocadillo', base: 'g', kcal: 260, p: 10, c: 30, f: 10, source: 'estimate' }, { qty: 200 }, 'y3', `${fdY}T13:00:00`)
+      const srcLog: FoodLogEntry[] = [
+        en('y1', 100, fdY, { occurredAt: `${fdY}T08:00:00`, serving: { name: 'Taza', n: 2 } }), quickEntry({ kcal: 300 }, 'y2', `${fdY}T09:00:00`), est,
+        en('y4', 700, fdY, { occurredAt: `${fdY}T14:00:00` }), { id: 'u4', undoes: 'y4', occurredAt: `${fdY}T14:00:00` }, en('t1', 50, fd),
+      ]
+      const before = JSON.stringify(srcLog)
+      const cp = copyDay(srcLog, fdY, nid, `${fd}T09:00:00`)
+      const withCp = [...srcLog, ...cp]
+      const srcIds = new Set(srcLog.map(e => e.id))
+      ok(cp.length === 3 && cp.map(e => e.name).join() === `x,Añadido rápido,${est.name}` && cp.every(e => !srcIds.has(e.id)) && new Set(cp.map(e => e.id)).size === 3 &&
+        cp.every(e => e.occurredAt === `${fd}T09:00:00` && e.via === 'copy') && est.via === 'voice' &&
+        cp[0].kcal === 100 && cp[0].p === 5 && cp[0].c === 10 && cp[0].f === 2 && cp[0].qty === 100 && cp[0].serving?.n === 2 && cp[0].foodId === 'rice-white-cooked' && cp[0].base === 'g' &&
+        cp[2].kcal === est.kcal && cp[2].qty === est.qty && !('foodId' in cp[2]) && !cp.some(e => e.kcal === 700) && JSON.stringify(srcLog) === before &&
+        copyDay(srcLog, addDays(fdY, -5), nid, `${fd}T09:00:00`).length === 0 &&
+        !hasCopy(srcLog, fd) && hasCopy(withCp, fd) && !hasCopy(withCp, fdY) &&
+        !hasCopy([...withCp, ...undoEntries(withCp, cp.map(e => e.id), nid)], fd), 'FD18 copyDay/hasCopy')
+    }
+
+    // FD19 (ciclo 39) — nombres de plato y filas USDA renombradas
+    {
+      const row = (id: string) => CATALOG.find(f => f.id === id)
+      const first = (q: string) => searchFoods(q, allFoods([]))[0]?.id
+      ok(mealNameTaken(' DESAYUNO ', [{ id: 'm', name: 'Desayuno', items: [] }]) && !mealNameTaken('Cena', [{ id: 'm', name: 'Desayuno', items: [] }]) && !mealNameTaken('x', undefined) &&
+        row('tomato-canned')?.name === 'Tomate en conserva' && row('tomato-canned')?.ref === '170051' && row('soy-sauce')?.name === 'Salsa de soja tamari' && row('soy-sauce')?.ref === '174278' &&
+        row('rabbit-raw')?.name === 'Conejo crudo' && row('rabbit-raw')?.ref === '172521' &&
+        first('tomate triturado') === 'tomato-canned' && first('salsa de soja') === 'soy-sauce' && first('conejo') === 'rabbit-raw' &&
+        parseFoodVoice('200 g de conejo', []).items[0]?.k === 'food' && JSON.stringify(parseFoodVoice('200 g de conejo', []).items).includes('rabbit-raw'), 'FD19 platos y catálogo')
     }
 
     // FD9, FD10 — persistencia de la comida

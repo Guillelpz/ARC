@@ -188,6 +188,8 @@ export function exactHits(norm: string, trackers: Tracker[], skip: ReadonlySet<s
   return trackers.filter(t => words(`${t.name} ${ALIASES[t.id] ?? ''}`).filter(x => !STOPWORDS.has(x)).some(x => ws.includes(x)))
 }
 // Coincidencia exacta y única: si hay dos, undefined.
+// Palabras (≥ 3 letras) del nombre y los alias de un hábito
+export const trackerWords = (t: Tracker): string[] => words(`${t.name} ${ALIASES[t.id] ?? ''}`)
 export function exactTracker(norm: string, trackers: Tracker[], skip: ReadonlySet<string> = new Set()): Tracker | undefined {
   const hits = exactHits(norm, trackers, skip)
   return hits.length === 1 ? hits[0] : undefined

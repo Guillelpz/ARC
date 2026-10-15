@@ -1,6 +1,6 @@
 import type { Memo } from './memory'
 import type { Branch, Confidence, Exercise, Food, Tracker, WeightUnit } from './types'
-import { STOPWORDS, classify, exactHits, exactTracker, isValidName, isValidUnit, matchTracker, normalizeText, trackerName } from './classify'
+import { STOPWORDS, classify, exactHits, exactTracker, isValidName, isValidUnit, matchTracker, normalizeText, trackerName, trackerWords } from './classify'
 import { FOOD_UNIT_SET, foodItemsFromAI, foodReady, itemReady, looksLikeFood, parseFoodVoice, type FoodItem } from './foodVoice'
 import { fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type HaikuError, type VoiceCommand } from './voice'
 
@@ -179,11 +179,19 @@ export function routeCapture(text: string, ctx: CaptureCtx): CaptureCommand {
   return newFromText(text, ctx)
 }
 
-// ¿Está el dispositivo seguro sin preguntar a Haiku? Gym completo o hábito con coincidencia exacta y única.
-// ponytail: coincidencia exacta por palabra suelta («I ran out of milk» → Running). Si aparecen falsos positivos, exigir que la palabra no vaya seguida de otra desconocida o mandar a Haiku las frases largas.
+// ¿Está el dispositivo seguro sin preguntar a Haiku? Gym completo, comida lista sin resto, o hábito con coincidencia exacta y única
+// y sin palabras ajenas: fuera del nombre/alias del hábito solo números, unidades (incl. la del tracker) y stopwords.
+// ponytail: sin clave el router sigue guardando estas frases (C3, «I ran out of milk» → Running +1); esto solo evita saltarse Haiku.
+// Palabras de < 3 letras se ignoran (como exactHits). Una frase mixta hábito + comida ya no es segura.
 export function deviceSure(c: CaptureCommand, ctx: CaptureCtx): boolean {
   if (c.kind === 'gym') return isComplete(c.draft, ctx.exercises)
-  if (c.kind === 'tracker') return exactTracker(captureNorm(c.text), ctx.trackers, ALL_UNITS)?.id === c.trackerId
+  if (c.kind === 'tracker') {
+    const t = exactTracker(captureNorm(c.text), ctx.trackers, ALL_UNITS)
+    if (t?.id !== c.trackerId) return false
+    const own = new Set([...trackerWords(t), ...normalizeText(t.unit).split(/[^a-z0-9]+/)])
+    return normalizeText(captureNorm(c.text)).split(/[^a-z0-9]+/)
+      .every(w => w.length < 3 || /^\d+$/.test(w) || own.has(w) || ALL_UNITS.has(w) || STOPWORDS.has(w))
+  }
   if (c.kind === 'food') return c.source === 'parser' && foodReady(c.items) && c.rest === ''
   return false
 }

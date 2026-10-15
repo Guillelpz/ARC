@@ -13,6 +13,7 @@ import { foodById } from '../core/food'
 import type { FoodItem, VoiceAdd } from '../core/foodVoice'
 import type { CaptureCommand } from '../core/capture'
 import type { FoodNet } from './FoodBarcode'
+import { FoodCopyDay } from './FoodCopyDay'
 import { FoodGoalCard } from './FoodGoalCard'
 import { FoodMeals } from './FoodMeals'
 import { FoodWeek } from './FoodWeek'
@@ -29,6 +30,7 @@ type Props = {
   onSaveMeal: (name: string, ids: string[]) => boolean
   onDeleteMeal: (id: string) => void
   onAddMeal: (id: string, day: string) => { ids: string[]; missing: number; diet: DietChange }
+  onCopyDay: (day: string) => { ids: string[]; diet: DietChange }
   onSaveGoal: (g: Omit<FoodGoal, 'from'>) => unknown
   onBack: () => void
   saveFailed: boolean
@@ -54,7 +56,7 @@ function openFor(i: FoodItem, key: number, own: Food[]): FoodOpen {
   return { key, kind: 'search', query: i.k === 'pending' ? i.query : i.said }
 }
 
-export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport, net, prefill, voice }: Props) {
+export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onCopyDay, onSaveGoal, onBack, saveFailed, onExport, net, prefill, voice }: Props) {
   const [day, setDay] = useState(today)
   const [pending, setPending] = useState<FoodItem[]>(() => prefill?.items ?? [])
   const [heard, setHeard] = useState(() => prefill?.heard ?? '')
@@ -134,6 +136,7 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
 
         <section aria-labelledby="food-diary" className={card}>
           <h2 id="food-diary" ref={diaryRef} tabIndex={-1} className="text-base font-semibold outline-hero focus-visible:outline-2">Diario</h2>
+          <FoodCopyDay key={day} food={food} day={day} today={today} onCopy={onCopyDay} onUndo={onUndo} />
           {entries.length === 0 ? <p className="text-sm text-hero-muted">Nada apuntado este día.</p> : (
             <ul className="divide-y divide-hero-border rounded-lg border border-hero-border">
               {entries.map(e => {
