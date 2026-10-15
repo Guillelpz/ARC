@@ -9,6 +9,7 @@ import { SaveFailBanner } from './SaveFailBanner'
 import { FoodAdd } from './FoodAdd'
 import { FoodGoalCard } from './FoodGoalCard'
 import { FoodMeals } from './FoodMeals'
+import { FoodWeek } from './FoodWeek'
 import { card, secondary } from './foodStyle'
 
 type Props = {
@@ -87,6 +88,8 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>
 
         <FoodMeals food={food} day={day} onSave={onSaveMeal} onDelete={onDeleteMeal} onAdd={onAddMeal} onUndo={onUndo} />
+
+        <FoodWeek food={food} today={today} />
 
         <section aria-labelledby="food-diary" className={card}>
           <h2 id="food-diary" ref={diaryRef} tabIndex={-1} className="text-base font-semibold outline-hero focus-visible:outline-2">Diario</h2>
