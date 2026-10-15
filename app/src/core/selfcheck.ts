@@ -14,6 +14,7 @@ import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay
 import { CATALOG } from './foodCatalog'
 import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
+import { labelContent, labelFromAI, labelSchema } from './label'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -864,6 +865,26 @@ export function runSelfCheck() {
     const back = loadFoodPrivacy(s)
     ok(absent && saved && back.off === '2026-10-15T10:00:00.000Z' && back.label === 'x' && ['5', '[]', '{roto', '{"off":3}'].every(raw => JSON.stringify(loadFoodPrivacy(mem({ [FOOD_PRIVACY_KEY]: raw }))) === '{}') &&
       !exportBackup([], { trackers: [], proposals: [] }, 'x').includes('privacy') && !isDataKey(FOOD_PRIVACY_KEY), 'FI8 loadFoodPrivacy')
+  }
+
+  // FI6, FI9 (ciclo 33) — foto de la etiqueta
+  {
+    const ean = '8480000118837'
+    const base = { readable: true, name: 'Yogur', ean: '', per: '100g', servingQty: null, servingUnit: 'none', kcal: 400, kj: null, p: 10, c: 70, f: 8 }
+    const lf = (o: Record<string, unknown>) => labelFromAI({ ...base, ...o })
+    const dd = (o: Record<string, unknown>) => { const r = lf(o); return typeof r === 'object' && r !== null ? r : null }
+    const serv = dd({ per: 'serving', servingQty: 30, servingUnit: 'g', kcal: 120, p: 3, c: 21, f: 2.4 })
+    const kj = dd({ kcal: null, kj: 1674 })
+    ok(dd({})?.draft.base === 'g' && dd({ per: '100ml' })?.draft.base === 'ml' && dd({})?.draft.source === 'label' &&
+      serv?.draft.kcal === 400 && serv.draft.p === 10 && serv.draft.c === 70 && serv.draft.f === 8 && JSON.stringify(serv.draft.servings) === '[{"name":"Ración","qty":30}]' &&
+      kj?.draft.kcal === 400 && lf({ readable: false }) === 'unreadable' && lf({ per: 'serving' }) === 'unreadable' && lf({ per: 'none' }) === 'unreadable' &&
+      labelFromAI('x') === null && labelFromAI({ readable: true }) === null && lf({ kcal: 'x' }) === null &&
+      dd({ ean })?.draft.ref === ean && dd({ ean: '8480000118838' })?.draft.ref === undefined &&
+      dd({ kcal: null, kj: null })?.draft.kcal === null && dd({ kcal: null, kj: null })?.coherent === true &&
+      dd({ kcal: 400, p: 10, c: 10, f: 5 })?.coherent === false && dd({})?.coherent === true, 'FI6 labelFromAI')
+    const ct = labelContent('QUJD') as { type: string; source?: { type: string; media_type: string; data: string } }[]
+    ok(ct.length === 2 && ct[0].type === 'image' && ct[0].source?.type === 'base64' && ct[0].source.media_type === 'image/jpeg' && ct[0].source.data === 'QUJD' && ct[1].type === 'text' &&
+      Object.keys(labelSchema.properties).length === 11 && labelSchema.required.length === 11 && Object.keys(labelSchema.properties).every(k => labelSchema.required.includes(k)) && labelSchema.additionalProperties === false, 'FI9 labelContent/labelSchema')
   }
 
   console.info('[selfcheck] done')

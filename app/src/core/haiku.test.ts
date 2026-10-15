@@ -3,6 +3,7 @@ import { EXERCISES } from './gym'
 import { TRACKERS } from './trackers'
 import type { Memo } from './memory'
 import { routeCapture, type CaptureCtx } from './capture'
+import { askLabel } from './label'
 import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretGym, postHaiku } from './haiku'
 
 const KEY = 'sk-ant-test-0000000000000000'
@@ -68,6 +69,34 @@ describe('postHaiku', () => {
     expect(await p).toEqual({ ok: false, error: 'timeout' })
     const body = JSON.parse((hang.mock.calls[0] as [string, RequestInit])[1].body as string)
     expect(body.messages[0].content).toEqual([{ type: 'text', text: 'x' }])
+  })
+})
+
+describe('askLabel', () => {
+  const lab = { readable: true, name: 'Yogur', ean: '', per: '100g', servingQty: null, servingUnit: 'none', kcal: 61, kj: null, p: 3.5, c: 4.7, f: 3.3 }
+  test('cuerpo con bloque image y resultado', async () => {
+    const f = mock(() => ok(reply(lab)))
+    const r = await askLabel('QUJD', KEY, f)
+    expect(r.ok && r.draft.kcal).toBe(61)
+    const [, init] = f.mock.calls[0] as [string, RequestInit]
+    const body = JSON.parse(init.body as string)
+    expect(body.messages[0].content[0]).toEqual({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'QUJD' } })
+    expect(body.output_config.format.schema.additionalProperties).toBe(false)
+    expect(JSON.stringify(body)).not.toContain(KEY)
+  })
+  test('timeout de 20 s', async () => {
+    const hang = mock((_u: unknown, init: unknown) => new Promise((_, rej) => (init as RequestInit).signal!.addEventListener('abort', () => rej(new DOMException('abort', 'AbortError')))))
+    const p = askLabel('QUJD', KEY, hang)
+    let done = false; void p.then(() => { done = true })
+    await vi.advanceTimersByTimeAsync(19999)
+    expect(done).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await p).toEqual({ ok: false, error: 'timeout' })
+  })
+  test('401 -> auth, readable false -> unreadable, forma invalida -> invalid', async () => {
+    expect(await askLabel('x', KEY, mock(() => ok({ error: 'x' }, 401)))).toEqual({ ok: false, error: 'auth' })
+    expect(await askLabel('x', KEY, mock(() => ok(reply({ ...lab, readable: false }))))).toEqual({ ok: false, error: 'unreadable' })
+    expect(await askLabel('x', KEY, mock(() => ok(reply({ nope: 1 }))))).toEqual({ ok: false, error: 'invalid' })
   })
 })
 
