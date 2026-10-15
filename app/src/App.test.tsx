@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
+import { FoodMeals } from './components/FoodMeals'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT } from './components/UpdateBanner'
@@ -1625,6 +1626,9 @@ test('U-FD10 platos: guardar, añadir de un toque, deshacer todo, borrar', async
   expect(screen.getByText(/^Deshecho: 2 entradas del plato/)).toBeTruthy()
   expect(diary().getAllByRole('button', { name: /^Deshacer/ })).toHaveLength(3)
   fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(screen.queryByText('Plato borrado: Comida típica')).toBeNull() // confirm cancelado
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar plato Comida típica'))
   expect(screen.getByText('Plato borrado: Comida típica')).toBeTruthy()
   await vi.waitFor(() => expect(foodStored().meals).toBeUndefined())
 })
@@ -2100,4 +2104,41 @@ test('U-C39-3 sin entradas ayer: botón desactivado; con el selector en ayer cop
   fireEvent.click(copyBtn())
   expect(screen.getByText('Copiado: 1 alimento · 400 kcal')).toBeTruthy()
   await vi.waitFor(() => expect(liveFood().filter(e => e.via === 'copy').map(e => e.occurredAt.slice(0, 10))).toEqual(['2026-10-06']))
+})
+
+// --- Platos (ciclo 39) ---
+const saveMealAs = (name: string) => {
+  fireEvent.click(btn('Guardar como plato'))
+  fireEvent.click(within(screen.getByRole('group', { name: 'Alimentos del día' })).getByLabelText(/^Arroz blanco cocido/))
+  type('Nombre del plato', name); fireEvent.click(btn('Guardar'))
+}
+
+test('U-ML1 un plato con el nombre de otro plato da error y no se guarda', async () => {
+  render(<App />); openFood()
+  search('arroz'); fireEvent.click(btn(/^Arroz blanco cocido/)); fireEvent.click(btn('Añadir'))
+  saveMealAs('Comida típica')
+  expect(screen.getByText('Plato guardado: Comida típica')).toBeTruthy()
+  saveMealAs(' comida TÍPICA ')
+  expect(screen.getByText('Ya tienes un plato con ese nombre.')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().meals).toHaveLength(1))
+})
+
+test('U-ML2 «Borrar» plato pide confirmación', async () => {
+  render(<App />); openFood()
+  search('arroz'); fireEvent.click(btn(/^Arroz blanco cocido/)); fireEvent.click(btn('Añadir'))
+  saveMealAs('Comida típica')
+  fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(window.confirm).toHaveBeenCalledWith('¿Borrar el plato «Comida típica»? Lo que ya has apuntado no cambia.')
+  expect(screen.queryByText('Plato borrado: Comida típica')).toBeNull()
+  vi.mocked(window.confirm).mockReturnValueOnce(true)
+  fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(screen.getByText('Plato borrado: Comida típica')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().meals).toBeUndefined())
+})
+
+test('U-ML3 añadir un plato que ya no existe avisa', () => {
+  const food = { log: [], foods: [], meals: [{ id: 'meal-1', name: 'Cena', items: [{ foodId: 'egg', qty: 100 }] }] }
+  render(<FoodMeals food={food} day="2026-10-07" onSave={() => true} onDelete={() => {}} onAdd={() => ({ ids: [], missing: 0, diet: 0, gone: true })} onUndo={() => ({ undone: 0, diet: 0 })} />)
+  fireEvent.click(btn('Añadir plato Cena'))
+  expect(screen.getByText('Ese plato ya no existe.')).toBeTruthy()
 })

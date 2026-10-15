@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { CircleAlert, Plus } from 'lucide-react'
 import type { DietChange, FoodData, Meal } from '../core/types'
-import { MAX_MEALS, allFoods, dayEntries, dietNote, fmtKcal, fmtPortion, portion } from '../core/food'
+import { MAX_MEALS, allFoods, dayEntries, dietNote, fmtKcal, fmtPortion, mealNameTaken, portion } from '../core/food'
 import { card, field, primary, secondary } from './foodStyle'
 
 type Props = {
@@ -9,7 +9,7 @@ type Props = {
   day: string
   onSave: (name: string, ids: string[]) => boolean
   onDelete: (id: string) => void
-  onAdd: (id: string, day: string) => { ids: string[]; missing: number; diet: DietChange }
+  onAdd: (id: string, day: string) => { ids: string[]; missing: number; diet: DietChange; gone?: true }
   onUndo: (ids: string[]) => { undone: number; diet: DietChange }
 }
 
@@ -40,17 +40,19 @@ export function FoodMeals({ food, day, onSave, onDelete, onAdd, onUndo }: Props)
     const n = name.trim()
     if (picked.size === 0) return setError('Marca al menos un alimento.')
     if (!n || n.length > 40) return setError('El nombre tiene entre 1 y 40 caracteres.')
+    if (mealNameTaken(n, meals)) return setError('Ya tienes un plato con ese nombre.')
     if (!onSave(n, entries.filter(x => picked.has(x.id)).map(x => x.id))) return setError('No se ha podido guardar el plato.')
     setNotice({ text: `Plato guardado: ${n}`, ids: [] })
     close()
   }
   const add = (m: Meal) => {
     const r = onAdd(m.id, day)
+    if (r.gone) return setNotice({ text: 'Ese plato ya no existe.', ids: [] })
     const miss = r.missing > 0 ? `. ${r.missing} ${r.missing === 1 ? 'alimento del plato ya no existe y no se ha añadido' : 'alimentos del plato ya no existen y no se han añadido'}` : ''
     setNotice({ text: r.ids.length ? `Añadido: ${m.name} (${r.ids.length} ${r.ids.length === 1 ? 'alimento' : 'alimentos'})${dietNote(r.diet)}${miss}` : `No se ha añadido nada${miss}`, ids: r.ids })
   }
   const undo = () => { const r = onUndo(notice.ids); setNotice({ text: `Deshecho: ${r.undone} ${r.undone === 1 ? 'entrada' : 'entradas'} del plato${dietNote(r.diet)}`, ids: [] }) }
-  const del = (m: Meal) => { onDelete(m.id); setNotice({ text: `Plato borrado: ${m.name}`, ids: [] }); headRef.current?.focus() }
+  const del = (m: Meal) => { if (!window.confirm(`¿Borrar el plato «${m.name}»? Lo que ya has apuntado no cambia.`)) return; onDelete(m.id); setNotice({ text: `Plato borrado: ${m.name}`, ids: [] }); headRef.current?.focus() }
 
   return (
     <section aria-labelledby="food-meals" className={card}>

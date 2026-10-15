@@ -42,6 +42,9 @@ export function copyDay(log: FoodLogEntry[], from: string, newId: () => string, 
 }
 export const hasCopy = (log: FoodLogEntry[], day: string) => dayEntries(log, day).some(e => e.via === 'copy')
 
+// ponytail: solo impide crear repetidos; la fusión puede traer dos platos con el mismo nombre (ids distintos) y se dejan.
+export const mealNameTaken = (name: string, meals: Meal[] = []) => meals.some(m => fold(m.name) === fold(name))
+
 export function makeEntry(food: Food, p: Portion, id: string, occurredAt: string, via?: string): FoodEntry {
   const n = portion(food, p.qty)
   return { id, occurredAt, name: food.name, kcal: n.kcal, p: n.p, c: n.c, f: n.f, foodId: food.id, base: food.base, qty: p.qty, ...(p.serving ? { serving: p.serving } : {}), ...(via ? { via } : {}) }

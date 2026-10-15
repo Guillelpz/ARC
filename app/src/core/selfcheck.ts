@@ -12,7 +12,7 @@ import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type 
 import { CAPTURE_SYSTEM, FOOD_SYSTEM, capturePrompt, captureSchema, foodItemSchema, foodPrompt, foodSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
-import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, copyDay, hasCopy, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, undoEntries, withDiet } from './food'
+import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, copyDay, hasCopy, makeEntry, mealNameTaken, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, undoEntries, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
 import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
@@ -828,6 +828,17 @@ export function runSelfCheck() {
         copyDay(srcLog, addDays(fdY, -5), nid, `${fd}T09:00:00`).length === 0 &&
         !hasCopy(srcLog, fd) && hasCopy(withCp, fd) && !hasCopy(withCp, fdY) &&
         !hasCopy([...withCp, ...undoEntries(withCp, cp.map(e => e.id), nid)], fd), 'FD18 copyDay/hasCopy')
+    }
+
+    // FD19 (ciclo 39) — nombres de plato y filas USDA renombradas
+    {
+      const row = (id: string) => CATALOG.find(f => f.id === id)
+      const first = (q: string) => searchFoods(q, allFoods([]))[0]?.id
+      ok(mealNameTaken(' DESAYUNO ', [{ id: 'm', name: 'Desayuno', items: [] }]) && !mealNameTaken('Cena', [{ id: 'm', name: 'Desayuno', items: [] }]) && !mealNameTaken('x', undefined) &&
+        row('tomato-canned')?.name === 'Tomate en conserva' && row('tomato-canned')?.ref === '170051' && row('soy-sauce')?.name === 'Salsa de soja tamari' && row('soy-sauce')?.ref === '174278' &&
+        row('rabbit-raw')?.name === 'Conejo crudo' && row('rabbit-raw')?.ref === '172521' &&
+        first('tomate triturado') === 'tomato-canned' && first('salsa de soja') === 'soy-sauce' && first('conejo') === 'rabbit-raw' &&
+        parseFoodVoice('200 g de conejo', []).items[0]?.k === 'food' && JSON.stringify(parseFoodVoice('200 g de conejo', []).items).includes('rabbit-raw'), 'FD19 platos y catálogo')
     }
 
     // FD9, FD10 — persistencia de la comida

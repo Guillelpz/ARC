@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ActivityEvent, DietChange, Food, FoodData, FoodEntry, FoodGoal, Portion } from './core/types'
-import { MAX_MEALS, allFoods, copyDay as copyEntries, hasCopy, nameTaken, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
+import { MAX_MEALS, allFoods, copyDay as copyEntries, hasCopy, mealNameTaken, nameTaken, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
 import { addDays } from './core/stats'
 import { saveFood } from './core/storage'
 import { estimateEntry, type VoiceAdd } from './core/foodVoice'
@@ -85,7 +85,7 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
   // Platos: guardar desde entradas vivas del día, borrar y añadir al día elegido (con su dietSync)
   function saveMeal(name: string, ids: string[]): boolean {
     const meals = food.meals ?? []
-    if (meals.length >= MAX_MEALS) return false
+    if (meals.length >= MAX_MEALS || mealNameTaken(name, meals)) return false
     const live = liveEntries(food.log), m = mealFromEntries(ids.flatMap(id => live.filter(e => e.id === id)), name, `meal-${uuid()}`)
     if (!m) return false
     setFood({ ...food, meals: [...meals, m] })
@@ -96,10 +96,10 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
     const { meals: _m, ...rest } = food
     setFood(meals.length ? { ...rest, meals } : rest)
   }
-  function addMeal(id: string, day: string): { ids: string[]; missing: number; diet: DietChange } {
+  function addMeal(id: string, day: string): { ids: string[]; missing: number; diet: DietChange; gone?: true } {
     if (day > today) day = today
     const m = (food.meals ?? []).find(x => x.id === id)
-    if (!m) return { ids: [], missing: 0, diet: 0 }
+    if (!m) return { ids: [], missing: 0, diet: 0, gone: true }
     const { entries, missing } = mealEntries(m, allFoods(food.foods), uuid, stamp(day))
     if (!entries.length) return { ids: [], missing, diet: 0 }
     return { ids: entries.map(e => e.id), missing, diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
