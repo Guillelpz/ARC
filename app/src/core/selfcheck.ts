@@ -15,6 +15,7 @@ import { CATALOG } from './foodCatalog'
 import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
+import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -885,6 +886,20 @@ export function runSelfCheck() {
     const ct = labelContent('QUJD') as { type: string; source?: { type: string; media_type: string; data: string } }[]
     ok(ct.length === 2 && ct[0].type === 'image' && ct[0].source?.type === 'base64' && ct[0].source.media_type === 'image/jpeg' && ct[0].source.data === 'QUJD' && ct[1].type === 'text' &&
       Object.keys(labelSchema.properties).length === 11 && labelSchema.required.length === 11 && Object.keys(labelSchema.properties).every(k => labelSchema.required.includes(k)) && labelSchema.additionalProperties === false, 'FI9 labelContent/labelSchema')
+  }
+
+  // FVZ3 (ciclo 36) — tabla de alias de voz de Comida
+  {
+    const fnorm = normalizeVoice // ponytail: en T36.2 pasa a foodNorm
+    const ids = new Set(CATALOG.map(f => f.id)), seen = new Map<string, string>()
+    let good = CATALOG.length === 188 && Object.keys(VOICE_ALIASES).every(k => ids.has(k)) && CATALOG.every(f => (VOICE_ALIASES[f.id]?.length ?? 0) >= 1)
+    for (const [id, list] of Object.entries(VOICE_ALIASES)) for (const a of list) {
+      const k = fnorm(a)
+      if (a.length < 1 || a.length > 40 || k !== a || seen.has(k)) good = false
+      seen.set(k, id)
+      if (CATALOG.some(f => f.id !== id && [f.name, ...(f.aliases ?? [])].some(x => fnorm(x) === k))) good = false
+    }
+    ok(good && Object.values(SERVING_WORDS).every(w => /^[a-z]+$/.test(w)) && GENERIC_SERVING.has('racion'), 'FVZ3 tabla de alias de voz')
   }
 
   console.info('[selfcheck] done')
