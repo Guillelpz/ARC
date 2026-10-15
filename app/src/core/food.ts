@@ -34,6 +34,14 @@ export function undoEntries(log: FoodLogEntry[], ids: string[], newId: () => str
   return [...new Set(ids)].flatMap(id => { const e = live.get(id); return e ? [{ id: newId(), undoes: e.id, occurredAt: e.occurredAt }] : [] })
 }
 
+// Entradas vivas de `from` como instantáneas nuevas para `at` (mismo orden que el Diario). No muta `log`.
+export function copyDay(log: FoodLogEntry[], from: string, newId: () => string, at: string): FoodEntry[] {
+  return dayEntries(log, from).map((e, i) => ({ e, i }))
+    .sort((a, b) => (a.e.occurredAt < b.e.occurredAt ? -1 : a.e.occurredAt > b.e.occurredAt ? 1 : a.i - b.i))
+    .map(({ e }) => ({ ...e, id: newId(), occurredAt: at, via: 'copy' }))
+}
+export const hasCopy = (log: FoodLogEntry[], day: string) => dayEntries(log, day).some(e => e.via === 'copy')
+
 export function makeEntry(food: Food, p: Portion, id: string, occurredAt: string, via?: string): FoodEntry {
   const n = portion(food, p.qty)
   return { id, occurredAt, name: food.name, kcal: n.kcal, p: n.p, c: n.c, f: n.f, foodId: food.id, base: food.base, qty: p.qty, ...(p.serving ? { serving: p.serving } : {}), ...(via ? { via } : {}) }

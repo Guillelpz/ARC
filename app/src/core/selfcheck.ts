@@ -12,7 +12,7 @@ import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type 
 import { CAPTURE_SYSTEM, FOOD_SYSTEM, capturePrompt, captureSchema, foodItemSchema, foodPrompt, foodSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
-import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
+import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, copyDay, hasCopy, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, undoEntries, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
 import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
@@ -791,6 +791,28 @@ export function runSelfCheck() {
       const a = wk[6], b = wk[7]
       ok(wk.length === 8 && wk[0].avg === null && wk[0].days === 0 && wk[0].goal === 2000 && a.monday === prevMon && !a.current && a.days === 2 && a.avg?.kcal === 1500 && a.avg.p === 5 && a.goal === 2000 && a.inRange === 1 &&
         b.monday === mon && b.current && b.days === 1 && b.avg?.kcal === 1800 && b.goal === 1800 && b.inRange === 1 && foodWeekly({ log: [], foods: [] }, today15).every(w => w.goal === null && w.avg === null), 'FD14/FD15 foodWeekly')
+    }
+
+    // FD18 (ciclo 39) — copiar el día anterior
+    {
+      let k = 0
+      const nid = () => `c-${++k}`
+      const est = estimateEntry({ name: 'Bocadillo', base: 'g', kcal: 260, p: 10, c: 30, f: 10, source: 'estimate' }, { qty: 200 }, 'y3', `${fdY}T13:00:00`)
+      const srcLog: FoodLogEntry[] = [
+        en('y1', 100, fdY, { occurredAt: `${fdY}T08:00:00`, serving: { name: 'Taza', n: 2 } }), quickEntry({ kcal: 300 }, 'y2', `${fdY}T09:00:00`), est,
+        en('y4', 700, fdY, { occurredAt: `${fdY}T14:00:00` }), { id: 'u4', undoes: 'y4', occurredAt: `${fdY}T14:00:00` }, en('t1', 50, fd),
+      ]
+      const before = JSON.stringify(srcLog)
+      const cp = copyDay(srcLog, fdY, nid, `${fd}T09:00:00`)
+      const withCp = [...srcLog, ...cp]
+      const srcIds = new Set(srcLog.map(e => e.id))
+      ok(cp.length === 3 && cp.map(e => e.name).join() === `x,Añadido rápido,${est.name}` && cp.every(e => !srcIds.has(e.id)) && new Set(cp.map(e => e.id)).size === 3 &&
+        cp.every(e => e.occurredAt === `${fd}T09:00:00` && e.via === 'copy') && est.via === 'voice' &&
+        cp[0].kcal === 100 && cp[0].p === 5 && cp[0].c === 10 && cp[0].f === 2 && cp[0].qty === 100 && cp[0].serving?.n === 2 && cp[0].foodId === 'rice-white-cooked' && cp[0].base === 'g' &&
+        cp[2].kcal === est.kcal && cp[2].qty === est.qty && !('foodId' in cp[2]) && !cp.some(e => e.kcal === 700) && JSON.stringify(srcLog) === before &&
+        copyDay(srcLog, addDays(fdY, -5), nid, `${fd}T09:00:00`).length === 0 &&
+        !hasCopy(srcLog, fd) && hasCopy(withCp, fd) && !hasCopy(withCp, fdY) &&
+        !hasCopy([...withCp, ...undoEntries(withCp, cp.map(e => e.id), nid)], fd), 'FD18 copyDay/hasCopy')
     }
 
     // FD9, FD10 — persistencia de la comida
