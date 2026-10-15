@@ -258,7 +258,7 @@ export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, c
 }
 
 // Comida del día elegido (Comida → «Dictar»): solo entiende comida. Otro día → no guarda (A7); sin nada reconocible → unknown.
-// ponytail: sin Haiku hasta el ciclo 38; no pasa por hábitos ni gym.
+// Es el respaldo determinista de `interpretFood` (haiku.ts, con Haiku y memoria); no pasa por hábitos ni gym.
 export function localFood(text: string, own: Food[]): Extract<CaptureCommand, { kind: 'food' | 'other-day' | 'unknown' }> {
   const src: Src = { text, source: 'parser' }
   if (isOtherDay(captureNorm(text))) return { ...src, kind: 'other-day' }

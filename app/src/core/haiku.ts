@@ -1,7 +1,8 @@
 import type { Exercise, Food, WeightUnit } from './types'
 import { VOICE_MAX_CHARS, fromAI, parseGym, pickDraft, type GymDraft, type HaikuError, type VoiceCommand } from './voice'
-import { localCapture } from './memory'
-import { captureFromAI, localFood, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { localCapture, recall, type Memo } from './memory'
+import { captureFromAI, deviceSure, isReady, localFood, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { foodItemsFromAI } from './foodVoice'
 
 export type { HaikuError } from './voice'
 export type HaikuResult = { ok: true; draft: GymDraft } | { ok: false; error: HaikuError }
@@ -200,7 +201,32 @@ export async function interpretCapture(text: string, ctx: CaptureCtx, key: strin
   return ai && !ai.ok ? { ...c, aiError: ai.error } : c
 }
 
-// Comida de «Dictar» en Comida: solo el parser (la rama de Haiku llega en el ciclo 38; sin clave ya es el comportamiento final).
-export async function interpretFood(text: string, own: Food[]): Promise<ReturnType<typeof localFood>> {
-  return localFood(text, own)
+export type FoodCmd = Extract<CaptureCommand, { kind: 'food' | 'other-day' | 'unknown' }>
+export type FoodResult = { ok: true; cmd: FoodCmd } | { ok: false; error: HaikuError }
+// Haiku solo con comida (esquema `foodSchema`, 800 tokens). Una respuesta con algún elemento inválido es `invalid` (manda el parser).
+export async function askFood(text: string, own: Food[], key: string, fetchImpl?: typeof fetch): Promise<FoodResult> {
+  const r = await postHaiku({ system: FOOD_SYSTEM, content: foodPrompt(text, own), schema: foodSchema, maxTokens: 800 }, key, fetchImpl)
+  if (!r.ok) return r
+  const o = r.value as { otherDay?: unknown; foods?: unknown } | null
+  if (typeof o !== 'object' || o === null || typeof o.otherDay !== 'boolean') return { ok: false, error: 'invalid' }
+  const src = { text, source: 'ai' } as const
+  if (o.otherDay) return { ok: true, cmd: { ...src, kind: 'other-day' } }
+  const items = foodItemsFromAI(o.foods, own)
+  if (items === null) return { ok: false, error: 'invalid' }
+  return { ok: true, cmd: items.length ? { ...src, kind: 'food', items, rest: '' } : { ...src, kind: 'unknown' } }
+}
+
+// «Dictar comida» (solo comida). Orden: otro día → parser (sin guardar); el dispositivo seguro (O3: todo listo y sin resto) o la memoria lista (O1) → sin llamada;
+// si no, Haiku (con clave y conexión) combinado con el parser como en la captura (pickCapture). Cualquier fallo de Haiku deja el parser, con `aiError`.
+export async function interpretFood(text: string, own: Food[], key: string | null, online: boolean, memo: Memo = [], fetchImpl?: typeof fetch): Promise<FoodCmd> {
+  const parsed = localFood(text, own)
+  if (parsed.kind === 'other-day') return parsed
+  const ctx: CaptureCtx = { exercises: [], trackers: [], all: [], unit: 'kg', memo, foods: own } // la memoria de gym y de hábitos no se aplica aquí
+  if (deviceSure(parsed, ctx)) return parsed
+  const mem = recall(text, ctx)
+  const heard: CaptureCommand = mem?.kind === 'food' ? mem : parsed
+  if (mem?.kind === 'food' && isReady(mem, ctx)) return mem
+  const ai = key && online ? await askFood(text, own, key, fetchImpl) : null
+  const c = pickCapture(ai?.ok ? ai.cmd : null, heard, ctx) as FoodCmd // las tres entradas son food/other-day/unknown, la salida también
+  return ai && !ai.ok ? { ...c, aiError: ai.error } : c
 }

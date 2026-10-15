@@ -297,7 +297,7 @@ export default function App() {
   const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
     interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo(), foods: food.foods }, loadAiKey(), navigator.onLine !== false)
-  const interpretFd = (text: string) => interpretFood(text, food.foods)
+  const interpretFd = (text: string) => interpretFood(text, food.foods, loadAiKey(), navigator.onLine !== false, loadMemo())
   const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
   const forgetCapture = (text: string) => { const m = loadMemo(), n = forget(m, text); if (n !== m) saveMemo(n) }
 
