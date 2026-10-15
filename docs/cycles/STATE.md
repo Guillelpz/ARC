@@ -1,6 +1,6 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–30 cerrados e implementados. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 y la spec de Comida el 2026-10-15; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–32 cerrados e implementados. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31 (salvo `cycle-31/research-integrations.md`) el 2026-10-15; todos están en el historial de git.
 
 ## En curso
 
@@ -31,7 +31,7 @@ Decisiones del usuario (2026-10-15), a partir del informe del 31b; no se reabren
 
 **Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food-integrations.md`; ciclos 32 (OFF tecleado), 33 (foto → Haiku), 34 (catálogo USDA), 35 (escáner), seguidos; X1 (FD1 máx. 170-190), X2 (wasm fuera del precache, caché al primer uso), X3 (`zxing-wasm` dependencia directa exacta).
 
-**Estado:** ciclo 32 en implementación (rama `cycle-32`).
+**Estado:** ciclo 32 **cerrado** (merge 38e3030; review APROBADO; análisis en `cycle-32/analysis.md`). Ciclo 33 (foto de la etiqueta → Haiku) en implementación (rama `cycle-33`).
 
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
