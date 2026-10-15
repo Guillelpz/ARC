@@ -136,7 +136,7 @@ describe('captura', () => {
     const [url, init] = f.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('https://api.anthropic.com/v1/messages')
     const body = JSON.parse(init.body as string)
-    expect(body.model).toBe('claude-haiku-5-5'); expect(body.max_tokens).toBe(400)
+    expect(body.model).toBe('claude-haiku-5-5'); expect(body.max_tokens).toBe(1000)
     expect(body.thinking).toEqual({ type: 'disabled' })
     expect(body.output_config.format.schema.properties.exerciseId.enum).toEqual([...EXERCISES.map(e => e.id), 'none'])
     expect(body.output_config.format.schema.properties.trackerId.enum).toEqual([...act.map(t => t.id), 'none'])

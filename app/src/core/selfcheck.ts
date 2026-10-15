@@ -9,7 +9,7 @@ import { FOOD_PRIVACY_KEY, exportBackup, isDataKey, loadFoodPrivacy, parseBackup
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
-import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
+import { CAPTURE_SYSTEM, FOOD_SYSTEM, capturePrompt, captureSchema, foodItemSchema, foodPrompt, foodSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
 import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
@@ -729,7 +729,7 @@ export function runSelfCheck() {
         fa({ ...newo, confidence: 'seguro' }) === null && fa({ otherDay: true })?.kind === 'other-day' && b8?.kind === 'tracker' && b8.trackerId === 'beer' && b8.amount === 2 && r8?.amount === 100 &&
         (fa(newo) as { habit: { amount: number; confidence: string } }).habit.amount === 30 && (fa(newo) as { habit: { confidence: string } }).habit.confidence === 'alta' && fa({ kind: 'none' })?.kind === 'unknown' && captureFromAI(null, 'x', ctx) === null, 'CV8 captureFromAI')
       const sch = captureSchema(['a'], ['b']), pr = capturePrompt('hola <b>', ctx)
-      ok(sch.properties.exerciseId.enum.join() === 'a,none' && sch.properties.trackerId.enum.join() === 'b,none' && sch.required.length === 17 && sch.required.every(k => k in sch.properties) &&
+      ok(sch.properties.exerciseId.enum.join() === 'a,none' && sch.properties.trackerId.enum.join() === 'b,none' && sch.required.length === 18 && sch.required.every(k => k in sch.properties) &&
         sch.additionalProperties === false && !pr.includes('Ajedrez') && !pr.includes('<b>') && pr.includes('<habitos>') && pr.includes('reading: Reading · HERO · min'), 'CV9 esquema y prompt')
     }
   }
@@ -953,6 +953,17 @@ export function runSelfCheck() {
     ok(es.length === 3 && es.every(e => e.via === 'voice') && es[0].foodId === 'rice-white-cooked' && es[0].qty === 200 && es[1].foodId === 'egg' && es[1].qty === 100 && es[1].serving?.n === 2 &&
       es[2].kcal === 500 && es[2].qty === 0 && !('foodId' in es[2]) && !('via' in raw) && raw.qty === 0 &&
       voiceAdds(parseFoodVoice('arroz').items, own).length === 0 && itemText(parseFoodVoice('200 g de arroz').items[0], own) === 'Arroz blanco cocido · 200 g · 260 kcal', 'FVZ11 voiceAdds/entradas')
+  }
+
+  // FVZ17 (ciclo 38) — esquemas y prompts de la comida por voz
+  {
+    const ctx: CaptureCtx = { exercises: EXERCISES, trackers: TRACKERS, all: TRACKERS, unit: 'kg', foods: [
+      { id: 'food-1', name: 'Mi tarta <b>', base: 'g', kcal: 300, p: 3, c: 40, f: 10 }, { id: 'food-2', name: 'Vieja', base: 'g', kcal: 100, p: 1, c: 1, f: 1, archived: true }] }
+    const sch = captureSchema([], []), pr = capturePrompt('arroz <b>', ctx), fp = foodPrompt('arroz <b>', ctx.foods!)
+    ok(sch.required.includes('foods') && sch.required.length === 18 && sch.properties.kind.enum.includes('food') && foodItemSchema.required.length === 10 && foodItemSchema.additionalProperties === false &&
+      foodItemSchema.required.every(k => k in foodItemSchema.properties) && foodSchema.required.join() === 'otherDay,foods' &&
+      !pr.includes('<b>') && pr.includes('<propios>') && pr.includes('Mi tarta') && !pr.includes('Vieja') && !pr.includes('Arroz blanco') && fp.includes('<propios>') && !fp.includes('Vieja') && !fp.includes('<b>') &&
+      !capturePrompt('x', { ...ctx, foods: [] }).includes('<propios>') && CAPTURE_SYSTEM.includes('foods') && CAPTURE_SYSTEM.includes('"food"') && FOOD_SYSTEM.includes('otherDay'), 'FVZ17 esquemas y prompts')
   }
 
   // FVZ3 (ciclo 36) — tabla de alias de voz de Comida
