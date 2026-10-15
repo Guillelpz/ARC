@@ -11,7 +11,7 @@ export type FoodDraft = {
   kcal: number | null          // por 100 de base; null = falta o fuera de rango
   p: number | null; c: number | null; f: number | null
   servings: Serving[]          // 0..1
-  source: 'off' | 'label'
+  source: 'off' | 'label' | 'estimate'
   ref?: string                 // EAN-13 normalizado
 }
 export type OffError = 'network' | 'timeout' | 'rate' | 'http' | 'invalid'

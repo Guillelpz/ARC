@@ -63,6 +63,7 @@ export function FoodCustom({ initialName, custom, onCreate, onReactivate, onCanc
     <form onSubmit={submit} noValidate aria-labelledby="food-c-title" className="flex flex-col gap-3 rounded-lg border border-hero-border p-3">
       <h3 id="food-c-title" className="text-sm font-semibold">{draft ? 'Revisar alimento' : 'Crear alimento'}</h3>
       {draft?.source === 'off' && draft.ref && <FoodOffCredit ean={draft.ref} />}
+      {draft?.source === 'estimate' && <span className="inline-flex w-fit items-center rounded-md border border-hero-border px-2 py-0.5 text-xs font-medium text-hero-muted">Estimación</span>}
       <div className="flex gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <label htmlFor="food-c-name" className="text-xs font-medium">Nombre</label>

@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { CircleAlert, Mic } from 'lucide-react'
 import type { ActivityEvent, Branch, DietChange, Exercise, Food, Tracker, WeightUnit } from '../core/types'
 import { dietNote } from '../core/food'
-import { itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
+import { isConfirmable, itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
 import { VOICE_MAX_CHARS, draftText, isComplete, type GymDraft, type VoiceCommand } from '../core/voice'
 import { AUTO_CREATE_S, MAX_CAPTURE, convNote, type CaptureCommand, type NewHabit, type Problem } from '../core/capture'
 import { unitFor } from '../core/trackers'
@@ -15,7 +15,7 @@ import { missingOf, type VoiceMissing } from './voiceNotes'
 import { CARD, LABEL } from './branchTone'
 import { CreatedResult, NewHabitCard, TrackerResult } from './CaptureCards'
 import { FoodVoiceCard } from './FoodVoiceCard'
-import { foodCount, foodStatus, kcalOf } from './foodVoiceText'
+import { confirmDone, foodCount, foodStatus, kcalOf, type FoodDone } from './foodVoiceText'
 
 export type CaptureStart = ListenStart | { mode: 'privacy' } | { mode: 'idle' }
 
@@ -47,8 +47,6 @@ type Props = {
   onOpenFood: (items: FoodItem[], heard: string) => void
 }
 type Mode = 'idle' | 'privacy' | 'listening' | 'processing' | 'text'
-// Comida apuntada por una frase: lo guardado, lo pendiente y el efecto en Dieta
-type FoodDone = { ids: string[]; saved: FoodItem[]; pending: FoodItem[]; diet: DietChange; undone: string | null }
 type Res =
   | { k: 'gym'; cmd: VoiceCommand; ids: string[]; auto: boolean }
   | { k: 'trk'; text: string; t: Tracker; ev: ActivityEvent; note: string | null; food: FoodItem[] | null; fres: FoodDone | null }
@@ -128,10 +126,10 @@ export function CaptureView(props: Props) {
       }
       case 'food': {
         const ready = cmd.items.filter(itemReady), pending = cmd.items.filter(i => !itemReady(i))
-        if (cmd.items.length === 1 && pending.length === 1) { setMode('idle'); r.onOpenFood(cmd.items, cmd.text); return } // FV1: nada que guardar, Comida lo completa
+        if (cmd.items.length === 1 && pending.length === 1 && !isConfirmable(pending[0])) { setMode('idle'); r.onOpenFood(cmd.items, cmd.text); return } // FV1: nada que guardar ni que confirmar, Comida lo completa
         const s = r.onSaveFood(voiceAdds(ready, r.foods))
         if (pending.length === 0) r.onLearn(cmd)
-        setRes({ k: 'food', cmd, done: { ids: s.ids, saved: ready, pending, diet: s.diet, undone: null } }); setMode('idle'); focusMic()
+        setRes({ k: 'food', cmd, done: { ids: s.ids, created: s.created, saved: ready, pending, diet: s.diet, undone: null } }); setMode('idle'); focusMic()
         return
       }
       case 'new':
@@ -209,13 +207,13 @@ export function CaptureView(props: Props) {
   }
   function undoFood() {
     if (res?.k !== 'food') return
-    const d = res.done, r = ref.current.onUndoFood(d.ids, [])
+    const d = res.done, r = ref.current.onUndoFood(d.ids, d.created)
     ref.current.onForget(res.cmd.text)
     setRes({ k: 'undone', text: `Deshecho: ${foodCount(d.ids.length)} (${kcalOf(d.saved, ref.current.foods)} kcal).${dietNote(r.diet)}` }); focusMic()
   }
   function editFood() {
     if (res?.k !== 'food') return
-    if (res.done.ids.length) ref.current.onUndoFood(res.done.ids, [])
+    if (res.done.ids.length) ref.current.onUndoFood(res.done.ids, res.done.created)
     ref.current.onForget(res.cmd.text)
     ref.current.onOpenFood(res.cmd.items, res.cmd.text) // todos los ítems vuelven como pendientes
   }
@@ -223,14 +221,20 @@ export function CaptureView(props: Props) {
   function attachFood() {
     if (res?.k !== 'trk' || !res.food) return
     const items = res.food, ready = items.filter(itemReady), pending = items.filter(i => !itemReady(i))
-    if (!ready.length) return ref.current.onOpenFood(items, res.text)
+    if (!ready.length && !pending.some(isConfirmable)) return ref.current.onOpenFood(items, res.text)
     const s = ref.current.onSaveFood(voiceAdds(ready, ref.current.foods))
-    setRes({ ...res, fres: { ids: s.ids, saved: ready, pending, diet: s.diet, undone: null } })
+    setRes({ ...res, fres: { ids: s.ids, created: s.created, saved: ready, pending, diet: s.diet, undone: null } })
   }
   function undoAttached() {
     if (res?.k !== 'trk' || !res.fres) return
-    const d = res.fres, r = ref.current.onUndoFood(d.ids, [])
-    setRes({ ...res, food: null, fres: { ...d, ids: [], saved: [], undone: `Deshecho: ${foodCount(d.ids.length)} (${kcalOf(d.saved, ref.current.foods)} kcal).${dietNote(r.diet)}` } })
+    const d = res.fres, r = ref.current.onUndoFood(d.ids, d.created)
+    setRes({ ...res, food: null, fres: { ...d, ids: [], created: [], saved: [], undone: `Deshecho: ${foodCount(d.ids.length)} (${kcalOf(d.saved, ref.current.foods)} kcal).${dietNote(r.diet)}` } })
+  }
+  // «Apuntar» de una estimación o ración propuesta, en la tarjeta de comida o en la adjunta a un hábito
+  function confirmFood(item: FoodItem, asOwn: boolean) {
+    const r = ref.current
+    if (res?.k === 'food') setRes({ ...res, done: confirmDone(res.done, item, asOwn, r.foods, r.onSaveFood) })
+    else if (res?.k === 'trk' && res.fres) setRes({ ...res, fres: confirmDone(res.fres, item, asOwn, r.foods, r.onSaveFood) })
   }
   function createHabit(h: NewHabit) {
     if (res?.k !== 'new') return
@@ -311,13 +315,13 @@ export function CaptureView(props: Props) {
                 <p role="status" className="text-sm font-semibold">{foodStatus(res.fres, props.foods)}</p>
                 {res.fres.undone === null && (
                   <FoodVoiceCard tone={res.t.branch} heard={res.text} saved={res.fres.saved} pending={res.fres.pending} rest="" own={props.foods}
-                    undoLabel="Deshacer comida" onUndo={res.fres.ids.length ? undoAttached : undefined} onComplete={() => ref.current.onOpenFood(res.fres!.pending, res.text)} onClose={() => setRes({ ...res, food: null, fres: null })} />
+                    undoLabel="Deshacer comida" onUndo={res.fres.ids.length ? undoAttached : undefined} onConfirm={confirmFood} onComplete={() => ref.current.onOpenFood(res.fres!.pending, res.text)} onClose={() => setRes({ ...res, food: null, fres: null })} />
                 )}
               </div>
             )}
             {res?.k === 'food' && (
               <FoodVoiceCard tone="hero" heard={res.cmd.text} saved={res.done.saved} pending={res.done.pending} rest={res.cmd.rest} own={props.foods}
-                onUndo={res.done.ids.length ? undoFood : undefined} onComplete={() => ref.current.onOpenFood(res.done.pending, res.cmd.text)} onEdit={editFood} onClose={close} />
+                onUndo={res.done.ids.length ? undoFood : undefined} onConfirm={confirmFood} onComplete={() => ref.current.onOpenFood(res.done.pending, res.cmd.text)} onEdit={editFood} onClose={close} />
             )}
             {res?.k === 'created' && <CreatedResult branch={res.t.branch} onUndo={undoCreated} onGo={() => ref.current.onGoToMissions(res.t.branch)} onClose={close} />}
             {res?.k === 'new' && (

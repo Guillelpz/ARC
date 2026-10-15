@@ -1935,3 +1935,67 @@ test('U-FV7b «Dictar comida» con un alimento sin cantidad: pasa a «Por voz: p
   expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
   expect(foodLive()).toHaveLength(1)
 })
+
+// --- Comida por voz con Haiku y memoria (ciclo 38). La API se simula: nunca se llama a la real. ---
+const capFood = (foods: unknown[]) => aiReply({ kind: 'food', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'none', amount: null, amountUnit: 'none', unitWord: '',
+  name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '', foods })
+const calamares = { name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', base: 'g', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 }
+
+test('U-FV9 con clave, «un bocadillo de calamares»: chip «Estimación» y nada guardado hasta «Apuntar»', async () => {
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  const f = stubFetch(() => Promise.resolve(capFood([calamares])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Estimación', { selector: 'span' })).toBeTruthy()
+  expect(screen.getByText('Bocadillo de calamares · 1 Ración (200 g) · 520 kcal')).toBeTruthy()
+  expect(screen.getByText('Revisa la propuesta: no se ha apuntado nada.')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0); expect(f).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: /^Apuntar Bocadillo de calamares/ }))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 520 kcal')).toBeTruthy()
+  expect(foodLive().map(e => [e.name, e.via, e.kcal])).toEqual([['Bocadillo de calamares (200 g)', 'voice', 520]])
+  expect((foodStored().foods as unknown[]).length).toBe(0) // sin la casilla, no se crea un propio (A4)
+})
+
+test('U-FV10 «Guardar también como alimento propio»: propio con source estimate y Deshacer lo archiva', async () => {
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  stubFetch(() => Promise.resolve(capFood([calamares])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  fireEvent.click(await screen.findByRole('checkbox', { name: 'Guardar también como alimento propio' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Apuntar Bocadillo de calamares/ }))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 520 kcal')).toBeTruthy()
+  const own = foodStored().foods as { id: string; source: string; archived?: boolean }[]
+  expect(own).toHaveLength(1); expect(own[0].source).toBe('estimate'); expect(own[0].id.startsWith('food-')).toBe(true)
+  expect(foodLive().map(e => [e.name, e.via])).toEqual([['Bocadillo de calamares', 'voice']])
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: 1 alimento (520 kcal).')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0)
+  expect((foodStored().foods as { archived?: boolean }[])[0].archived).toBe(true)
+})
+
+test('U-FV11 memoria: la segunda frase igual se resuelve sin llamar a Haiku', async () => {
+  ackVoice(); withKey(); setVoz('el arroz de siempre 200 g')
+  const arroz = { ...calamares, name: 'arroz blanco', amount: 200, unit: 'g', servingWord: '', typicalQty: null, kcal100: 130, p100: 3, c100: 28, f100: 0 }
+  const f = stubFetch(() => Promise.resolve(capFood([arroz])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 260 kcal')).toBeTruthy()
+  expect(f).toHaveBeenCalledTimes(1)
+  fireEvent.click(btn('Cerrar'))
+  fireEvent.click(btn('Dictar'))
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(2))
+  expect(f).toHaveBeenCalledTimes(1)
+})
+
+test('U-FV12 «Editar» una estimación abre Comida en «Revisar alimento» con la marca «Estimación»', async () => {
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  stubFetch(() => Promise.resolve(capFood([calamares])))
+  render(<App />)
+  fireEvent.click(btn('Dictar'))
+  await screen.findByText('Estimación', { selector: 'span' })
+  fireEvent.click(btn('Editar'))
+  expect(await screen.findByRole('heading', { name: 'Revisar alimento' })).toBeTruthy()
+  expect(screen.getByText('Estimación', { selector: 'span' })).toBeTruthy()
+  expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Bocadillo de calamares')
+  expect(foodLive()).toHaveLength(0)
+})

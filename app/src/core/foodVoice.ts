@@ -263,10 +263,11 @@ export function itemKcal(i: FoodItem, own: Food[]): number {
 
 // Lo que falta de un ítem no listo, para la tarjeta de la captura y la lista «Por voz: pendiente» de Comida
 export function pendingText(i: FoodItem, own: Food[]): string {
+  if (i.k === 'estimate') return `Estimación · ${itemText(i, own)}`
   if (i.k === 'pending') return i.ids.length >= 2 ? `«${i.query}»: hay varios alimentos` : `«${i.query}»: no está en tus alimentos`
   if (i.k === 'food' && !itemReady(i)) {
     const name = foodById(i.foodId, own)?.name ?? i.said
-    if (i.problem === 'guess') return itemText(i, own)
+    if (i.problem === 'guess') return `Ración propuesta · ${itemText(i, own)}`
     return `${name} · ${i.problem === 'range' ? 'cantidad fuera de rango' : i.problem === 'unit' ? 'no sé esa medida' : 'falta la cantidad'}`
   }
   return itemText(i, own)
