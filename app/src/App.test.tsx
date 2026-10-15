@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, configure, fireEvent, render, screen, within } from '@testing-library/react'
 import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT } from './components/UpdateBanner'
 
+// La suite completa corre en paralelo: con carga, el 1 s por defecto de findBy* se queda corto (U-C1 fallaba ~1 de cada 6).
+configure({ asyncUtilTimeout: 3000 })
 const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
 beforeEach(() => {
