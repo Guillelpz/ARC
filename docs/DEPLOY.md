@@ -79,6 +79,7 @@ Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run previ
 ## Comida: código de barras (Open Food Facts)
 
 - [ ] iPhone (PWA instalada), comida por voz desde el «+» (ciclo 36): dictar «200 gramos de arroz y dos huevos» → «Registrado en Comida: 2 alimentos · 403 kcal»; recargar y ver las 2 filas en el Diario; «Deshacer» las retira. Dictar «comí una hamburguesa» → Burgers +1 y «Apuntar también en Comida» abre Comida con la hamburguesa pendiente (sin mezclar paletas en la tarjeta VILLAIN).
+- [ ] iPhone (PWA instalada), «Dictar comida» dentro de Comida (ciclo 37): con el selector en «Ayer», dictar «200 gramos de arroz y dos huevos» → la escucha arranca en el toque y queda en el Diario de ayer (no en hoy); decir «ayer…» no guarda y pide cambiar el selector.
 - [ ] iPhone (Safari y PWA): teclear un EAN real de Hacendado → «Revisar alimento» con la atribución «Open Food Facts (ODbL)» y su enlace → guardar → apuntar. Repetir el mismo EAN → «Ya lo tienes» sin peticiones en Network.
 - [ ] Modo avión: «Código de barras» → «Sin conexión. Puedes crearlo a mano»; «Crear a mano» guarda y después el EAN lo encuentra.
 - [ ] El aviso de privacidad sale solo la primera vez; «Exportar copia» no incluye `life-rpg-food-privacy-v1` y «Borrar todo» no lo vuelve a mostrar.
