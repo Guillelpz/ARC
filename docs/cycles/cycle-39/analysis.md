@@ -1,7 +1,7 @@
 # Análisis ciclo 39
 
 ## Entregado frente a lo especificado
-Todo lo aprobado: checklist unificada en `DEPLOY.md` y «Copiar resumen» (sin clave); «Copiar día anterior» en Comida (`copyDay`, un solo «Deshacer», FD18); `deviceSure` ya no guarda sin cantidad (CV13 cambiado, CV14); `readGym` descarta rutinas con id repetido; menores de los platos; 3 filas USDA renombradas con alias. Review APROBADO, 297 tests. Recortado a propósito: fijar `KEYBOARD_ON_IOS` y arreglar fallos de iPhone.
+Todo lo aprobado: checklist unificada en `DEPLOY.md` y «Copiar resumen» (sin clave); «Copiar día anterior» en Comida (`copyDay`, un solo «Deshacer», FD18); `deviceSure` ya no guarda sin cantidad (CV13 cambiado, CV14); `readGym` descarta rutinas con id repetido; menores de los platos; 3 filas USDA renombradas con alias. Review APROBADO, 297 tests. Recortado a propósito: fijar `KEYBOARD_ON_IOS` y arreglar fallos de iPhone (el 2026-10-15 el usuario probó sin fallos reportados: se queda en `'never'`).
 
 ## Deuda nueva
 - Menor 1: falta un assert de que `voiceSummary` no contiene la clave (la función no la recibe).
@@ -11,7 +11,7 @@ Todo lo aprobado: checklist unificada en `DEPLOY.md` y «Copiar resumen» (sin c
 ## Fricción del proceso
 Sin bloqueos. El ESTADO-ACTUAL ya lo había actualizado el implementer; al cierre solo hizo falta ajustar fecha y deuda.
 
-## Pendiente y riesgos para el siguiente ciclo
-- **Mini-ciclo de iPhone (bloqueado por el usuario):** arranca cuando mande los resultados de la checklist unificada de `DEPLOY.md` y el «Copiar resumen». Contenido: fijar `KEYBOARD_ON_IOS` (`'standalone'` o `'always'`; hoy `'never'`), arreglar los fallos (T8 de voz, captura, checklist I4 de etiquetas, `click()` tras el aviso, escáner en PWA).
-- **P39.2** (métricas de Haiku) y **P39.4** (temporizador de descanso, sin vibración en iOS): pospuestas. Tampoco olvidar la frase al deshacer desde misiones.
+## Riesgos para el siguiente ciclo
+- **Mini-ciclo de iPhone: cerrado sin cambios de código.** El usuario probó la checklist unificada el 2026-10-15 sin fallos reportados; `KEYBOARD_ON_IOS` se queda en `'never'` (sin fallos reportados en la prueba del usuario).
+- **P39.2** (métricas de Haiku): pospuesta. **P39.4** (temporizador de descanso): rechazada por el usuario el 2026-10-15. Tampoco olvidar la frase al deshacer desde misiones.
 - Riesgo: toda la voz y la cámara siguen sin validar en dispositivo real; no añadir funcionalidad de voz nueva antes de ese resultado.

@@ -1,18 +1,18 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en pausa a la espera de los resultados del iPhone (mini-ciclo de iPhone). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en pausa, sin nada pendiente del usuario (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15; todos están en el historial de git.
 
 ## En curso
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`, en el historial de git). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
-- Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
-- Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
+- Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 probado en iPhone por el usuario (2026-10-15, sin fallos reportados). El workflow vuelve a pausa.
+- Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Probado en iPhone por el usuario (2026-10-15, sin fallos reportados). El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`, en el historial de git). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
 ## Ciclo 39 — Preparar iPhone, copiar día y saneamiento
 
 Aprobado por el usuario el 2026-10-15 (paso 3) a partir de `cycle-39/evaluation.md`, todo lo recomendado. Orden:
-1. **P39.5, parte preparatoria:** checklist unificada en `DEPLOY.md` y botón «Copiar resumen» en `VoiceCheck.tsx`, sin la clave. Fijar `KEYBOARD_ON_IOS` y arreglar lo que falle queda para un mini-ciclo cuando el usuario mande los resultados.
+1. **P39.5, parte preparatoria:** checklist unificada en `DEPLOY.md` y botón «Copiar resumen» en `VoiceCheck.tsx`, sin la clave. El usuario probó en iPhone el 2026-10-15 sin fallos reportados: `KEYBOARD_ON_IOS` se queda en `'never'` y no hace falta mini-ciclo.
 2. **P39.1 Comida, «Copiar día anterior»:** el origen es siempre el día anterior al del selector. Helper puro `copyDay` con assert FD; copia también las entradas rápidas y las estimadas, con `via: 'copy'`.
 3. **P39.3 recortada:**
    - `deviceSure` no debe guardar sin cantidad: «I ran out of milk» → Running.
@@ -20,13 +20,13 @@ Aprobado por el usuario el 2026-10-15 (paso 3) a partir de `cycle-39/evaluation.
    - Menores de los platos.
    - Renombrar 3 filas USDA sin tocar `id` ni `ref`.
 
-Pospuestas: P39.2 (métricas de Haiku), P39.4 (temporizador de descanso, sin vibración en iOS) y olvidar la frase al deshacer desde misiones.
+Pospuestas: P39.2 (métricas de Haiku) y olvidar la frase al deshacer desde misiones.
 
 **Ejecución:** tech-lead → implementer `cycle-39` → reviewer → merge → push → cycle-analyst.
 
 **Spec:** `TECH_SPEC-cycle39.md` (eliminada al cerrar, en el historial de git; CV13 cambió por el endurecimiento aprobado de `deviceSure`).
 
-**Estado:** **cerrado** (merge 0f7f3a6; review APROBADO, 2 menores; análisis en `cycle-39/analysis.md`). **Workflow en pausa** hasta que el usuario mande los resultados de la checklist unificada de `DEPLOY.md` y el «Copiar resumen»; entonces arranca el mini-ciclo de iPhone (fijar `KEYBOARD_ON_IOS`, arreglar fallos).
+**Estado:** **cerrado** (merge 0f7f3a6; review APROBADO, 2 menores; análisis en `cycle-39/analysis.md`). Decisiones del usuario del 2026-10-15: P39.4 (temporizador de descanso) **rechazada**; checklist unificada probada en iPhone sin fallos reportados, así que `KEYBOARD_ON_IOS` sigue en `'never'` (sin fallos reportados en la prueba del usuario) y el mini-ciclo de iPhone queda cerrado sin cambios de código. **Workflow en pausa**, sin nada pendiente del usuario.
 
 ## Ciclos 36+ — Comida fase 3: voz
 
@@ -74,7 +74,7 @@ Decisiones del usuario (2026-10-15), a partir del informe del 31b; no se reabren
 
 **Spec aprobada (2026-10-15):** `TECH_SPEC-food-integrations.md` (eliminada al cerrar la fase 2); ciclos 32 (OFF tecleado), 33 (foto → Haiku), 34 (catálogo USDA), 35 (escáner), seguidos; X1 (FD1 máx. 170-190), X2 (wasm fuera del precache, caché al primer uso), X3 (`zxing-wasm` dependencia directa exacta).
 
-**Estado:** ciclo 32 **cerrado** (merge 38e3030; review APROBADO; análisis en `cycle-32/analysis.md`). Ciclo 33 (foto de la etiqueta → Haiku) **cerrado** (merge 4a21145; review APROBADO; análisis en `cycle-33/analysis.md`); pendiente de la prueba del usuario en iPhone: checklist I4 (10-20 etiquetas reales, `DEPLOY.md`) y `click()` programático tras el aviso. Ciclo 34 (catálogo USDA, 130 → 188) **cerrado** (merge c489035; review APROBADO). Ciclo 35 (escáner con cámara) **cerrado** (merge 5a040be; review APROBADO; análisis en `cycle-35/analysis.md`). **Fase 2 cerrada.** Workflow en pausa hasta que el usuario lance la fase 3 (voz de Comida por la captura del «+»).
+**Estado:** ciclo 32 **cerrado** (merge 38e3030; review APROBADO; análisis en `cycle-32/analysis.md`). Ciclo 33 (foto de la etiqueta → Haiku) **cerrado** (merge 4a21145; review APROBADO; análisis en `cycle-33/analysis.md`); probado en iPhone por el usuario (2026-10-15, sin fallos reportados): checklist I4 y `click()` programático tras el aviso. Ciclo 34 (catálogo USDA, 130 → 188) **cerrado** (merge c489035; review APROBADO). Ciclo 35 (escáner con cámara) **cerrado** (merge 5a040be; review APROBADO; análisis en `cycle-35/analysis.md`). **Fase 2 cerrada.** Workflow en pausa hasta que el usuario lance la fase 3 (voz de Comida por la captura del «+»).
 
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
@@ -140,13 +140,13 @@ Arrancado por el usuario el 2026-10-12 con las decisiones V1-V5 ya aprobadas (pa
 
 **Decisiones de spec aprobadas (2026-10-12), todas las recomendadas (§13 de la spec):** A `fetch` directo, sin SDK; B prueba en iPhone con `vite preview` + túnel `cloudflared` (o Pages con okay); C plan B en iOS = el botón abre el campo de texto y se dicta con el teclado, solo donde falle según la prueba; D «Borrar todo» no toca la clave; E sin unidad dicha → preferencia del gym (kg por defecto). El usuario pide hacerlo todo seguido y hará la prueba del iPhone al final: T8 (`KEYBOARD_ON_IOS`) se queda en `'never'` con caída al texto tras error de voz hasta que la prueba dé resultado.
 
-**Estado:** **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 (`KEYBOARD_ON_IOS`) pendiente de la prueba del usuario en iPhone, ya posible en la PWA de Pages (checklist en `docs/DEPLOY.md`). El workflow vuelve a pausa.
+**Estado:** **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 (`KEYBOARD_ON_IOS`) probado en iPhone por el usuario el 2026-10-15 sin fallos reportados: se queda en `'never'` (checklist en `docs/DEPLOY.md`, como referencia). El workflow vuelve a pausa.
 
 ## Ciclo 25 — Gym: progreso, volumen, rutinas y «Hoy»
 
 Aprobado directamente por el usuario el 2026-10-12 a partir de las pospuestas del ciclo 24 (pasos 1-2 omitidos): **P24.7** progreso por ejercicio (mejor 1RM estimado por semanas), **P24.8** volumen semanal por grupo muscular, **P24.10** rutinas/plantillas, **P24.12** gym en el bloque «Hoy», y la **deuda de sesiones del ciclo 24** (los dos `ponytail:`: deshacer la manual con series vivas; `restoreLast` con copia sin gym). Para la deuda, el tech-lead propone el comportamiento y se pregunta al usuario. Siguen vigentes D1-D8 del ciclo 24 (sin party, XP sin cambios, sin dependencias de runtime, paleta HERO).
 
-No aprobadas en este ciclo: P24.6 (nivel Gym), P24.9 (sobrecarga), P24.11 (temporizador) siguen pospuestas; P3.5 y P13.4 sin cambios.
+No aprobadas en este ciclo: P24.6 (nivel Gym), P24.9 (sobrecarga) siguen pospuestas (P24.11, temporizador, rechazada el 2026-10-15); P3.5 y P13.4 sin cambios.
 
 Decisiones de spec aprobadas (2026-10-12), todas las recomendadas: la sesión automática se recrea al deshacer/«−» con series vivas, también al importar y fusionar; «Recuperar» con copia sin gym conserva las series y recrea sesiones con aviso; las rutinas se fusionan (conflicto → local + aviso); «Hoy» muestra «Gym · N series · M ejercicios»; «Volver» desde Gym abierto desde «Hoy» → Inicio con foco en «Hoy».
 
@@ -200,5 +200,5 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 | P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta |
 | P24.6 | Nivel Gym propio (requiere peso corporal y cambia reglas de juego) | pospuesta |
 | P24.9 | G8 Sugerencia de sobrecarga progresiva | pospuesta |
-| P24.11 | G10 Temporizador de descanso | pospuesta |
+| P24.11 | G10 Temporizador de descanso (= P39.4) | rechazada (2026-10-15, decisión del usuario) |
 | P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |

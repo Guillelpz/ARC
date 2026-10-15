@@ -64,9 +64,9 @@ GitHub Pages está activo en `https://guillelpz.github.io/ARC/`. La app es un si
 
 Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`. En Git Bash, antepón `MSYS_NO_PATHCONV=1` (si no, `/rpg/` se convierte en una ruta de Windows).
 
-## Prueba en iPhone (pendiente)
+## Prueba en iPhone (referencia)
 
-Una sola pasada, ordenada por tiempo de prueba. Se hace en iPhone real, con la PWA instalada, y otra vez tras el merge a producción.
+Una sola pasada, ordenada por tiempo de prueba. El usuario la hizo en iPhone el 2026-10-15 sin fallos reportados; queda como referencia para pruebas futuras. Se hace en iPhone real, con la PWA instalada, y otra vez tras el merge a producción.
 
 ### Preparación
 
@@ -127,7 +127,7 @@ El escáner usa `barcode-detector` + `zxing-wasm` (runtime, versiones exactas). 
 
 ### 7. Foto de la etiqueta, I4 (ciclo 33, ~45 min)
 
-Validación manual (I4) que hace el usuario en el iPhone antes de cerrar el ciclo 33. Requiere la clave de Anthropic en Ajustes.
+Validación manual (I4) hecha por el usuario en el iPhone (2026-10-15, sin fallos reportados). Requiere la clave de Anthropic en Ajustes.
 
 - [ ] Primer uso: «Foto de la etiqueta» muestra el aviso («la app envía la foto, reducida y sin datos de ubicación, a Anthropic con tu clave»); «Entendido» abre la cámara/selector de una vez (incluido el `click()` tras el aviso). No vuelve a salir; «Borrar todo» no lo restablece y «Exportar copia» no lo incluye.
 - [ ] Etiquetas: 10-20 etiquetas reales distintas (yogur, cereales, bebida en ml, producto solo por ración, etiqueta en otro idioma, foto torcida, con reflejos, HEIC de la cámara). Por cada una, anota kcal, P, C, G y base tras la revisión: acierto sin tocar nada, valor corregido o error. Objetivo: >= 8 de 10 sin corregir. Si >= 3 de cada 10 salen con algún valor mal, se anota para un ciclo aparte (no se cambia de modelo aquí).
