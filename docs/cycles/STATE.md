@@ -24,7 +24,9 @@ Pospuestas: P39.2 (métricas de Haiku), P39.4 (temporizador de descanso, sin vib
 
 **Ejecución:** tech-lead → implementer `cycle-39` → reviewer → merge → push → cycle-analyst.
 
-**Estado:** paso 4 (tech-lead).
+**Spec:** `docs/TECH_SPEC-cycle39.md` (sin decisiones abiertas; CV13 cambia por el endurecimiento aprobado de `deviceSure`).
+
+**Estado:** en implementación (rama `cycle-39`).
 
 ## Ciclos 36+ — Comida fase 3: voz
 
