@@ -3,7 +3,7 @@ import { EXERCISES } from './gym'
 import { TRACKERS } from './trackers'
 import type { Memo } from './memory'
 import { routeCapture, type CaptureCtx } from './capture'
-import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretGym } from './haiku'
+import { HAIKU_VOICE_MODEL, askCapture, askHaiku, interpretCapture, interpretGym, postHaiku } from './haiku'
 
 const KEY = 'sk-ant-test-0000000000000000'
 const reply = (o: unknown, extra: Record<string, unknown> = {}) => ({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(o) }], ...extra })
@@ -54,6 +54,20 @@ describe('askHaiku', () => {
     await vi.advanceTimersByTimeAsync(1)
     expect(await p).toEqual({ ok: false, error: 'timeout' })
     expect(await ask(mock(() => Promise.reject(new TypeError('Failed to fetch'))))).toEqual({ ok: false, error: 'network' })
+  })
+})
+
+describe('postHaiku', () => {
+  test('timeout configurable y content en array', async () => {
+    const hang = mock((_u: unknown, init: unknown) => new Promise((_, rej) => (init as RequestInit).signal!.addEventListener('abort', () => rej(new DOMException('abort', 'AbortError')))))
+    const p = postHaiku({ system: 's', content: [{ type: 'text', text: 'x' }], schema: {}, maxTokens: 10, timeoutMs: 20000 }, KEY, hang)
+    let done = false; void p.then(() => { done = true })
+    await vi.advanceTimersByTimeAsync(19999)
+    expect(done).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(await p).toEqual({ ok: false, error: 'timeout' })
+    const body = JSON.parse((hang.mock.calls[0] as [string, RequestInit])[1].body as string)
+    expect(body.messages[0].content).toEqual([{ type: 'text', text: 'x' }])
   })
 })
 
