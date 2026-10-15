@@ -29,7 +29,9 @@ Decisiones del usuario (2026-10-15), a partir del informe del 31b; no se reabren
 
 **Ejecución:** tech-lead (spec `docs/TECH_SPEC-food-integrations.md`, partida en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, por ciclo.
 
-**Estado:** paso 4 (tech-lead).
+**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food-integrations.md`; ciclos 32 (OFF tecleado), 33 (foto → Haiku), 34 (catálogo USDA), 35 (escáner), seguidos; X1 (FD1 máx. 170-190), X2 (wasm fuera del precache, caché al primer uso), X3 (`zxing-wasm` dependencia directa exacta).
+
+**Estado:** ciclo 32 en implementación (rama `cycle-32`).
 
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
