@@ -38,8 +38,8 @@ export function makeEntry(food: Food, p: Portion, id: string, occurredAt: string
   const n = portion(food, p.qty)
   return { id, occurredAt, name: food.name, kcal: n.kcal, p: n.p, c: n.c, f: n.f, foodId: food.id, base: food.base, qty: p.qty, ...(p.serving ? { serving: p.serving } : {}), ...(via ? { via } : {}) }
 }
-export function quickEntry(i: { kcal: number; p?: number; c?: number; f?: number; name?: string }, id: string, occurredAt: string): FoodEntry {
-  return { id, occurredAt, name: i.name?.trim() || 'Añadido rápido', kcal: i.kcal, qty: 0, ...(i.p !== undefined ? { p: i.p } : {}), ...(i.c !== undefined ? { c: i.c } : {}), ...(i.f !== undefined ? { f: i.f } : {}) }
+export function quickEntry(i: { kcal: number; p?: number; c?: number; f?: number; name?: string }, id: string, occurredAt: string, via?: string): FoodEntry {
+  return { id, occurredAt, name: i.name?.trim() || 'Añadido rápido', kcal: i.kcal, qty: 0, ...(via ? { via } : {}), ...(i.p !== undefined ? { p: i.p } : {}), ...(i.c !== undefined ? { c: i.c } : {}), ...(i.f !== undefined ? { f: i.f } : {}) }
 }
 export const fmtKcal = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 

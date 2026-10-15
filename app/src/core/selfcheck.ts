@@ -16,7 +16,7 @@ import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, di
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
 import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
-import { MAX_FOOD_ITEMS, foodNorm, parseFoodVoice, pluralEq } from './foodVoice'
+import { MAX_FOOD_ITEMS, foodNorm, itemText, parseFoodVoice, pluralEq, voiceAdds } from './foodVoice'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -930,6 +930,17 @@ export function runSelfCheck() {
     const sure = (t: string) => deviceSure(r(t), ctx)
     ok(['200 g de arroz', '500 kcal', 'two eggs and a banana'].every(sure) && !['arroz', 'papa 100 g', 'comí un bocadillo', 'café con leche'].some(sure) &&
       isReady(r('200 g de arroz'), ctx) && !isReady(r('arroz'), ctx), 'FVZ10 deviceSure/isReady')
+  }
+
+  // FVZ11 (ciclo 36) — entradas de voz
+  {
+    const own: Food[] = []
+    const adds = voiceAdds(parseFoodVoice('200 g de arroz y dos huevos y 500 kcal', own).items, own)
+    const es = adds.map((a, i) => 'quick' in a ? quickEntry(a.quick, `q${i}`, '2026-10-15T10:00:00', 'voice') : makeEntry(a.food, a.portion, `f${i}`, '2026-10-15T10:00:00', 'voice'))
+    const raw = quickEntry({ kcal: 300 }, 'q', '2026-10-15T10:00:00')
+    ok(es.length === 3 && es.every(e => e.via === 'voice') && es[0].foodId === 'rice-white-cooked' && es[0].qty === 200 && es[1].foodId === 'egg' && es[1].qty === 100 && es[1].serving?.n === 2 &&
+      es[2].kcal === 500 && es[2].qty === 0 && !('foodId' in es[2]) && !('via' in raw) && raw.qty === 0 &&
+      voiceAdds(parseFoodVoice('arroz').items, own).length === 0 && itemText(parseFoodVoice('200 g de arroz').items[0], own) === 'Arroz blanco cocido · 200 g · 260 kcal', 'FVZ11 voiceAdds/entradas')
   }
 
   // FVZ3 (ciclo 36) — tabla de alias de voz de Comida

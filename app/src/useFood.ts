@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { ActivityEvent, DietChange, Food, FoodData, FoodEntry, FoodGoal, Portion } from './core/types'
 import { MAX_MEALS, allFoods, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
 import { saveFood } from './core/storage'
+import type { VoiceAdd } from './core/foodVoice'
 
 const uuid = () => crypto.randomUUID()
 
@@ -47,6 +48,21 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
     const e: FoodEntry = quickEntry(input, uuid(), stamp(day))
     return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
   }
+  // Varias entradas de una frase (voz): un solo setFood y un solo dietSync (nunca dos push en el mismo manejador). `created` queda vacío hasta las estimaciones (ciclo 38).
+  function addVoice(adds: VoiceAdd[], day: string): { ids: string[]; created: string[]; diet: DietChange } {
+    if (!adds.length) return { ids: [], created: [], diet: 0 }
+    if (day > today) day = today
+    const at = stamp(day)
+    const entries = adds.map(a => 'quick' in a ? quickEntry(a.quick, uuid(), at, 'voice') : makeEntry(a.food, a.portion, uuid(), at, 'voice'))
+    return { ids: entries.map(e => e.id), created: [], diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
+  }
+  // Deshace varias entradas y archiva `archive` (propios creados por la frase) en el mismo guardado
+  function undoVoice(ids: string[], archive: string[]): { undone: number; diet: DietChange } {
+    const us = undoEntries(food.log, ids, uuid)
+    const foods = food.foods.map(f => (archive.includes(f.id) ? { ...f, archived: true } : f))
+    if (!us.length && foods.every((f, i) => f === food.foods[i])) return { undone: 0, diet: 0 }
+    return { undone: us.length, diet: syncDiet({ ...food, foods, log: [...food.log, ...us] }, us.map(u => u.occurredAt.slice(0, 10))) }
+  }
   // Alimentos propios: las entradas guardan su instantánea (T1), así que crear o archivar no toca Dieta
   function createFood(input: Omit<Food, 'id'>): Food {
     const f: Food = { id: `food-${uuid()}`, ...input }
@@ -90,5 +106,5 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
   }
 
   // `setFood` y `unsaved` quedan fuera para App: sincronía entre pestañas, importar, fusionar, recuperar y «Borrar todo»
-  return { food, setFood, unsaved, foodToday, handlers: { addFoodEntry, addQuick, undoFood, createFood, setFoodArchived, saveMeal, deleteMeal, addMeal, saveFoodGoal } }
+  return { food, setFood, unsaved, foodToday, handlers: { addFoodEntry, addQuick, addVoice, undoVoice, undoFood, createFood, setFoodArchived, saveMeal, deleteMeal, addMeal, saveFoodGoal } }
 }
