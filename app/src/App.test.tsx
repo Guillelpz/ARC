@@ -1779,6 +1779,46 @@ test('U-FI9 401, ilegible, foto inválida y sin conexión: mensajes y «Crear a 
   expect(screen.getByRole('heading', { name: 'Crear alimento' })).toBeTruthy()
 })
 
+// --- Comida: escáner con cámara (ciclo 35). Cámara y detector simulados; sin red ni wasm. ---
+const nativeDetector = (codes: string[]) => vi.stubGlobal('BarcodeDetector', class { static getSupportedFormats = () => Promise.resolve(['ean_13']); detect = () => Promise.resolve(codes.map(rawValue => ({ rawValue }))) })
+const track = () => ({ stop: vi.fn() })
+const streamOf = (t: { stop: () => void }) => Object.assign(new MediaStream(), { getTracks: () => [t] })
+const camera = (gum: () => Promise<unknown>) => Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: vi.fn(gum) } })
+afterEach(() => { Reflect.deleteProperty(navigator, 'mediaDevices') })
+
+test('U-FI10 sin mediaDevices no hay botón de cámara; con él, sí', () => {
+  ack(); render(<App />); openBarcode()
+  expect(screen.queryByRole('button', { name: 'Escanear con la cámara' })).toBeNull()
+  cleanup()
+  camera(() => new Promise(() => undefined))
+  render(<App />); openBarcode()
+  expect(btn('Escanear con la cámara')).toBeTruthy()
+})
+
+test('U-FI11 permiso denegado: mensaje y foco en el campo; otro error: sin cámara', async () => {
+  ack(); nativeDetector([]); render(<App />)
+  camera(() => Promise.reject(Object.assign(new Error('x'), { name: 'NotAllowedError' })))
+  openBarcode(); fireEvent.click(btn('Escanear con la cámara'))
+  expect((await screen.findByRole('alert')).textContent).toBe('Sin permiso para la cámara. Teclea el código.')
+  expect(document.activeElement).toBe(screen.getByRole('textbox', { name: 'Código de barras' }))
+  camera(() => Promise.reject(Object.assign(new Error('x'), { name: 'NotFoundError' })))
+  fireEvent.click(btn('Escanear con la cámara'))
+  await screen.findByText('No hay cámara disponible. Teclea el código.')
+})
+
+test('U-FI12 BarcodeDetector nativo detecta un EAN: se paran las pistas y se busca', async () => {
+  ack(); const f = stubFetch(() => offJson(yogur))
+  const t = track()
+  nativeDetector(['1234', EAN])
+  camera(() => Promise.resolve(streamOf(t)))
+  render(<App />); openBarcode(); fireEvent.click(btn('Escanear con la cámara'))
+  expect(screen.getByLabelText('Vista de la cámara')).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'Revisar alimento' })).toBeTruthy()
+  expect(t.stop).toHaveBeenCalled()
+  expect(f).toHaveBeenCalledTimes(1)
+  expect(String(f.mock.calls[0])).toContain(EAN)
+})
+
 test('U-FI13 «Exportar copia» no contiene el aviso de OFF', () => {
   ack(); render(<App />)
   expect(exportBackup([], { trackers: [], proposals: [] } as never, 'x')).not.toContain(PK)

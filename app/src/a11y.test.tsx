@@ -231,3 +231,16 @@ test('A-FI3 error de etiqueta', async () => {
   expect(await screen.findByText('No se ha podido abrir la foto. Prueba con otra.')).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A-FI4 escáner abierto (vídeo simulado)', async () => {
+  localStorage.setItem('life-rpg-food-privacy-v1', JSON.stringify({ off: 'x' }))
+  Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: () => Promise.resolve(Object.assign(new MediaStream(), { getTracks: () => [{ stop: vi.fn() }] })) } })
+  vi.stubGlobal('BarcodeDetector', class { static getSupportedFormats = () => Promise.resolve(['ean_13']); detect = () => Promise.resolve([]) })
+  render(<App />); openBarcode()
+  expect(await serious()).toEqual([])
+  fireEvent.click(screen.getByRole('button', { name: 'Escanear con la cámara' }))
+  await screen.findByText('Apunta al código de barras')
+  expect(await serious()).toEqual([])
+  fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar' })[0])
+  Reflect.deleteProperty(navigator, 'mediaDevices'); vi.unstubAllGlobals()
+})

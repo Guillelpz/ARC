@@ -7,6 +7,8 @@ import type { LabelResult } from '../core/label'
 import type { FoodPrivacy } from '../core/storage'
 import { FoodCustom } from './FoodCustom'
 import { FoodNetPrivacy } from './FoodNetPrivacy'
+import { FoodScanner } from './FoodScanner'
+import { hasCamera } from '../scan'
 import { field, primary, secondary } from './foodStyle'
 
 export type FoodNet = {
@@ -57,9 +59,9 @@ export function FoodBarcode({ net, custom, onPick, onReactivate, onCreate, onSta
 
   if (!ack) return <FoodNetPrivacy kind="off" onAccept={() => net.onAck('off')} onCancel={onClose} />
 
-  async function search(e?: React.FormEvent) {
+  async function search(e?: React.FormEvent, raw = text) {
     e?.preventDefault()
-    const ean = normEan(text)
+    const ean = normEan(raw)
     if (!ean) return setError('Revisa el código: son 8 o 13 cifras.')
     setError('')
     const own = foodByRef(ean, custom)
@@ -94,6 +96,7 @@ export function FoodBarcode({ net, custom, onPick, onReactivate, onCreate, onSta
         <button type="submit" disabled={view.t === 'searching'} className={primary}>Buscar</button>
         <button type="button" onClick={onClose} className={secondary}>Cancelar</button>
       </form>
+      {hasCamera() && <FoodScanner onCode={c => { setText(c); void search(undefined, c) }} onError={t => { setError(t); inputRef.current?.focus() }} />}
       {error && <p id="food-ean-err" role="alert" className="flex items-center gap-2 text-sm text-hero-text"><CircleAlert className="size-4 shrink-0" aria-hidden />{error}</p>}
       <p role="status" className="text-sm text-hero-muted empty:sr-only">{view.t === 'searching' ? 'Buscando en Open Food Facts…' : view.t === 'archived' ? 'Ya lo tienes, archivado' : ''}</p>
       {view.t === 'archived' && <button type="button" onClick={() => onReactivate(view.food)} className={`${secondary} self-start`}>Reactivar</button>}

@@ -27,3 +27,5 @@ export async function makeDetector(): Promise<Detector> {
   const d = new Ctor({ formats: [...FORMATS] })
   return { detect: async v => (await d.detect(v)).map(b => b.rawValue) }
 }
+
+export const hasCamera = () => !!navigator.mediaDevices?.getUserMedia
