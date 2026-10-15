@@ -671,8 +671,15 @@ export function runSelfCheck() {
       ok(ex('Read 50 pages of the name of the wind') === 'reading' && ex('corrí 5 km') === 'running' && ex('fui al gimnasio') === 'gym' && ex('ate a burguer') === undefined &&
         ex('lectur') === undefined && exactTracker('shower 10 min', two) === undefined, 'CV12 exactTracker')
       const sure = (t: string) => deviceSure(routeCapture(t, ctx), ctx)
-      ok(['80kg bench press 5 reps', 'Read 50 pages of the name of the wind', 'corrí 30 minutos'].every(sure) &&
-        !['press banca 80', 'ate a burguer', 'grounding 30 min', 'ayer leí 20 páginas'].some(sure), 'CV13 deviceSure')
+      ok(['80kg bench press 5 reps', 'corrí 30 minutos'].every(sure) &&
+        !['press banca 80', 'ate a burguer', 'grounding 30 min', 'ayer leí 20 páginas', 'Read 50 pages of the name of the wind'].some(sure), 'CV13 deviceSure')
+      // CV14 (ciclo 39) — deviceSure sin palabras ajenas al hábito
+      const cvMemo: Memo = [{ k: 'burguer', kind: 'tracker', id: 'burgers' }]
+      const ranOut = routeCapture('I ran out of milk', ctx)
+      ok(!['I ran out of milk', 'corrí con mi perro'].some(sure) &&
+        ['corrí 5 km', 'comí una hamburguesa', 'drank 3 beers', 'cómics 10 páginas', 'fui al gimnasio'].every(sure) &&
+        ranOut.kind === 'tracker' && ranOut.trackerId === 'running' &&
+        localCapture('ate a burguer', { ...ctx, memo: cvMemo }).done && localCapture('burguer', { ...ctx, memo: cvMemo }).done, 'CV14 deviceSure sin palabras ajenas')
     }
     // MC1–MC5 — memoria de frases
     {
