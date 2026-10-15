@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { CircleAlert, Plus } from 'lucide-react'
 import type { Food, FoodBase, Serving } from '../core/types'
-import { fold, nameTaken, parseMacro, parseQty } from '../core/food'
+import { fmtNum, fold, nameTaken, parseMacro, parseQty } from '../core/food'
+import { kcalCoherent, type FoodDraft } from '../core/off'
+import { FoodOffCredit } from './FoodOffCredit'
 import { field, primary, secondary } from './foodStyle'
 
 type Props = {
@@ -10,15 +12,18 @@ type Props = {
   onCreate: (f: Omit<Food, 'id'>) => void
   onReactivate: (f: Food) => void
   onCancel: () => void
+  draft?: FoodDraft // prerrelleno desde Open Food Facts o la etiqueta: modo «Revisar alimento»
+  manualRef?: string // «Crear a mano» desde el flujo del EAN: se guarda el ref (sin source)
 }
 type Row = { name: string; qty: string }
 
 // Formulario «Crear alimento»: valores por 100 g/ml (§5), hasta 5 raciones. Nombre único frente al catálogo y los propios.
-export function FoodCustom({ initialName, custom, onCreate, onReactivate, onCancel }: Props) {
-  const [name, setName] = useState(initialName)
-  const [base, setBase] = useState<FoodBase>('g')
-  const [v, setV] = useState({ kcal: '', p: '', c: '', f: '' })
-  const [rows, setRows] = useState<Row[]>([])
+export function FoodCustom({ initialName, custom, onCreate, onReactivate, onCancel, draft, manualRef }: Props) {
+  const [name, setName] = useState(draft ? draft.name : initialName)
+  const [base, setBase] = useState<FoodBase>(draft?.base ?? 'g')
+  const txt = (n: number | null | undefined) => (n === null || n === undefined ? '' : fmtNum(n))
+  const [v, setV] = useState({ kcal: txt(draft?.kcal), p: txt(draft?.p), c: txt(draft?.c), f: txt(draft?.f) })
+  const [rows, setRows] = useState<Row[]>(() => (draft?.servings ?? []).map(s => ({ name: s.name, qty: fmtNum(s.qty) })))
   const [error, setError] = useState('')
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => ref.current?.focus(), [])
@@ -43,17 +48,21 @@ export function FoodCustom({ initialName, custom, onCreate, onReactivate, onCanc
       if (servings.some(s => fold(s.name) === fold(sn))) return setError('Los nombres de las raciones no se pueden repetir.')
       servings.push({ name: sn, qty: q })
     }
-    onCreate({ name: n, base, kcal, p: p ?? 0, c: c ?? 0, f: f ?? 0, ...(servings.length ? { servings } : {}) })
+    const origin = draft ? { source: draft.source, ...(draft.ref ? { ref: draft.ref } : {}) } : manualRef ? { ref: manualRef } : {}
+    onCreate({ name: n, base, kcal, p: p ?? 0, c: c ?? 0, f: f ?? 0, ...(servings.length ? { servings } : {}), ...origin })
   }
+  const [kk, pp, cc, ff] = [parseMacro(v.kcal), parseMacro(v.p), parseMacro(v.c), parseMacro(v.f)]
+  const incoherent = draft !== undefined && [kk, pp, cc, ff].every(x => typeof x === 'number') && !kcalCoherent({ kcal: kk as number, p: pp as number, c: cc as number, f: ff as number })
   const num = (key: 'kcal' | 'p' | 'c' | 'f', label: string) => (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <label htmlFor={`food-c-${key}`} className="text-xs font-medium">{label}</label>
-      <input id={`food-c-${key}`} type="text" inputMode="decimal" autoComplete="off" value={v[key]} onChange={e => { setV(x => ({ ...x, [key]: e.target.value })); setError('') }} className={`${field} tabular-nums`} />
+      <input id={`food-c-${key}`} type="text" inputMode="decimal" autoComplete="off" value={v[key]} onChange={e => { setV(x => ({ ...x, [key]: e.target.value })); setError('') }} aria-invalid={draft !== undefined && draft[key] === null && !v[key].trim() ? true : undefined} className={`${field} tabular-nums`} />
     </div>
   )
   return (
     <form onSubmit={submit} noValidate aria-labelledby="food-c-title" className="flex flex-col gap-3 rounded-lg border border-hero-border p-3">
-      <h3 id="food-c-title" className="text-sm font-semibold">Crear alimento</h3>
+      <h3 id="food-c-title" className="text-sm font-semibold">{draft ? 'Revisar alimento' : 'Crear alimento'}</h3>
+      {draft?.source === 'off' && draft.ref && <FoodOffCredit ean={draft.ref} />}
       <div className="flex gap-2">
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <label htmlFor="food-c-name" className="text-xs font-medium">Nombre</label>
@@ -73,6 +82,7 @@ export function FoodCustom({ initialName, custom, onCreate, onReactivate, onCanc
       )}
       <p className="text-xs text-hero-muted">Valores por 100 {base}.</p>
       <div className="flex gap-2">{num('kcal', 'Calorías (kcal)')}{num('p', 'Proteína (g)')}{num('c', 'Carbohidratos (g)')}{num('f', 'Grasa (g)')}</div>
+      {incoherent && <p role="status" className="flex items-center gap-2 text-sm text-hero-text"><CircleAlert className="size-4 shrink-0" aria-hidden />Las kcal no cuadran con los macros. Revisa la etiqueta.</p>}
       {rows.map((r, i) => (
         <div key={i} className="flex gap-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1">
