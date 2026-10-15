@@ -145,7 +145,7 @@ export function readGym(v: unknown): Parsed<GymData> {
       const routines: Routine[] = []
       for (const x of v.routines) {
         const r = readRoutine(x)
-        if (r) { routines.push(r.r); fixedN += r.fixed } else rDropped++
+        if (r && !routines.some(y => y.id === r.r.id)) { routines.push(r.r); fixedN += r.fixed } else rDropped++ // id repetido: gana la primera
       }
       if (routines.length) data.routines = routines
     }

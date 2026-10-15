@@ -560,6 +560,14 @@ export function runSelfCheck() {
       const m21 = man('m'), u21 = { id: 'um', trackerId: 'gym', amount: -1, occurredAt: m21.occurredAt, undoes: 'm' }
       ok(get(deriveGame([m21, u21, a1], D), 'gym').xp.xp === get(deriveGame([m21], D), 'gym').xp.xp, 'GY21 XP neta 0 al reponer la sesión')
     }
+    // GY23 (ciclo 39) — rutinas con id repetido en readGym
+    {
+      const rA = { id: 'routine-a', name: 'Push', items: [{ exerciseId: 'bench-press', sets: 3 }] }
+      const rB = { id: 'routine-b', name: 'Pull', items: [{ exerciseId: 'pull-up', sets: 4 }] }
+      const dup = readGym({ log: [], exercises: [], routines: [rA, { ...rA, name: 'Otra' }, rB] })!
+      const clean = readGym({ log: [], exercises: [], routines: [rA, rB] })!
+      ok(JSON.stringify(dup.data.routines) === JSON.stringify([rA, rB]) && dup.dropped === 1 && clean.dropped === 0, 'GY23 readGym: rutinas repetidas, gana la primera')
+    }
     // GY22 — undoMany (deshacer un comando de voz de varias series)
     {
       const D22 = DEMO_DATE, ids22 = () => `u${Math.random()}`
