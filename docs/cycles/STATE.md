@@ -1,6 +1,6 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–34 cerrados e implementados. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31 (salvo `cycle-31/research-integrations.md`) el 2026-10-15; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–35 cerrados e implementados. **Workflow en pausa** hasta que el usuario lance la fase 3 de Comida (voz por la captura del «+»). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15; todos están en el historial de git.
 
 ## En curso
 
@@ -13,9 +13,9 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–34 cerrados e implementados. Las specs y docu
 
 Arrancado por el usuario el 2026-10-15 («adelante con lo siguiente»). Dos líneas en paralelo:
 - **31a Refactor:** extraer la lógica de comida de `App.tsx` a `src/useFood.ts` sin cambiar comportamiento (deuda del ciclo 30). Rama `cycle-31`; implementer → reviewer → merge → push.
-- **31b Investigación:** informe `docs/cycles/cycle-31/research-integrations.md` (fuentes de datos, código de barras, importación desde otras apps, viabilidad sin backend, licencias, privacidad, coste). Después, preguntas al usuario → tech-lead → implementación en ciclos siguientes. MyFitnessPal descartado como fuente (API cerrada).
+- **31b Investigación:** informe (eliminado, en el historial de git) (fuentes de datos, código de barras, importación desde otras apps, viabilidad sin backend, licencias, privacidad, coste). Después, preguntas al usuario → tech-lead → implementación en ciclos siguientes. MyFitnessPal descartado como fuente (API cerrada).
 
-**Estado:** 31a **cerrado** (merge 7a793d6, push; review APROBADO). 31b terminado: informe en `cycle-31/research-integrations.md`.
+**Estado:** 31a **cerrado** (merge 7a793d6, push; review APROBADO). 31b terminado (informe en el historial de git).
 
 ## Ciclos 32+ — Comida fase 2: integraciones
 
@@ -27,11 +27,11 @@ Decisiones del usuario (2026-10-15), a partir del informe del 31b; no se reabren
 - **I5 Descartado por ahora:** búsqueda OFF por texto (sin CORS), FatSecret/Edamam/Nutritionix/MyFitnessPal, HealthKit/Atajos, importador CSV.
 - **I6:** `X-User-Agent` con la URL del repo, no un email. Atribución ODbL con enlace a OFF.
 
-**Ejecución:** tech-lead (spec `docs/TECH_SPEC-food-integrations.md`, partida en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, por ciclo.
+**Ejecución:** tech-lead (spec `TECH_SPEC-food-integrations.md`, eliminada al cerrar, partida en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, por ciclo.
 
-**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food-integrations.md`; ciclos 32 (OFF tecleado), 33 (foto → Haiku), 34 (catálogo USDA), 35 (escáner), seguidos; X1 (FD1 máx. 170-190), X2 (wasm fuera del precache, caché al primer uso), X3 (`zxing-wasm` dependencia directa exacta).
+**Spec aprobada (2026-10-15):** `TECH_SPEC-food-integrations.md` (eliminada al cerrar la fase 2); ciclos 32 (OFF tecleado), 33 (foto → Haiku), 34 (catálogo USDA), 35 (escáner), seguidos; X1 (FD1 máx. 170-190), X2 (wasm fuera del precache, caché al primer uso), X3 (`zxing-wasm` dependencia directa exacta).
 
-**Estado:** ciclo 32 **cerrado** (merge 38e3030; review APROBADO; análisis en `cycle-32/analysis.md`). Ciclo 33 (foto de la etiqueta → Haiku) **cerrado** (merge 4a21145; review APROBADO; análisis en `cycle-33/analysis.md`); pendiente de la prueba del usuario en iPhone: checklist I4 (10-20 etiquetas reales, `DEPLOY.md`) y `click()` programático tras el aviso. Ciclo 34 (catálogo USDA, 130 → 188) **cerrado** (merge c489035; review APROBADO; análisis en `cycle-34/analysis.md`). Ciclo 35 (escáner con cámara) en implementación (rama `cycle-35`).
+**Estado:** ciclo 32 **cerrado** (merge 38e3030; review APROBADO; análisis en `cycle-32/analysis.md`). Ciclo 33 (foto de la etiqueta → Haiku) **cerrado** (merge 4a21145; review APROBADO; análisis en `cycle-33/analysis.md`); pendiente de la prueba del usuario en iPhone: checklist I4 (10-20 etiquetas reales, `DEPLOY.md`) y `click()` programático tras el aviso. Ciclo 34 (catálogo USDA, 130 → 188) **cerrado** (merge c489035; review APROBADO). Ciclo 35 (escáner con cámara) **cerrado** (merge 5a040be; review APROBADO; análisis en `cycle-35/analysis.md`). **Fase 2 cerrada.** Workflow en pausa hasta que el usuario lance la fase 3 (voz de Comida por la captura del «+»).
 
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
