@@ -83,6 +83,25 @@ test('A12 Yo con Ajustes y el diagnóstico de voz', async () => {
   expect(await serious()).toEqual([])
 })
 
+test('A11Y-1 Ajustes con el resultado de Probar voz y el textarea de respaldo', async () => {
+  class Fake {
+    lang = ''; continuous = false; interimResults = false; maxAlternatives = 1
+    onresult: ((e: unknown) => void) | null = null; onend: (() => void) | null = null
+    start() { setTimeout(() => { this.onresult?.({ results: [Object.assign([{ transcript: 'press banca 80 kg 5 reps' }], { isFinal: true })] }); this.onend?.() }, 0) }
+    stop() {}; abort() {}
+  }
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = Fake
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: 'x' }))
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('x')) }, configurable: true })
+  try {
+    render(<App />); go('Yo')
+    fireEvent.click(screen.getByRole('button', { name: 'Probar voz' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Copiar resumen' }))
+    expect(await screen.findByLabelText('Resumen de la prueba de voz')).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition; delete (navigator as unknown as Record<string, unknown>).clipboard }
+})
+
 test('A12b Yo con la clave guardada', async () => {
   localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
   render(<App />); go('Yo')

@@ -899,6 +899,48 @@ test('U-V0b Probar voz sin API: no disponible', async () => {
   expect(screen.getAllByText('Error: not-supported').length).toBeGreaterThan(0)
 })
 
+async function voiceRun(writeText: ReturnType<typeof vi.fn>) {
+  vi.useRealTimers()
+  ;(window as unknown as Record<string, unknown>).webkitSpeechRecognition = FakeSpeech
+  ;(window as unknown as Record<string, unknown>).__voz = '80 kilos press banca 5 repeticiones'
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: 'x' }))
+  localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-XYZ')
+  Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
+  render(<App />); go('Yo')
+  fireEvent.click(btn('Probar voz'))
+  await screen.findByRole('button', { name: 'Copiar resumen' })
+}
+const voiceCleanup = () => {
+  delete (window as unknown as Record<string, unknown>).webkitSpeechRecognition; delete (window as unknown as Record<string, unknown>).__voz
+  delete (navigator as unknown as Record<string, unknown>).clipboard
+}
+
+test('U-V1 Copiar resumen: copia el resumen sin la clave', async () => {
+  const writeText = vi.fn(() => Promise.resolve())
+  try {
+    await voiceRun(writeText)
+    fireEvent.click(btn('Copiar resumen'))
+    expect(await screen.findByText(/Resumen copiado/)).toBeTruthy()
+    const txt = (writeText.mock.calls[0] as unknown as [string])[0]
+    expect(txt).toContain(navigator.userAgent)
+    for (const k of ['Reconocimiento:', '80 kilos press banca 5 repeticiones', 'KEYBOARD_ON_IOS']) expect(txt).toContain(k)
+    expect(txt).not.toContain('sk-ant-test-XYZ')
+  } finally { voiceCleanup() }
+})
+
+test('U-V2 Copiar resumen: si el portapapeles falla, textarea enfocado', async () => {
+  const writeText = vi.fn(() => Promise.reject(new Error('denied')))
+  try {
+    await voiceRun(writeText)
+    fireEvent.click(btn('Copiar resumen'))
+    const area = await screen.findByLabelText('Resumen de la prueba de voz') as HTMLTextAreaElement
+    expect(screen.getByText(/No se ha podido copiar/)).toBeTruthy()
+    expect(area.value).toContain('Reconocimiento:')
+    expect(area.value).not.toContain('sk-ant-test-XYZ')
+    await vi.waitFor(() => expect(document.activeElement).toBe(area))
+  } finally { voiceCleanup() }
+})
+
 const AIK = 'life-rpg-ai-key-v1', KEY = 'sk-ant-test-0000000000000000'
 const typeKey = (v: string) => fireEvent.change(screen.getByLabelText('Clave'), { target: { value: v } })
 
