@@ -9,6 +9,28 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–35 cerrados e implementados. **Workflow en pa
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`, en el historial de git). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
+## Ciclos 36+ — Comida fase 3: voz
+
+Arrancado por el usuario el 2026-10-15. Decisiones del usuario, que no se reabren:
+- **FV1 Guardado:** un alimento reconocido con cantidad («200 gramos de arroz», «2 huevos», «500 kcal» como añadido rápido) se guarda directamente. Sale la tarjeta «Oído / Registrado / Deshacer / Editar», como en gym y hábitos (C3/V5). Si falta la cantidad o el alimento es ambiguo, no se guarda y se abre Comida prerrellenada.
+- **FV2 Varios por frase:** sí («200 g de arroz, 150 g de pollo y una manzana»). Se guardan todos y un único «Deshacer» los retira. Con Haiku, interpretación fina; sin clave, el parser separa por «y» y por comas.
+- **FV3 Alimento desconocido** (ni catálogo ni propios): con clave, Haiku estima kcal y macros. La tarjeta lleva la marca «Estimación» y **nunca se guarda sola**: hay que confirmar, con opción de guardarlo también como alimento propio. Sin clave, se abre Comida con el nombre puesto.
+- **FV4 Choque con un hábito existente** («hamburguesa» frente a Burgers): se apunta el hábito como hoy y la tarjeta añade «Apuntar también en Comida», con kcal del catálogo, de los propios o estimadas por Haiku con confirmación.
+- **FV5 Entradas:** la captura general («+», «Nuevo», «Dictar») reconoce comida, solo para hoy (C6 sin cambios). Además, la pantalla Comida tiene su propio botón «Dictar», que solo entiende comida (como «Dictar serie» en Gym) y apunta en el día del selector.
+- **FV6 Sin cantidad:** «un/una» o el alimento a secas, si tiene ración definida, cuenta como 1 ración y se guarda. Sin ración («arroz»), no se guarda y se pide la cantidad. Si Haiku propone una ración típica, hay que confirmarla.
+- **Por defecto (orquestador, coherente con ciclos 26-28):**
+  - Alias en inglés y plurales en el catálogo.
+  - Sin clave, la confianza del parser se limita a «media».
+  - La memoria de frases (O1) y `deviceSure` (O3) se extienden a comida.
+  - Dieta en vivo con su toast como siempre.
+  - ES/EN.
+  - Sin dependencias nuevas.
+  - La API real nunca se llama en tests.
+
+**Ejecución:** tech-lead (`docs/TECH_SPEC-food-voice.md`, partido en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, en cada ciclo.
+
+**Estado:** paso 4 (tech-lead).
+
 ## Ciclo 31 — Comida fase 2: investigar integraciones (+ extraer `useFood`)
 
 Arrancado por el usuario el 2026-10-15 («adelante con lo siguiente»). Dos líneas en paralelo:
