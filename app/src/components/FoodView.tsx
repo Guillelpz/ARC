@@ -6,7 +6,10 @@ import { dayLabel } from '../core/stats'
 import { DayPicker } from './DayPicker'
 import { ProgressBar } from './ProgressBar'
 import { SaveFailBanner } from './SaveFailBanner'
-import { FoodAdd } from './FoodAdd'
+import { FoodAdd, type FoodOpen } from './FoodAdd'
+import { FoodPending } from './FoodPending'
+import { foodById } from '../core/food'
+import type { FoodItem } from '../core/foodVoice'
 import type { FoodNet } from './FoodBarcode'
 import { FoodGoalCard } from './FoodGoalCard'
 import { FoodMeals } from './FoodMeals'
@@ -29,10 +32,26 @@ type Props = {
   saveFailed: boolean
   onExport: () => void
   net: FoodNet
+  prefill?: { heard: string; items: FoodItem[] } // ítems de la voz que no se pudieron guardar solos
 }
 
-export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport, net }: Props) {
+// Lo que `FoodAdd` abre para revisar un ítem pendiente
+function openFor(i: FoodItem, key: number, own: Food[]): FoodOpen {
+  if (i.k === 'quick') return { key, kind: 'quick', kcal: i.kcal, name: i.name }
+  if (i.k === 'food') { const f = foodById(i.foodId, own); if (f) return { key, kind: 'qty', food: f, portion: i.portion } }
+  return { key, kind: 'search', query: i.k === 'pending' ? i.query : i.said }
+}
+
+export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport, net, prefill }: Props) {
   const [day, setDay] = useState(today)
+  const [pending, setPending] = useState<FoodItem[]>(() => prefill?.items ?? [])
+  const [open, setOpen] = useState<FoodOpen | null>(() => (prefill?.items.length === 1 ? openFor(prefill.items[0], 1, food.foods) : null)) // con uno solo se abre directamente
+  const reviewing = useRef<FoodItem | null>(prefill?.items.length === 1 ? prefill.items[0] : null)
+  const review = (i: FoodItem) => { reviewing.current = i; setOpen(o => openFor(i, (o?.key ?? 0) + 1, food.foods)) }
+  // ponytail: al añadir cualquier cosa tras «Revisar» sale de la lista la fila revisada, aunque se haya apuntado otro alimento
+  const settle = () => { const r = reviewing.current; reviewing.current = null; if (r) setPending(p => p.filter(x => x !== r)) }
+  const addEntry: Props['onAddEntry'] = (f, p, d) => { const r = onAddEntry(f, p, d); settle(); return r }
+  const addQuick: Props['onAddQuick'] = (i, d) => { const r = onAddQuick(i, d); settle(); return r }
   const [status, setStatus] = useState('')
   const diaryRef = useRef<HTMLHeadingElement>(null)
   const rows = useRef(new Map<string, HTMLButtonElement>())
@@ -86,7 +105,8 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreate
         </section>
 
         <FoodGoalCard goal={todayGoal} onSave={onSaveGoal} />
-        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} net={net} />
+        {prefill && pending.length > 0 && <FoodPending heard={prefill.heard} items={pending} own={food.foods} onReview={review} onRemove={i => setPending(p => p.filter(x => x !== i))} />}
+        <FoodAdd key={open?.key ?? 0} open={open} food={food} day={day} today={today} onAdd={addEntry} onQuick={addQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} net={net} />
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>
 
         <FoodMeals food={food} day={day} onSave={onSaveMeal} onDelete={onDeleteMeal} onAdd={onAddMeal} onUndo={onUndo} />

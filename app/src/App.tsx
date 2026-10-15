@@ -65,6 +65,7 @@ export default function App() {
   const [focusHoy, setFocusHoy] = useState(false) // true al volver de un módulo abierto desde «Hoy»: el foco va al encabezado «Hoy»
   const [moduleFrom, setModuleFrom] = useState<'me' | 'home'>('me') // desde dónde se abrió Gym o Comida
   const [gymPrefill, setGymPrefill] = useState<{ draft: GymDraft; note: string } | null>(null) // borrador de la voz en «Hoy» que abre Gym prerrellenado
+  const [foodPrefill, setFoodPrefill] = useState<{ heard: string; items: FoodItem[] } | null>(null) // ítems de la voz que abren Comida con pendientes
   const [newMode, setNewMode] = useState<'capture' | 'manual'>('capture') // pantalla «Nuevo»: captura por voz o formulario a mano
   const [manualText, setManualText] = useState('')
   const [capture, setCapture] = useState<{ key: number; start: CaptureStart }>({ key: 0, start: { mode: 'idle' } })
@@ -186,16 +187,16 @@ export default function App() {
     if (captureBusy.current && screen === 'new' && newMode === 'capture') return // ya escucha o procesa: solo se navega
     const start: CaptureStart = voiceAck ? beginListen() : { mode: 'privacy' }
     setCapture(c => ({ key: c.key + 1, start })); setNewMode('capture')
-    setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new')
+    setFocusCard(null); setFocusHoy(false); setGymPrefill(null); setFoodPrefill(null); go('new')
   }
-  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new') }
-  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go(s) }
+  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); setFoodPrefill(null); go('new') }
+  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); setFoodPrefill(null); go(s) }
   const openGym = (from: 'me' | 'home') => { setModuleFrom(from); goTo('gym') }
   const openFood = (from: 'me' | 'home') => { setModuleFrom(from); goTo('food') }
   // Comida prerrellenada por la voz (captura): los ítems llegan como pendientes. Vuelve a «Hoy», como Gym con `openGymWith`.
-  const openFoodWith = (_items: FoodItem[], _heard: string) => { setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('food') }
+  const openFoodWith = (items: FoodItem[], heard: string) => { setFoodPrefill({ heard, items }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('food') }
   const backFromGym = () => { setGymPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('gym'); go('me') } }
-  const backFromFood = () => { if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
+  const backFromFood = () => { setFoodPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
   function push(evs: ActivityEvent[], t: Tracker, list = trackers) {
@@ -486,7 +487,7 @@ export default function App() {
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
-      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} prefill={foodPrefill ?? undefined}
         net={{ online: navigator.onLine !== false, hasKey: aiKey.hint !== null, ack: foodAck, onAck: ackFood, lookupEan: ean => (navigator.onLine === false ? Promise.resolve({ kind: 'error', error: 'network' }) : fetchOff(ean)), readLabel }} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
