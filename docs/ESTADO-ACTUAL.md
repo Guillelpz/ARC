@@ -1,6 +1,6 @@
 # Estado actual — RPG Life Tracker
 
-> Fecha de corte: 2026-10-15 (tras ciclo 32). Describe lo que hay en el código que no está ya en `CLAUDE.md` (comandos, arquitectura de `core/`, restricciones) y lo que lo separa de un producto en producción.
+> Fecha de corte: 2026-10-15 (tras ciclo 34). Describe lo que hay en el código que no está ya en `CLAUDE.md` (comandos, arquitectura de `core/`, restricciones) y lo que lo separa de un producto en producción.
 
 ## 1. Qué es
 
@@ -58,6 +58,8 @@ Feedback: avisos anunciados por regiones `role="status"` (`liveText` en `compone
 | Calidad | El aviso de versión nueva e iOS solo en el checklist manual de `DEPLOY.md`. | Ampliar `App.test.tsx` al añadir flujos; los tests dependen de textos de la UI. |
 | Calidad (CI) | Una ejecución local de `npm test` falló en 12 tests (axe A4-A13, U-F4) y no se reprodujo en 14 más: probable timeout por carga (5 s por defecto de Vitest). | Vigilar en la CI; si reaparece, subir `testTimeout`. |
 | Calidad (CI) 2 | El test U-C1 de `App.test.tsx` fallaba ~1 de cada 6 veces con la suite en paralelo; se subió `asyncUtilTimeout` a 3 s (76baae6). | Si reaparece, revisar la carga de la suite en lugar de subir más el timeout. |
+| Calidad (CI) 3 | U-C2 de `App.test.tsx` (~l. 1229, dictado simulado + «Editar») falló una vez en el ciclo 34 y no se reprodujo en 8 ejecuciones; antes ya ocurrió con U-C1 (`asyncUtilTimeout` ya en 3 s). Hipótesis: aserciones síncronas sobre foco (`activeElement`) y neto tras `fireEvent`, sin `waitFor`, con la CPU cargada. | Si reaparece, pasar esas aserciones a `waitFor`/`findBy*` en U-C1/U-C2 en vez de subir timeouts. |
+| Catálogo USDA (menores) | Nombres poco precisos: «Tomate triturado en conserva» (es tomate en conserva), «Salsa de soja» (es tamari) y algunos sin estado (conejo crudo, pistachos tostados sin sal…). | Renombrar en un ciclo de Comida. |
 | Comida (menores) | `saveMeal` admite nombres de plato repetidos; `deleteMeal` sin confirmación; `addMeal` con plato inexistente no avisa; la media semanal se muestra «X / Y kcal/día»; `sameFood` en `merge.ts` compara con `JSON.stringify` (poco legible); `App.tsx` ya no crece por Comida: el estado y los handlers viven en `src/useFood.ts` (ciclo 31a; App ~484 líneas). | — |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Se quedan de momento (decisión 2026-10-12). |
 
