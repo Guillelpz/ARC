@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { CircleAlert } from 'lucide-react'
+import { Camera, CircleAlert } from 'lucide-react'
 import type { Food } from '../core/types'
 import { foodByRef } from '../core/food'
 import { normEan, type FoodDraft, type OffResult } from '../core/off'
+import type { LabelResult } from '../core/label'
 import type { FoodPrivacy } from '../core/storage'
 import { FoodCustom } from './FoodCustom'
 import { FoodNetPrivacy } from './FoodNetPrivacy'
@@ -14,6 +15,7 @@ export type FoodNet = {
   ack: FoodPrivacy
   onAck: (k: 'off' | 'label') => void
   lookupEan: (ean: string) => Promise<OffResult>
+  readLabel: (file: File) => Promise<LabelResult>
 }
 
 type Props = {
@@ -24,6 +26,7 @@ type Props = {
   onCreate: (f: Omit<Food, 'id'>) => void
   onStatus: (text: string) => void
   onClose: () => void
+  onLabel: () => void                  // abre el panel «Foto de la etiqueta» (solo con clave)
 }
 type View =
   | { t: 'form' }
@@ -44,7 +47,7 @@ const OFFLINE_TEXT = 'Sin conexión. Puedes crearlo a mano'
 const NO_KEY_TEXT = 'Con una clave de Anthropic en Ajustes puedes leer la etiqueta con una foto.'
 
 // Panel «Código de barras»: aviso de privacidad, campo EAN, búsqueda en OFF y revisión antes de guardar.
-export function FoodBarcode({ net, custom, onPick, onReactivate, onCreate, onStatus, onClose }: Props) {
+export function FoodBarcode({ net, custom, onPick, onReactivate, onCreate, onStatus, onClose, onLabel }: Props) {
   const [text, setText] = useState('')
   const [view, setView] = useState<View>({ t: 'form' })
   const [error, setError] = useState('')
@@ -73,6 +76,7 @@ export function FoodBarcode({ net, custom, onPick, onReactivate, onCreate, onSta
   if (view.t === 'review') return (
     <div className="flex flex-col gap-2">
       {!view.complete && <p role="status" className="flex items-center gap-2 text-sm text-hero-text"><CircleAlert className="size-4 shrink-0" aria-hidden />Open Food Facts no tiene todos los valores. Complétalos o haz una foto de la etiqueta.</p>}
+      {!view.complete && net.hasKey && <button type="button" onClick={onLabel} className={`${secondary} self-start`}><Camera className="size-4" aria-hidden />Foto de la etiqueta</button>}
       <FoodCustom key="review" initialName="" draft={view.draft} custom={custom} onCreate={onCreate} onReactivate={onReactivate} onCancel={() => setView({ t: 'form' })} />
     </div>
   )
@@ -100,6 +104,7 @@ export function FoodBarcode({ net, custom, onPick, onReactivate, onCreate, onSta
           <div className="flex flex-wrap gap-2">
             {view.retry && <button type="button" onClick={() => void search()} className={secondary}>Reintentar</button>}
             <button type="button" onClick={() => setView({ t: 'manual', ean: view.ean })} className={secondary}>Crear a mano</button>
+            {net.hasKey && <button type="button" onClick={onLabel} className={secondary}><Camera className="size-4" aria-hidden />Foto de la etiqueta</button>}
           </div>
           {!net.hasKey && <p className="text-sm text-hero-muted">{NO_KEY_TEXT}</p>}
         </div>

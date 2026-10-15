@@ -40,13 +40,13 @@ export function voicePrompt(text: string, exercises: Exercise[], defaultUnit: We
   return `<ejercicios>\n${list}\n</ejercicios>\n<unidad_por_defecto>${defaultUnit}</unidad_por_defecto>\n<frase>${clean(text.slice(0, VOICE_MAX_CHARS))}</frase>`
 }
 
-type PostArgs = { system: string; content: string; schema: unknown; maxTokens: number }
+type PostArgs = { system: string; content: string | unknown[]; schema: unknown; maxTokens: number; timeoutMs?: number }
 export type PostResult = { ok: true; value: unknown } | { ok: false; error: HaikuError }
 
 // Llamada directa a la API (sin SDK, sin reintentos). Nunca escribe la clave en consola ni en los errores.
-export async function postHaiku({ system, content, schema, maxTokens }: PostArgs, key: string, fetchImpl: typeof fetch = fetch): Promise<PostResult> {
+export async function postHaiku({ system, content, schema, maxTokens, timeoutMs = HAIKU_TIMEOUT_MS }: PostArgs, key: string, fetchImpl: typeof fetch = fetch): Promise<PostResult> {
   const ctl = new AbortController()
-  const timer = setTimeout(() => ctl.abort(), HAIKU_TIMEOUT_MS) // no AbortSignal.timeout: no existe en iOS < 16
+  const timer = setTimeout(() => ctl.abort(), timeoutMs) // no AbortSignal.timeout: no existe en iOS < 16
   let res: Response
   try {
     res = await fetchImpl(API_URL, {

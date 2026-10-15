@@ -5,6 +5,9 @@ import App from './App'
 import { exportBackup, unlockStorage } from './core/storage'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT } from './components/UpdateBanner'
+import { downscale } from './image'
+
+vi.mock('./image', () => ({ downscale: vi.fn() })) // la foto no se decodifica en happy-dom
 
 // La suite completa corre en paralelo: con carga, el 1 s por defecto de findBy* se queda corto (U-C1 fallaba ~1 de cada 6).
 configure({ asyncUtilTimeout: 3000 })
@@ -1713,6 +1716,67 @@ test('U-FI6 ficha incompleta: campos vacíos marcados y mensaje', async () => {
     const el = document.getElementById('food-c-' + k) as HTMLInputElement
     expect(el.value).toBe(''); expect(el.getAttribute('aria-invalid')).toBe('true')
   }
+})
+
+// --- Comida: foto de la etiqueta (ciclo 33). Haiku siempre simulado: ningún test llama a Anthropic. ---
+const LAB = { readable: true, name: 'Galletas', ean: '', per: '100g', servingQty: null, servingUnit: 'none', kcal: 450, kj: null, p: 6, c: 70, f: 16 }
+const claude = (o: unknown) => Promise.resolve(new Response(JSON.stringify({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(o) }] }), { status: 200 }))
+const ackLabel = () => localStorage.setItem(PK, JSON.stringify({ off: 'x', label: 'x' }))
+const withKey = () => localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
+const photo = () => fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [new File(['x'], 'e.jpg', { type: 'image/jpeg' })] } })
+const openLabel = () => { openFood(); fireEvent.click(btn('Foto de la etiqueta')) }
+const goodImage = () => vi.mocked(downscale).mockResolvedValue({ data: 'QUJD', mediaType: 'image/jpeg' })
+
+test('U-FI7 sin clave no hay «Foto de la etiqueta»; con clave, aviso y después el selector', () => {
+  render(<App />); openFood()
+  expect(screen.queryByRole('button', { name: 'Foto de la etiqueta' })).toBeNull()
+  cleanup(); withKey()
+  const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {})
+  render(<App />); openLabel()
+  expect(screen.getByRole('heading', { name: 'Privacidad de la foto' })).toBeTruthy()
+  expect(screen.getByText(/envía la foto, reducida y sin datos de ubicación, a Anthropic/)).toBeTruthy()
+  const inp = document.querySelector('input[type=file]')!
+  expect([inp.getAttribute('accept'), inp.getAttribute('capture'), inp.getAttribute('tabindex'), inp.getAttribute('aria-hidden')]).toEqual(['image/*', 'environment', '-1', 'true'])
+  expect(click).not.toHaveBeenCalled()
+  fireEvent.click(btn('Entendido'))
+  expect(click).toHaveBeenCalledTimes(1)
+  expect(JSON.parse(localStorage.getItem(PK)!).label).toMatch(/^\d{4}-/)
+})
+
+test('U-FI8 foto leída: revisión con aviso de coherencia; guardar crea source label', async () => {
+  ackLabel(); withKey(); goodImage()
+  const f = stubFetch(() => claude({ ...LAB, kcal: 100 }))
+  render(<App />); openLabel(); photo()
+  expect(await screen.findByRole('heading', { name: 'Revisar alimento' })).toBeTruthy()
+  expect(screen.getByText('Las kcal no cuadran con los macros. Revisa la etiqueta.')).toBeTruthy()
+  expect(screen.queryByRole('link', { name: /Open Food Facts/ })).toBeNull()
+  expect(f).toHaveBeenCalledTimes(1)
+  const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+  expect(url).toBe('https://api.anthropic.com/v1/messages')
+  expect(JSON.parse(init.body as string).messages[0].content[0].source.data).toBe('QUJD')
+  expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Galletas')
+  fireEvent.click(btn('Guardar'))
+  await vi.waitFor(() => expect(foodStored().foods).toMatchObject([{ name: 'Galletas', source: 'label', kcal: 100 }]))
+})
+
+test('U-FI9 401, ilegible, foto inválida y sin conexión: mensajes y «Crear a mano»', async () => {
+  ackLabel(); withKey(); goodImage()
+  let reply: () => Promise<Response> = () => Promise.resolve(new Response('{}', { status: 401 }))
+  const f = stubFetch(() => reply())
+  render(<App />); openLabel(); photo()
+  expect((await screen.findByRole('alert')).textContent).toBe('Anthropic rechaza la clave. Comprueba que la has copiado entera.')
+  reply = () => claude({ ...LAB, readable: false }); photo()
+  await screen.findByText('No se lee la tabla nutricional. Haz la foto más cerca y con luz.')
+  vi.mocked(downscale).mockResolvedValueOnce(null); photo()
+  await screen.findByText('No se ha podido abrir la foto. Prueba con otra.')
+  expect(f).toHaveBeenCalledTimes(2)
+  const online = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  photo()
+  expect(await screen.findByText('Sin conexión. Puedes crearlo a mano')).toBeTruthy()
+  expect(f).toHaveBeenCalledTimes(2)
+  online.mockRestore()
+  fireEvent.click(btn('Crear a mano'))
+  expect(screen.getByRole('heading', { name: 'Crear alimento' })).toBeTruthy()
 })
 
 test('U-FI13 «Exportar copia» no contiene el aviso de OFF', () => {

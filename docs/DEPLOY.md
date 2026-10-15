@@ -82,3 +82,16 @@ Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run previ
 - [ ] Modo avión: «Código de barras» → «Sin conexión. Puedes crearlo a mano»; «Crear a mano» guarda y después el EAN lo encuentra.
 - [ ] El aviso de privacidad sale solo la primera vez; «Exportar copia» no incluye `life-rpg-food-privacy-v1` y «Borrar todo» no lo vuelve a mostrar.
 - [ ] 320 px sin scroll horizontal con el panel abierto.
+
+## Comida: foto de la etiqueta (Haiku)
+
+Validación manual (I4) que hace el usuario en el iPhone antes de cerrar el ciclo 33. Requiere la clave de Anthropic en Ajustes.
+
+- [ ] Primer uso: «Foto de la etiqueta» muestra el aviso («la app envía la foto, reducida y sin datos de ubicación, a Anthropic con tu clave»); «Entendido» abre la cámara/selector de una vez. No vuelve a salir; «Borrar todo» no lo restablece y «Exportar copia» no lo incluye.
+- [ ] Etiquetas: 10-20 etiquetas reales distintas (yogur, cereales, bebida en ml, producto solo por ración, etiqueta en otro idioma, foto torcida, con reflejos, HEIC de la cámara). Por cada una, anota kcal, P, C, G y base tras la revisión: acierto sin tocar nada, valor corregido o error. Objetivo: >= 8 de 10 sin corregir. Si >= 3 de cada 10 salen con algún valor mal, se anota para un ciclo aparte (no se cambia de modelo aquí).
+- [ ] Tabla en la foto: se rellena «Revisar alimento»; si las kcal no cuadran con los macros sale el aviso y no bloquea.
+- [ ] La foto sale reducida: DevTools (Safari remoto) → la petición a `api.anthropic.com` pesa < 1 MB y no lleva EXIF.
+- [ ] Foto ilegible o sin tabla: «No se lee la tabla nutricional…»; con una clave mala: «Anthropic rechaza la clave…»; ambos con «Crear a mano» y «Probar otra foto».
+- [ ] Modo avión: «Sin conexión. Puedes crearlo a mano», sin petición.
+- [ ] Etiqueta con código de barras legible ya guardado: «Ya lo tienes».
+- [ ] 320 px sin scroll horizontal con el panel abierto.

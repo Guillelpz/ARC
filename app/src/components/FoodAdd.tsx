@@ -1,11 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
-import { CircleAlert, Plus, ScanBarcode } from 'lucide-react'
+import { Camera, CircleAlert, Plus, ScanBarcode } from 'lucide-react'
 import type { DietChange, Food, FoodData, Portion } from '../core/types'
 import { allFoods, dietNote, fmtKcal, fmtPortion, foodById, frequentFoods, lastPortion, parseKcal, parseMacro, portion, recentFoods, searchFoods } from '../core/food'
 import { Segmented } from './Segmented'
 import { FoodQty } from './FoodQty'
 import { FoodCustom } from './FoodCustom'
 import { FoodBarcode, type FoodNet } from './FoodBarcode'
+import { FoodLabel } from './FoodLabel'
 import { card, field, primary, secondary } from './foodStyle'
 
 type Quick = { kcal: number; p?: number; c?: number; f?: number; name?: string }
@@ -28,7 +29,7 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'recent' | 'frequent'>('recent')
   const [picked, setPicked] = useState<Food | null>(null)
-  const [panel, setPanel] = useState<null | 'create' | 'barcode'>(null) // un solo panel abierto; abrir uno cierra `picked`
+  const [panel, setPanel] = useState<null | 'create' | 'barcode' | 'label'>(null) // un solo panel abierto; abrir uno cierra `picked`
   const [createName, setCreateName] = useState('') // nombre prerrellenado de «Crear alimento»
   const openCreate = (name: string) => { setPicked(null); setCreateName(name); setPanel('create') }
   const [quickOpen, setQuickOpen] = useState(false)
@@ -105,7 +106,9 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
       {panel === 'create'
         ? <FoodCustom key="create" initialName={createName} custom={food.foods} onCreate={create} onReactivate={reactivate} onCancel={() => { setPanel(null); searchRef.current?.focus() }} />
         : panel === 'barcode'
-        ? <FoodBarcode net={net} custom={food.foods} onPick={f => { setPanel(null); setQuery(''); setPicked(f) }} onReactivate={reactivate} onCreate={create} onStatus={onStatus} onClose={() => { setPanel(null); searchRef.current?.focus() }} />
+        ? <FoodBarcode net={net} custom={food.foods} onPick={f => { setPanel(null); setQuery(''); setPicked(f) }} onReactivate={reactivate} onCreate={create} onStatus={onStatus} onClose={() => { setPanel(null); searchRef.current?.focus() }} onLabel={() => setPanel('label')} />
+        : panel === 'label'
+        ? <FoodLabel net={net} custom={food.foods} onPick={f => { setPanel(null); setQuery(''); setPicked(f) }} onReactivate={reactivate} onCreate={create} onStatus={onStatus} onClose={() => { setPanel(null); searchRef.current?.focus() }} />
         : picked
         ? <FoodQty key={picked.id} food={picked} initial={defaultPortion(picked, lastPortion(food.log, picked.id))} onAdd={p => add(picked, p)} onCancel={() => { setPicked(null); searchRef.current?.focus() }} />
         : typing
@@ -134,6 +137,11 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
         <button type="button" onClick={() => { setPicked(null); setPanel('barcode') }} className={secondary}>
           <ScanBarcode className="size-4" aria-hidden />Código de barras
         </button>
+        {net.hasKey && (
+          <button type="button" onClick={() => { setPicked(null); setPanel('label') }} className={secondary}>
+            <Camera className="size-4" aria-hidden />Foto de la etiqueta
+          </button>
+        )}
       </div>
       {quickOpen && (
         <form id="food-quick" onSubmit={submitQuick} noValidate className="flex flex-col gap-3 rounded-lg border border-hero-border p-3">
