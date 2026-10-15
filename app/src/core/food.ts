@@ -1,6 +1,6 @@
-import type { ActivityEvent, DietChange, Food, FoodBase, FoodData, FoodDay, FoodEntry, FoodGoal, FoodLogEntry, FoodUndo, Nutrients, Portion } from './types'
+import type { ActivityEvent, DietChange, Food, FoodBase, FoodData, FoodDay, FoodEntry, FoodGoal, FoodLogEntry, FoodUndo, FoodWeek, Meal, Nutrients, Portion } from './types'
 import { CATALOG } from './foodCatalog'
-import { addDays, clampAmount, dayTotal, undoneIds } from './stats'
+import { addDays, clampAmount, dayTotal, mondayOf, undoneIds } from './stats'
 import type { Tracker } from './types'
 
 export const EMPTY_FOOD: FoodData = { log: [], foods: [] }
@@ -144,4 +144,43 @@ export function fmtPortion(p: Portion, base: FoodBase | undefined): string {
   if (!(p.qty > 0)) return ''
   const q = `${fmtNum(p.qty)} ${base ?? 'g'}`
   return p.serving ? `${fmtNum(p.serving.n)} ${p.serving.name} (${q})` : q
+}
+
+// Ciclo 30 — platos, nombres de alimentos propios y resumen semanal
+export const MAX_MEALS = 20
+// Entradas de un plato para `occurredAt`; los ítems con alimento desconocido o archivado cuentan en `missing`
+export function mealEntries(m: Meal, foods: Food[], newId: () => string, occurredAt: string): { entries: FoodEntry[]; missing: number } {
+  const entries: FoodEntry[] = []
+  let missing = 0
+  for (const it of m.items) {
+    const f = foods.find(x => x.id === it.foodId)
+    if (!f || f.archived) { missing++; continue }
+    entries.push(makeEntry(f, { qty: it.qty, ...(it.serving ? { serving: it.serving } : {}) }, newId(), occurredAt, 'meal'))
+  }
+  return { entries, missing }
+}
+// Plato desde entradas con alimento (en el orden dado, máx. 20 ítems); null si no queda ninguna
+export function mealFromEntries(entries: FoodEntry[], name: string, id: string): Meal | null {
+  const items = entries.filter(e => e.foodId).slice(0, 20).map(e => ({ foodId: e.foodId!, qty: e.qty, ...(e.serving ? { serving: e.serving } : {}) }))
+  return items.length ? { id, name: name.trim(), items } : null
+}
+// El propio con ese nombre (archivado → «Reactivar»), 'catalog' si ya existe en el catálogo, o null
+export function nameTaken(name: string, custom: Food[]): Food | 'catalog' | null {
+  const k = fold(name)
+  return custom.find(f => fold(f.name) === k) ?? (CATALOG.some(f => fold(f.name) === k) ? 'catalog' : null)
+}
+// Últimas n semanas lun–dom (la última es la en curso, hasta hoy). E1: la media es sobre los días con registros.
+export function foodWeekly(food: FoodData, today: string, n = 8): FoodWeek[] {
+  const cur = mondayOf(today), live = liveEntries(food.log)
+  return Array.from({ length: n }, (_, i) => {
+    const monday = addDays(cur, -7 * (n - 1 - i)), end = addDays(monday, 7), last = addDays(monday, 6)
+    const days = [...new Set(live.map(e => e.occurredAt.slice(0, 10)).filter(d => d >= monday && d < end && d <= today))].sort()
+    const sum = (k: 'kcal' | 'p' | 'c' | 'f') => r1(days.reduce((a, d) => a + dayTotals(food.log, d)[k], 0) / days.length)
+    return {
+      monday, days: days.length, current: i === n - 1,
+      avg: days.length ? { kcal: sum('kcal'), p: sum('p'), c: sum('c'), f: sum('f') } : null,
+      goal: goalOn(food.goals, last < today ? last : today)?.kcal ?? null,
+      inRange: days.filter(d => inRange(food, d)).length,
+    }
+  })
 }

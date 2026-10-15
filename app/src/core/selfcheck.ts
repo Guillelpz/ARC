@@ -12,7 +12,7 @@ import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type 
 import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
-import { allFoods, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, goalOn, inRange, kcalRange, lastPortion, makeEntry, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
+import { allFoods, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, makeEntry, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -769,6 +769,25 @@ export function runSelfCheck() {
       parseServings('1,3') === 1.25 && parseServings('0.1') === null && parseServings('51') === null && parseKcal('1000') === 1000 && parseKcal('0') === null && parseKcal('10001') === null &&
       parseMacro('') === undefined && parseMacro('12,34') === 12.3 && parseMacro('x') === null && parsePct('30') === 30 && parsePct('101') === null && parsePct('3.5') === null &&
       fmtKcal(1640) === '1.640' && fmtKcal(999) === '999' && fmtKcal(12345.4) === '12.345', 'FD17 parsers y fmtKcal')
+
+    // FD14, FD15 (ciclo 30) — platos, nombres y resumen semanal
+    {
+      let k = 0
+      const nid = () => `n-${++k}`
+      const meal = { id: 'meal-1', name: 'Desayuno', items: [{ foodId: 'egg', qty: 100, serving: { name: 'Unidad', n: 2 } }, { foodId: 'ghost', qty: 50 }, { foodId: 'food-x', qty: 30 }, { foodId: 'oats', qty: 40 }] }
+      const cust = [mine('food-x', 'Mi cosa', { archived: true })]
+      const me = mealEntries(meal, allFoods(cust), nid, `${fd}T09:00:00`)
+      const mf = mealFromEntries([en('a', 100, fd, { foodId: 'egg', qty: 100, serving: { name: 'Unidad', n: 2 } }), quickEntry({ kcal: 300 }, 'q', `${fd}T11:00:00`), en('b', 100, fd, { foodId: 'oats', qty: 40 })], ' Cena ', 'meal-2')
+      ok(me.entries.length === 2 && me.missing === 2 && me.entries.every(e => e.via === 'meal' && e.occurredAt === `${fd}T09:00:00`) && new Set(me.entries.map(e => e.id)).size === 2 && me.entries[0].qty === 100 && me.entries[0].serving?.n === 2 && me.entries[0].foodId === 'egg' &&
+        mf?.items.length === 2 && mf.name === 'Cena' && mf.items[0].serving?.n === 2 && mealFromEntries([quickEntry({ kcal: 1 }, 'q', `${fd}T11:00:00`)], 'x', 'm') === null &&
+        nameTaken(' ARROZ blanco cocido', []) === 'catalog' && nameTaken('mi cosa', cust) === cust[0] && nameTaken('Nada raro', cust) === null, 'FD14 platos y nombres')
+      const mon = mondayOf(fd), prevMon = addDays(mon, -7), today15 = addDays(mon, 2) // miércoles de la semana en curso
+      const fl: FoodLogEntry[] = [en('w1', 1000, prevMon), en('w2', 3000, prevMon), { id: 'wu', undoes: 'w2', occurredAt: `${prevMon}T10:00:00` }, en('w3', 2000, addDays(prevMon, 1)), en('w4', 1800, mon), en('w5', 500, addDays(mon, 3))]
+      const wk = foodWeekly({ log: fl, foods: [], goals: [{ from: prevMon, kcal: 2000, p: 20, c: 50, f: 30 }, { from: addDays(mon, 1), kcal: 1800, p: 20, c: 50, f: 30 }] }, today15)
+      const a = wk[6], b = wk[7]
+      ok(wk.length === 8 && wk[0].avg === null && wk[0].days === 0 && wk[0].goal === 2000 && a.monday === prevMon && !a.current && a.days === 2 && a.avg?.kcal === 1500 && a.avg.p === 5 && a.goal === 2000 && a.inRange === 1 &&
+        b.monday === mon && b.current && b.days === 1 && b.avg?.kcal === 1800 && b.goal === 1800 && b.inRange === 1 && foodWeekly({ log: [], foods: [] }, today15).every(w => w.goal === null && w.avg === null), 'FD14/FD15 foodWeekly')
+    }
 
     // FD9, FD10 — persistencia de la comida
     {
