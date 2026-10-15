@@ -16,6 +16,7 @@ import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, di
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
 import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
+import { MAX_FOOD_ITEMS, foodNorm, parseFoodVoice, pluralEq } from './foodVoice'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -888,9 +889,36 @@ export function runSelfCheck() {
       Object.keys(labelSchema.properties).length === 11 && labelSchema.required.length === 11 && Object.keys(labelSchema.properties).every(k => labelSchema.required.includes(k)) && labelSchema.additionalProperties === false, 'FI9 labelContent/labelSchema')
   }
 
+  // FVZ1-FVZ8 (ciclo 36) — parser de comida por voz
+  {
+    const fz = (text: string, own: Food[] = [], o?: { anyFood?: boolean }) => parseFoodVoice(text, own, o).items.map(i =>
+      i.k === 'quick' ? `quick:${i.kcal}:${i.name}` : i.k === 'pending' ? `pend:${i.query}:${i.ids.length}` :
+        i.portion ? `food:${i.foodId}:${i.portion.qty}${i.portion.serving ? ':' + i.portion.serving.n : ''}` : `miss:${i.foodId}:${i.problem}`).join('|')
+    const kc = (text: string) => parseFoodVoice(text).items.map(i => i.k === 'food' && i.portion ? nutrientsOf(i.foodId, i.portion.qty) : -1)
+    const nutrientsOf = (id: string, qty: number) => portion(CATALOG.find(f => f.id === id)!, qty).kcal
+    const mine = (o: Partial<Food> & { id: string; name: string }): Food => ({ base: 'g', kcal: 200, p: 1, c: 1, f: 1, ...o })
+    ok(fz('medio kilo de arroz') === 'food:rice-white-cooked:500' && fz('un kilo y medio de patatas') === 'food:potato-boiled:1500' && fz('media docena de huevos') === 'food:egg:300:6' &&
+      fz('trescientos gramos de pasta') === 'food:pasta-cooked:300' && fz('arroz 150,5 g') === 'food:rice-white-cooked:150.5' && fz('treinta y cinco gramos de almendras') === 'food:almonds:35', 'FVZ1 foodNorm')
+    ok(pluralEq('nuez', 'nueces') && pluralEq('arroz', 'arroces') && pluralEq('cherry', 'cherries') && pluralEq('huevo', 'huevos') && pluralEq('tomate', 'tomates') && !pluralEq('arroz', 'avena') &&
+      fz('crema de cacao y avellanas 20 g') === 'food:hazelnut-cocoa-spread:20' && fz('patatas fritas 100 g') === 'food:french-fries:100' &&
+      fz('mi tarta 100 g', [mine({ id: 'food-1', name: 'Mi tarta' })]) === 'food:food-1:100' && fz('100 g de pan', [mine({ id: 'food-1', name: 'Mi tarta', aliases: ['pan'] })]) === 'food:food-1:100' &&
+      fz('mi tarta 100 g', [mine({ id: 'food-1', name: 'Mi tarta', archived: true })]) === '', 'FVZ2 pluralEq/findFoods')
+    ok(fz('33 cl de cola') === 'food:cola:330' && fz('2 litros de leche') === 'food:milk-semi:2000' && fz('200 ml de zumo de naranja') === 'food:orange-juice:200' && fz('200 ml de arroz') === 'food:rice-white-cooked:200' &&
+      fz('2500 g de arroz') === 'miss:rice-white-cooked:range' && fz('3 latas de cola') === 'food:cola:990:3' && fz('una cucharada de aceite') === 'food:olive-oil:13:1' && fz('2 rebanadas de pan') === 'miss:bread-white:unit', 'FVZ4 portionFor')
+    ok(fz('una manzana') === 'food:apple:180:1' && fz('manzana') === 'food:apple:180:1' && fz('arroz') === 'miss:rice-white-cooked:missing' && fz('arroz 200') === 'food:rice-white-cooked:200' &&
+      fz('arroz 5') === 'miss:rice-white-cooked:missing' && fz('2 hamburguesas') === 'miss:beef-burger:missing' && fz('medio plátano') === 'food:banana:60:0.5' && fz('2 vasos de leche') === 'food:milk-semi:500:2', 'FVZ5 FV6')
+    ok(fz('500 kcal') === 'quick:500:Añadido rápido' && fz('1000 calorías') === 'quick:1000:Añadido rápido' && fz('un bocadillo de 600 kcal') === 'quick:600:Bocadillo' && fz('0 kcal') === '' && fz('20000 kcal') === '', 'FVZ6 kcal')
+    const three = kc('200 g de arroz, 150 g de pollo y una manzana')
+    const cafe = parseFoodVoice('café con leche')
+    ok(three.join() === '260,247.5,93.6' && fz('arroz 200 g y pollo 150 g') === 'food:rice-white-cooked:200|food:chicken-breast-grilled:150' && fz('200 g de arroz 150 g de pollo').split('|').length === 2 &&
+      fz('café con leche') === 'food:coffee:50:1' && cafe.rest.includes('leche') && fz(Array(10).fill('una manzana').join(' y ')).split('|').length === MAX_FOOD_ITEMS, 'FVZ7 varios')
+    ok(fz('ate 200 g of rice') === 'food:rice-white-cooked:200' && fz('two eggs and a banana') === 'food:egg:100:2|food:banana:120:1' && fz('a glass of milk') === 'food:milk-semi:250:1' &&
+      fz('half an apple') === 'food:apple:90:0.5' && fz('papa 100 g') === 'pend:papa:2', 'FVZ8 EN')
+  }
+
   // FVZ3 (ciclo 36) — tabla de alias de voz de Comida
   {
-    const fnorm = normalizeVoice // ponytail: en T36.2 pasa a foodNorm
+    const fnorm = foodNorm
     const ids = new Set(CATALOG.map(f => f.id)), seen = new Map<string, string>()
     let good = CATALOG.length === 188 && Object.keys(VOICE_ALIASES).every(k => ids.has(k)) && CATALOG.every(f => (VOICE_ALIASES[f.id]?.length ?? 0) >= 1)
     for (const [id, list] of Object.entries(VOICE_ALIASES)) for (const a of list) {
