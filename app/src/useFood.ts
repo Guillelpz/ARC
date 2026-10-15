@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ActivityEvent, DietChange, Food, FoodData, FoodEntry, FoodGoal, Portion } from './core/types'
-import { MAX_MEALS, allFoods, nameTaken, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
+import { MAX_MEALS, allFoods, copyDay as copyEntries, hasCopy, nameTaken, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
+import { addDays } from './core/stats'
 import { saveFood } from './core/storage'
 import { estimateEntry, type VoiceAdd } from './core/foodVoice'
 
@@ -103,6 +104,14 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
     if (!entries.length) return { ids: [], missing, diet: 0 }
     return { ids: entries.map(e => e.id), missing, diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
   }
+  // Copia las entradas vivas del día anterior al `day` del selector (un solo setFood y dietSync); con copia previa no hace nada
+  function copyDay(day: string): { ids: string[]; diet: DietChange } {
+    if (day > today) day = today
+    if (hasCopy(food.log, day)) return { ids: [], diet: 0 }
+    const entries = copyEntries(food.log, addDays(day, -1), uuid, stamp(day))
+    if (!entries.length) return { ids: [], diet: 0 }
+    return { ids: entries.map(e => e.id), diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
+  }
   function undoFood(ids: string[]): { undone: number; diet: DietChange } {
     const us = undoEntries(food.log, ids, uuid)
     if (!us.length) return { undone: 0, diet: 0 }
@@ -115,5 +124,5 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
   }
 
   // `setFood` y `unsaved` quedan fuera para App: sincronía entre pestañas, importar, fusionar, recuperar y «Borrar todo»
-  return { food, setFood, unsaved, foodToday, handlers: { addFoodEntry, addQuick, addVoice, undoVoice, undoFood, createFood, setFoodArchived, saveMeal, deleteMeal, addMeal, saveFoodGoal } }
+  return { food, setFood, unsaved, foodToday, handlers: { addFoodEntry, addQuick, addVoice, undoVoice, undoFood, createFood, setFoodArchived, saveMeal, deleteMeal, addMeal, copyDay, saveFoodGoal } }
 }

@@ -314,3 +314,13 @@ test('A-FV4 captura: fila «Estimación» con casilla y «Apuntar» (Haiku simul
   expect(await serious()).toEqual([])
   vi.unstubAllGlobals()
 })
+
+test('A11Y-2 Comida con Copiar día anterior activo y desactivado', async () => {
+  localStorage.setItem('life-rpg-food-v1', JSON.stringify({ log: [{ id: 'a', occurredAt: '2026-10-06T10:00:00', name: 'Plato', kcal: 300, qty: 0 }], foods: [] }))
+  render(<App />); go('Yo'); fireEvent.click(screen.getByRole('button', { name: /^Comida/ }))
+  expect(screen.getByRole('button', { name: 'Copiar día anterior' }).hasAttribute('disabled')).toBe(false)
+  expect(await serious()).toEqual([])
+  fireEvent.click(screen.getByRole('button', { name: 'Copiar día anterior' }))
+  expect(screen.getByRole('button', { name: 'Copiar día anterior' }).hasAttribute('disabled')).toBe(true)
+  expect(await serious()).toEqual([])
+})

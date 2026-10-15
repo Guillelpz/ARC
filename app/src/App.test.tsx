@@ -2056,3 +2056,48 @@ test('U-FV13 doble clic en «Apuntar» de «Dictar comida» guarda una sola vez 
   await vi.waitFor(() => expect(foodLive()).toHaveLength(1))
   await vi.waitFor(() => expect(net('dieta')).toBe(1))
 })
+
+// --- Copiar día anterior (ciclo 39) ---
+const yEntry = (id: string, kcal: number, day = '2026-10-06') => ({ id, occurredAt: `${day}T10:00:00`, name: `Plato ${id}`, kcal, qty: 0 })
+const liveFood = () => { const l = foodStored().log as { id: string; undoes?: string; via?: string; occurredAt: string }[]; const u = new Set(l.map(e => e.undoes)); return l.filter(e => !e.undoes && !u.has(e.id)) }
+const copyBtn = () => screen.getByRole('button', { name: 'Copiar día anterior' }) as HTMLButtonElement
+
+test('U-C39-1 copiar día anterior: 2 entradas con via copy, botón desactivado con su motivo', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [yEntry('a', 300), yEntry('b', 500)], foods: [] }))
+  render(<App />); openFood()
+  expect(screen.getByText('Añade lo de ayer: 2 alimentos · 800 kcal')).toBeTruthy()
+  fireEvent.click(copyBtn())
+  expect(screen.getByText('Copiado: 2 alimentos · 800 kcal')).toBeTruthy()
+  expect(copyBtn().disabled).toBe(true)
+  expect(screen.getByText('Ya has copiado el día anterior aquí. Deshaz las copias para volver a copiar.')).toBeTruthy()
+  fireEvent.click(copyBtn())
+  await vi.waitFor(() => expect(liveFood().filter(e => e.occurredAt.startsWith('2026-10-07') && e.via === 'copy')).toHaveLength(2))
+  expect(liveFood()).toHaveLength(4)
+  expect(screen.getByText('800 kcal', { selector: 'p' })).toBeTruthy()
+})
+
+test('U-C39-2 Deshacer retira las copias de un golpe, reactiva el botón y quita el +1 de Dieta', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [yEntry('a', 1000), yEntry('b', 900)], foods: [], goals: [{ from: '2026-10-01', kcal: 2000, p: 20, c: 50, f: 30 }] }))
+  render(<App />); openFood()
+  fireEvent.click(copyBtn())
+  expect(screen.getByText('Copiado: 2 alimentos · 1.900 kcal · Día dentro del objetivo: +1 Dieta')).toBeTruthy()
+  await vi.waitFor(() => expect(stored()).toMatchObject([{ trackerId: 'dieta', amount: 1 }]))
+  fireEvent.click(btn('Deshacer'))
+  expect(screen.getByText(/^Deshecho: 2 entradas copiadas · Fuera del rango: se retira el \+1 de Dieta$/)).toBeTruthy()
+  expect(copyBtn().disabled).toBe(false)
+  await vi.waitFor(() => expect(liveFood()).toHaveLength(2))
+  await vi.waitFor(() => expect(stored().map((e: { amount: number }) => e.amount)).toEqual([1, -1]))
+  expect(document.activeElement).toBe(copyBtn())
+})
+
+test('U-C39-3 sin entradas ayer: botón desactivado; con el selector en ayer copia desde anteayer', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [yEntry('a', 400, '2026-10-05')], foods: [] }))
+  render(<App />); openFood()
+  expect(copyBtn().disabled).toBe(true)
+  expect(screen.getByText('Nada apuntado el día anterior.')).toBeTruthy()
+  fireEvent.click(btn('Ayer'))
+  expect(copyBtn().disabled).toBe(false)
+  fireEvent.click(copyBtn())
+  expect(screen.getByText('Copiado: 1 alimento · 400 kcal')).toBeTruthy()
+  await vi.waitFor(() => expect(liveFood().filter(e => e.via === 'copy').map(e => e.occurredAt.slice(0, 10))).toEqual(['2026-10-06']))
+})
