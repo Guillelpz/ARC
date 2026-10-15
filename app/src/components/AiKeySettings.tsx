@@ -3,19 +3,9 @@ import { CircleAlert, Eye, EyeOff, KeyRound } from 'lucide-react'
 import type { HaikuError } from '../core/haiku'
 import { isIosStandalone } from '../speech'
 import { VT } from './voiceTone'
+import { TEST_TEXT } from './aiKeyText'
 
 export type KeySave = 'ok' | 'format' | 'save'
-const TEST_TEXT: Record<HaikuError | 'ok', string> = {
-  ok: 'La clave funciona.',
-  auth: 'Anthropic rechaza la clave. Comprueba que la has copiado entera.',
-  rate: 'Has llegado al límite de uso o de gasto de la clave.',
-  'bad-request': 'Anthropic no acepta la petición (modelo o parámetros). Hay que revisar la app.',
-  network: 'No hay conexión con Anthropic. Inténtalo más tarde.',
-  timeout: 'No hay conexión con Anthropic. Inténtalo más tarde.',
-  http: 'Anthropic ha respondido algo inesperado.',
-  refusal: 'Anthropic ha respondido algo inesperado.',
-  invalid: 'Anthropic ha respondido algo inesperado.',
-}
 
 // Clave de Anthropic de este dispositivo. Solo recibe los últimos 4 caracteres de la guardada (`hint`): nunca la entera.
 export function AiKeySettings({ hint, invalid, onSave, onClear, onTest }: {

@@ -5,6 +5,9 @@ import axe from 'axe-core'
 import App from './App'
 import { unlockStorage } from './core/storage'
 import { liveText } from './components/liveText'
+import { downscale } from './image'
+
+vi.mock('./image', () => ({ downscale: vi.fn() }))
 
 beforeEach(() => {
   localStorage.clear(); unlockStorage()
@@ -216,4 +219,15 @@ test('A-FI2 revisión con atribución y aviso de coherencia', async () => {
   expect(screen.getByRole('link', { name: /Open Food Facts/ })).toBeTruthy()
   expect(await serious()).toEqual([])
   vi.unstubAllGlobals()
+})
+
+test('A-FI3 error de etiqueta', async () => {
+  localStorage.setItem('life-rpg-food-privacy-v1', JSON.stringify({ off: 'x', label: 'x' }))
+  localStorage.setItem('life-rpg-ai-key-v1', 'sk-ant-test-0000000000000000')
+  vi.mocked(downscale).mockResolvedValue(null)
+  render(<App />); openFood(); fireEvent.click(screen.getByRole('button', { name: 'Foto de la etiqueta' }))
+  expect(await serious()).toEqual([])
+  fireEvent.change(document.querySelector('input[type=file]')!, { target: { files: [new File(['x'], 'e.jpg', { type: 'image/jpeg' })] } })
+  expect(await screen.findByText('No se ha podido abrir la foto. Prueba con otra.')).toBeTruthy()
+  expect(await serious()).toEqual([])
 })
