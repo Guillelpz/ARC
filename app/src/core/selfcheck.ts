@@ -737,7 +737,7 @@ export function runSelfCheck() {
     const fd = DEMO_DATE, fdY = addDays(DEMO_DATE, -1)
     const arroz = CATALOG.find(f => f.id === 'rice-white-cooked')!
     const cat = CATALOG, uniq = (xs: string[]) => new Set(xs).size === xs.length
-    ok(cat.length >= 100 && cat.length <= 150 && uniq(cat.map(f => f.id)) && cat.every(f => /^[a-z0-9-]+$/.test(f.id) && !f.id.startsWith('food-')) && uniq(cat.map(f => fold(f.name))) &&
+    ok(cat.length >= 170 && cat.length <= 190 && uniq(cat.map(f => f.id)) && cat.every(f => /^[a-z0-9-]+$/.test(f.id) && !f.id.startsWith('food-')) && uniq(cat.map(f => fold(f.name))) &&
       cat.every(f => [f.kcal, f.p, f.c, f.f].every(x => Number.isFinite(x) && x >= 0) && f.kcal <= 900 && f.p + f.c + f.f <= 100 && Math.abs(f.kcal - (4 * f.p + 4 * f.c + 9 * f.f)) <= Math.max(20, 0.12 * f.kcal) &&
         (f.source === 'usda' || f.source === 'bedca') && !!f.ref && (f.source !== 'usda' || /^\d+$/.test(f.ref!)) && (f.servings ?? []).every(s => s.qty > 0) && uniq((f.servings ?? []).map(s => s.name))), 'FD1 catálogo coherente')
     const fe = makeEntry({ ...arroz, kcal: 130 }, { qty: 100, serving: { name: 'Unidad', n: 2 } }, 'e', `${fd}T10:00:00`)
