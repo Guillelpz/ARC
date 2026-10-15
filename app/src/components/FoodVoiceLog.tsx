@@ -118,8 +118,10 @@ export function FoodVoiceLog(props: Props) {
     ref.current.onPending(done.cmd.items, done.cmd.text) // todos los ítems vuelven como pendientes
   }
   // «Apuntar» de una estimación o ración propuesta: guarda en el día elegido y suma sus ids al mismo «Deshacer»
+  const confirmed = useRef(new Set<FoodItem>()) // `done` es el del render: un segundo clic rápido no debe guardar dos veces
   function confirm(item: FoodItem, asOwn: boolean) {
-    if (!done) return
+    if (!done || confirmed.current.has(item)) return
+    confirmed.current.add(item)
     setDone(confirmDone(done, item, asOwn, ref.current.own, adds => ref.current.onSave(adds, done.day)))
   }
   function complete() { if (done) { const d = done; setDone({ ...d, pending: [] }); ref.current.onPending(d.pending, d.cmd.text) } }
