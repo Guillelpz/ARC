@@ -58,7 +58,7 @@ Feedback: avisos anunciados por regiones `role="status"` (`liveText` en `compone
 | Calidad | El aviso de versión nueva e iOS solo en el checklist manual de `DEPLOY.md`. | Ampliar `App.test.tsx` al añadir flujos; los tests dependen de textos de la UI. |
 | Calidad (CI) | Una ejecución local de `npm test` falló en 12 tests (axe A4-A13, U-F4) y no se reprodujo en 14 más: probable timeout por carga (5 s por defecto de Vitest). | Vigilar en la CI; si reaparece, subir `testTimeout`. |
 | Calidad (CI) 2 | El test U-C1 de `App.test.tsx` fallaba ~1 de cada 6 veces con la suite en paralelo; se subió `asyncUtilTimeout` a 3 s (76baae6). | Si reaparece, revisar la carga de la suite en lugar de subir más el timeout. |
-| Comida (menores) | `saveMeal` admite nombres de plato repetidos; `deleteMeal` sin confirmación; `addMeal` con plato inexistente no avisa; la media semanal se muestra «X / Y kcal/día»; `sameFood` en `merge.ts` compara con `JSON.stringify` (poco legible); `App.tsx` crece (`ponytail:` extraer `useFood` pasado de ~550 líneas; ya en 551 + handlers de propios/platos, extraerlo antes de la fase 2). | Extraer `useFood` al empezar la fase 2. |
+| Comida (menores) | `saveMeal` admite nombres de plato repetidos; `deleteMeal` sin confirmación; `addMeal` con plato inexistente no avisa; la media semanal se muestra «X / Y kcal/día»; `sameFood` en `merge.ts` compara con `JSON.stringify` (poco legible); `App.tsx` ya no crece por Comida: el estado y los handlers viven en `src/useFood.ts` (ciclo 31a; App ~484 líneas). | — |
 | Copy | Quedan textos y claves con «demo» (`life-rpg-demo-v1`, «Party de ejemplo»). | Se quedan de momento (decisión 2026-10-12). |
 
 Simplificaciones deliberadas: comentarios `ponytail:` en el código (`git grep -n "ponytail:"`).
