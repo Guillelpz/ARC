@@ -244,3 +244,27 @@ test('A-FI4 escáner abierto (vídeo simulado)', async () => {
   fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar' })[0])
   Reflect.deleteProperty(navigator, 'mediaDevices'); vi.unstubAllGlobals()
 })
+
+// Comida por voz (ciclo 36): sin API de voz, la frase se escribe en el campo de la captura
+const typeCapture = async (text: string) => {
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Dictar' }))
+  fireEvent.change(screen.getByLabelText('¿Qué has hecho hoy?'), { target: { value: text } })
+  fireEvent.click(screen.getByRole('button', { name: 'Apuntar' }))
+}
+
+test('A-FV1 captura: tarjeta de comida con apuntados, pendientes y sin reconocer', async () => {
+  await typeCapture('200 g de arroz, café con leche y papa 100 g')
+  expect(await screen.findByText(/^Registrado en Comida: 2 alimentos/)).toBeTruthy()
+  expect(screen.getByText('«papa»: hay varios alimentos')).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'Completar en Comida' })).toBeTruthy()
+  expect(await serious()).toEqual([])
+})
+
+test('A-FV2 Comida con pendientes por voz', async () => {
+  await typeCapture('arroz y pan')
+  fireEvent.click(await screen.findByRole('button', { name: 'Completar en Comida' }))
+  expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

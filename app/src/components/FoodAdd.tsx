@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, CircleAlert, Plus, ScanBarcode } from 'lucide-react'
 import type { DietChange, Food, FoodData, Portion } from '../core/types'
 import { allFoods, dietNote, fmtKcal, fmtPortion, foodById, frequentFoods, lastPortion, parseKcal, parseMacro, portion, recentFoods, searchFoods } from '../core/food'
@@ -10,7 +10,13 @@ import { FoodLabel } from './FoodLabel'
 import { card, field, primary, secondary } from './foodStyle'
 
 type Quick = { kcal: number; p?: number; c?: number; f?: number; name?: string }
+// Abre el panel con algo ya elegido (desde «Por voz: pendiente»). `key` distingue dos aperturas seguidas: quien lo pasa remonta FoodAdd con él.
+export type FoodOpen = { key: number } & (
+  | { kind: 'qty'; food: Food; portion: Portion | null }
+  | { kind: 'search'; query: string }
+  | { kind: 'quick'; kcal: number; name: string })
 type Props = {
+  open?: FoodOpen | null
   food: FoodData
   day: string
   today: string
@@ -25,18 +31,20 @@ type Props = {
 const isOwn = (f: Food) => f.id.startsWith('food-')
 const defaultPortion = (f: Food, last: Portion | null): Portion => last ?? (f.servings?.[0] ? { qty: f.servings[0].qty, serving: { name: f.servings[0].name, n: 1 } } : { qty: 100 })
 
-export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive, onStatus, net }: Props) {
-  const [query, setQuery] = useState('')
+export function FoodAdd({ open, food, day, today, onAdd, onQuick, onCreate, onArchive, onStatus, net }: Props) {
+  const [query, setQuery] = useState(open?.kind === 'search' ? open.query : '')
   const [tab, setTab] = useState<'recent' | 'frequent'>('recent')
-  const [picked, setPicked] = useState<Food | null>(null)
+  const [picked, setPicked] = useState<Food | null>(open?.kind === 'qty' ? open.food : null)
+  const [seed, setSeed] = useState<Portion | null>(open?.kind === 'qty' ? open.portion : null) // ración propuesta por la voz, solo para el primer alimento
   const [panel, setPanel] = useState<null | 'create' | 'barcode' | 'label'>(null) // un solo panel abierto; abrir uno cierra `picked`
   const [createName, setCreateName] = useState('') // nombre prerrellenado de «Crear alimento»
   const openCreate = (name: string) => { setPicked(null); setCreateName(name); setPanel('create') }
-  const [quickOpen, setQuickOpen] = useState(false)
-  const [q, setQ] = useState({ kcal: '', p: '', c: '', f: '', name: '' })
+  const [quickOpen, setQuickOpen] = useState(open?.kind === 'quick')
+  const [q, setQ] = useState({ kcal: open?.kind === 'quick' ? String(open.kcal) : '', p: '', c: '', f: '', name: open?.kind === 'quick' && open.name !== 'Añadido rápido' ? open.name : '' })
   const [qErr, setQErr] = useState('')
   const searchRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => { if (open?.kind === 'search') searchRef.current?.focus() }, [open])
   const foods = useMemo(() => allFoods(food.foods), [food.foods])
   const results = useMemo(() => searchFoods(query, foods), [query, foods])
   const list = useMemo(() => (tab === 'recent' ? recentFoods(food.log, 20) : frequentFoods(food.log, today, 20))
@@ -45,7 +53,7 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
 
   const done = (text: string, diet: DietChange) => {
     onStatus(text + dietNote(diet))
-    setQuery(''); setPicked(null)
+    setQuery(''); setPicked(null); setSeed(null)
     setTimeout(() => searchRef.current?.focus(), 0)
   }
   const add = (f: Food, p: Portion) => {
@@ -81,7 +89,7 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
   }
   const item = (f: Food, extra?: string) => (
     <li key={f.id} className="flex items-center">
-      <button type="button" onClick={() => setPicked(f)}
+      <button type="button" onClick={() => { setPicked(f); setSeed(null) }}
         className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left text-sm outline-hero hover:bg-hero-bg focus-visible:outline-2 focus-visible:-outline-offset-2">
         <span className="min-w-0 flex-1 font-semibold">{f.name}</span>
         <span className="shrink-0 text-hero-muted tabular-nums">{extra ?? `${fmtKcal(f.kcal)} kcal/100 ${f.base}`}</span>
@@ -110,7 +118,7 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive,
         : panel === 'label'
         ? <FoodLabel net={net} custom={food.foods} onPick={f => { setPanel(null); setQuery(''); setPicked(f) }} onReactivate={reactivate} onCreate={create} onStatus={onStatus} onClose={() => { setPanel(null); searchRef.current?.focus() }} />
         : picked
-        ? <FoodQty key={picked.id} food={picked} initial={defaultPortion(picked, lastPortion(food.log, picked.id))} onAdd={p => add(picked, p)} onCancel={() => { setPicked(null); searchRef.current?.focus() }} />
+        ? <FoodQty key={picked.id} food={picked} initial={seed ?? defaultPortion(picked, lastPortion(food.log, picked.id))} onAdd={p => add(picked, p)} onCancel={() => { setPicked(null); searchRef.current?.focus() }} />
         : typing
           ? results.length === 0
             ? <div className="flex flex-col items-start gap-2">

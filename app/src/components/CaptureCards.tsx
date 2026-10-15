@@ -10,7 +10,7 @@ const validAmount = (v: string) => { const n = Number(v); return v.trim() !== ''
 
 // Hábito existente: acciones de lo guardado («Deshacer», «Editar», «Cerrar») o formulario de cantidad. Va dentro del panel
 // de la rama (el panel y el texto de estado los pone CaptureView). Paleta entera de la rama del hábito.
-export function TrackerResult({ tracker, heard, note, form, amount, onUndo, onEdit, onClose, onSubmit, onCancel }: {
+export function TrackerResult({ tracker, heard, note, form, amount, onUndo, onEdit, onClose, onSubmit, onCancel, onFood }: {
   tracker: Tracker
   heard: string
   note: string | null // conversión («50 páginas ≈ 100 min»)
@@ -21,6 +21,7 @@ export function TrackerResult({ tracker, heard, note, form, amount, onUndo, onEd
   onClose: () => void
   onSubmit: (amount: number) => void
   onCancel: () => void
+  onFood?: () => void // «Apuntar también en Comida» (FV4): solo si la frase traía comida y aún no se ha apuntado
 }) {
   const c = CARD[tracker.branch]
   const [value, setValue] = useState(amount === null ? '' : String(amount))
@@ -49,6 +50,7 @@ export function TrackerResult({ tracker, heard, note, form, amount, onUndo, onEd
         <button type="button" onClick={onEdit} className={c.secondary}>Editar</button>
         <button type="button" onClick={onClose} className={c.link}>Cerrar</button>
       </div>
+      {onFood && <button type="button" onClick={onFood} className={`${c.secondary} self-start`}>Apuntar también en Comida</button>}
     </>
   )
 }

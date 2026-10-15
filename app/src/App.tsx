@@ -14,6 +14,7 @@ import { askLabel, type LabelResult } from './core/label'
 import { downscale } from './image'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
 import type { CaptureCommand, NewHabit } from './core/capture'
+import type { FoodItem } from './core/foodVoice'
 import { TYPE_DEFAULTS, createTracker } from './core/classify'
 import { beginListen } from './speech'
 import type { GymDraft, VoiceCommand } from './core/voice'
@@ -64,6 +65,7 @@ export default function App() {
   const [focusHoy, setFocusHoy] = useState(false) // true al volver de un módulo abierto desde «Hoy»: el foco va al encabezado «Hoy»
   const [moduleFrom, setModuleFrom] = useState<'me' | 'home'>('me') // desde dónde se abrió Gym o Comida
   const [gymPrefill, setGymPrefill] = useState<{ draft: GymDraft; note: string } | null>(null) // borrador de la voz en «Hoy» que abre Gym prerrellenado
+  const [foodPrefill, setFoodPrefill] = useState<{ heard: string; items: FoodItem[] } | null>(null) // ítems de la voz que abren Comida con pendientes
   const [newMode, setNewMode] = useState<'capture' | 'manual'>('capture') // pantalla «Nuevo»: captura por voz o formulario a mano
   const [manualText, setManualText] = useState('')
   const [capture, setCapture] = useState<{ key: number; start: CaptureStart }>({ key: 0, start: { mode: 'idle' } })
@@ -185,14 +187,16 @@ export default function App() {
     if (captureBusy.current && screen === 'new' && newMode === 'capture') return // ya escucha o procesa: solo se navega
     const start: CaptureStart = voiceAck ? beginListen() : { mode: 'privacy' }
     setCapture(c => ({ key: c.key + 1, start })); setNewMode('capture')
-    setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new')
+    setFocusCard(null); setFocusHoy(false); setGymPrefill(null); setFoodPrefill(null); go('new')
   }
-  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new') }
-  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go(s) }
+  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); setFoodPrefill(null); go('new') }
+  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); setFoodPrefill(null); go(s) }
   const openGym = (from: 'me' | 'home') => { setModuleFrom(from); goTo('gym') }
   const openFood = (from: 'me' | 'home') => { setModuleFrom(from); goTo('food') }
+  // Comida prerrellenada por la voz (captura): los ítems llegan como pendientes. Vuelve a «Hoy», como Gym con `openGymWith`.
+  const openFoodWith = (items: FoodItem[], heard: string) => { setFoodPrefill({ heard, items }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('food') }
   const backFromGym = () => { setGymPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('gym'); go('me') } }
-  const backFromFood = () => { if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
+  const backFromFood = () => { setFoodPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
   function push(evs: ActivityEvent[], t: Tracker, list = trackers) {
@@ -292,7 +296,7 @@ export default function App() {
   const activeExercises = allExercises(gym.exercises).filter(x => !x.archived)
   const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
-    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo() }, loadAiKey(), navigator.onLine !== false)
+    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo(), foods: food.foods }, loadAiKey(), navigator.onLine !== false)
   const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
   const forgetCapture = (text: string) => { const m = loadMemo(), n = forget(m, text); if (n !== m) saveMemo(n) }
 
@@ -474,7 +478,8 @@ export default function App() {
           ? <CaptureView key={capture.key} start={capture.start} onConsumed={() => setCapture(c => ({ ...c, start: { mode: 'idle' } }))} ack={voiceAck} onAck={ackVoice}
               trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onLearn={learnCapture} onForget={forgetCapture} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
               onGymEdit={d => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg'))} onGymIncomplete={(d, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing))}
-              onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }} />
+              onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }}
+              foods={food.foods} onSaveFood={adds => foodHandlers.addVoice(adds, today)} onUndoFood={foodHandlers.undoVoice} onOpenFood={openFoodWith} />
           : <UnknownView key={manualText} initialText={manualText} trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
       )}
       {screen === 'party' && (
@@ -482,7 +487,7 @@ export default function App() {
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
-      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} prefill={foodPrefill ?? undefined}
         net={{ online: navigator.onLine !== false, hasKey: aiKey.hint !== null, ack: foodAck, onAck: ackFood, lookupEan: ean => (navigator.onLine === false ? Promise.resolve({ kind: 'error', error: 'network' }) : fetchOff(ean)), readLabel }} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}

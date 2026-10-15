@@ -1,7 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { CircleAlert, Mic } from 'lucide-react'
-import type { ActivityEvent, Branch, Exercise, Tracker, WeightUnit } from '../core/types'
+import type { ActivityEvent, Branch, DietChange, Exercise, Food, Tracker, WeightUnit } from '../core/types'
+import { dietNote, fmtKcal } from '../core/food'
+import { itemKcal, itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
 import { VOICE_MAX_CHARS, draftText, isComplete, type GymDraft, type VoiceCommand } from '../core/voice'
 import { AUTO_CREATE_S, MAX_CAPTURE, convNote, type CaptureCommand, type NewHabit, type Problem } from '../core/capture'
 import { unitFor } from '../core/trackers'
@@ -12,6 +14,7 @@ import { noApiText, offlineText, speechErrorText } from './voiceErrors'
 import { missingOf, type VoiceMissing } from './voiceNotes'
 import { CARD, LABEL } from './branchTone'
 import { CreatedResult, NewHabitCard, TrackerResult } from './CaptureCards'
+import { FoodVoiceCard } from './FoodVoiceCard'
 
 export type CaptureStart = ListenStart | { mode: 'privacy' } | { mode: 'idle' }
 
@@ -37,11 +40,18 @@ type Props = {
   onBusy: (busy: boolean) => void
   onLearn: (cmd: CaptureCommand) => void
   onForget: (text: string) => void
+  foods: Food[] // propios (también archivados)
+  onSaveFood: (adds: VoiceAdd[]) => { ids: string[]; created: string[]; diet: DietChange }
+  onUndoFood: (ids: string[], archive: string[]) => { undone: number; diet: DietChange }
+  onOpenFood: (items: FoodItem[], heard: string) => void
 }
 type Mode = 'idle' | 'privacy' | 'listening' | 'processing' | 'text'
+// Comida apuntada por una frase: lo guardado, lo pendiente y el efecto en Dieta
+type FoodDone = { ids: string[]; saved: FoodItem[]; pending: FoodItem[]; diet: DietChange; undone: string | null }
 type Res =
   | { k: 'gym'; cmd: VoiceCommand; ids: string[]; auto: boolean }
-  | { k: 'trk'; text: string; t: Tracker; ev: ActivityEvent; note: string | null }
+  | { k: 'trk'; text: string; t: Tracker; ev: ActivityEvent; note: string | null; food: FoodItem[] | null; fres: FoodDone | null }
+  | { k: 'food'; cmd: Extract<CaptureCommand, { kind: 'food' }>; done: FoodDone }
   | { k: 'form'; text: string; t: Tracker; problem: Problem | null; amount: number | null }
   | { k: 'new'; cmd: Extract<CaptureCommand, { kind: 'new' }>; auto: boolean }
   | { k: 'created'; t: Tracker; ev: ActivityEvent }
@@ -50,6 +60,11 @@ type Res =
   | { k: 'undone'; text: string }
 
 const WHAT = 'lo que has hecho'
+const foodCount = (n: number) => `${n} ${n === 1 ? 'alimento' : 'alimentos'}`
+const kcalOf = (items: FoodItem[], own: Food[]) => fmtKcal(items.reduce((n, i) => n + itemKcal(i, own), 0))
+const foodStatus = (d: FoodDone, own: Food[]) => d.undone ?? (d.ids.length
+  ? `Registrado en Comida: ${foodCount(d.ids.length)} · ${kcalOf(d.saved, own)} kcal${dietNote(d.diet)}`
+  : 'Revisa la propuesta: no se ha apuntado nada.')
 const OTHER_DAY_TEXT = 'Por voz solo se apunta hoy. Para otro día, hazlo a mano.'
 const UNKNOWN_TEXT = 'No se ha entendido qué apuntar. Prueba otra vez o escríbelo a mano.'
 
@@ -111,8 +126,16 @@ export function CaptureView(props: Props) {
         if (!tr) { setRes({ k: 'unknown' }); setMode('idle'); focusMic(); return }
         const ev = cmd.amount !== null && cmd.problem === null ? r.onAdd(tr.id, cmd.amount) : null
         setMode('idle')
-        if (ev) { r.onLearn(cmd); setRes({ k: 'trk', text: cmd.text, t: tr, ev, note: convNote(cmd.said, cmd.amount) }); focusMic() }
+        if (ev) { r.onLearn(cmd); setRes({ k: 'trk', text: cmd.text, t: tr, ev, note: convNote(cmd.said, cmd.amount), food: cmd.food ?? null, fres: null }); focusMic() }
         else setRes({ k: 'form', text: cmd.text, t: tr, problem: cmd.problem, amount: cmd.amount })
+        return
+      }
+      case 'food': {
+        const ready = cmd.items.filter(itemReady), pending = cmd.items.filter(i => !itemReady(i))
+        if (cmd.items.length === 1 && pending.length === 1) { setMode('idle'); r.onOpenFood(cmd.items, cmd.text); return } // FV1: nada que guardar, Comida lo completa
+        const s = r.onSaveFood(voiceAdds(ready, r.foods))
+        if (pending.length === 0) r.onLearn(cmd)
+        setRes({ k: 'food', cmd, done: { ids: s.ids, saved: ready, pending, diet: s.diet, undone: null } }); setMode('idle'); focusMic()
         return
       }
       case 'new':
@@ -186,7 +209,32 @@ export function CaptureView(props: Props) {
     if (res?.k !== 'form') return
     const ev = ref.current.onAdd(res.t.id, n)
     if (!ev) return
-    setRes({ k: 'trk', text: res.text, t: res.t, ev, note: null }); focusMic()
+    setRes({ k: 'trk', text: res.text, t: res.t, ev, note: null, food: null, fres: null }); focusMic()
+  }
+  function undoFood() {
+    if (res?.k !== 'food') return
+    const d = res.done, r = ref.current.onUndoFood(d.ids, [])
+    ref.current.onForget(res.cmd.text)
+    setRes({ k: 'undone', text: `Deshecho: ${foodCount(d.ids.length)} (${kcalOf(d.saved, ref.current.foods)} kcal).${dietNote(r.diet)}` }); focusMic()
+  }
+  function editFood() {
+    if (res?.k !== 'food') return
+    if (res.done.ids.length) ref.current.onUndoFood(res.done.ids, [])
+    ref.current.onForget(res.cmd.text)
+    ref.current.onOpenFood(res.cmd.items, res.cmd.text) // todos los ítems vuelven como pendientes
+  }
+  // FV4: «Apuntar también en Comida». Sin nada listo abre Comida; con algo listo lo guarda (los pendientes quedan en la tarjeta).
+  function attachFood() {
+    if (res?.k !== 'trk' || !res.food) return
+    const items = res.food, ready = items.filter(itemReady), pending = items.filter(i => !itemReady(i))
+    if (!ready.length) return ref.current.onOpenFood(items, res.text)
+    const s = ref.current.onSaveFood(voiceAdds(ready, ref.current.foods))
+    setRes({ ...res, fres: { ids: s.ids, saved: ready, pending, diet: s.diet, undone: null } })
+  }
+  function undoAttached() {
+    if (res?.k !== 'trk' || !res.fres) return
+    const d = res.fres, r = ref.current.onUndoFood(d.ids, [])
+    setRes({ ...res, food: null, fres: { ...d, ids: [], saved: [], undone: `Deshecho: ${foodCount(d.ids.length)} (${kcalOf(d.saved, ref.current.foods)} kcal).${dietNote(r.diet)}` } })
   }
   function createHabit(h: NewHabit) {
     if (res?.k !== 'new') return
@@ -221,6 +269,7 @@ export function CaptureView(props: Props) {
     : busy ? 'Procesando…'
     : res?.k === 'gym' ? `Registrado: ${draftText(res.cmd.draft, exercises, unit)}${res.auto ? ' Sesión de Gym apuntada en HERO (hoy).' : ''}`
     : res?.k === 'trk' ? `Registrado: ${res.t.name} · +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)} · +${res.ev.amount * res.t.xpPerUnit} ${LABEL[res.t.branch]} XP`
+    : res?.k === 'food' ? foodStatus(res.done, props.foods)
     : res?.k === 'form' ? (res.problem === 'unit' ? `${res.t.name} se mide en ${res.t.unit}: no se ha apuntado nada.` : res.problem === 'range' ? `La cantidad debe estar entre 1 y ${MAX_CAPTURE} ${res.t.unit}: no se ha apuntado nada.` : '')
     : res?.k === 'new' ? (res.auto ? (stopped ? 'Cuenta atrás parada. Revisa la propuesta.' : `Se creará sola en ${AUTO_CREATE_S} segundos. Toca la tarjeta para revisarla.`) : '')
     : res?.k === 'created' ? `Creada: ${res.t.name} (${LABEL[res.t.branch]}) · +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)}.`
@@ -229,7 +278,7 @@ export function CaptureView(props: Props) {
     : res?.k === 'undone' ? res.text
     : mode === 'text' ? (message ?? '') : ''
   const visible = statusText !== '' && res?.k !== 'new' && (busy || res !== null || (mode === 'text' && message !== null))
-  const branch = res?.k === 'trk' || res?.k === 'form' || res?.k === 'created' ? CARD[res.t.branch] : null
+  const branch = res?.k === 'trk' || res?.k === 'form' || res?.k === 'created' ? CARD[res.t.branch] : res?.k === 'food' ? CARD.hero : null
   const card = res?.k === 'gym' ? `flex flex-col gap-2 rounded-lg border p-3 ${t.border} ${t.surface} ${t.text}` : branch ? `flex flex-col gap-2 rounded-lg border p-3 ${branch.box}` : ''
 
   return (
@@ -254,12 +303,25 @@ export function CaptureView(props: Props) {
             </div>
           )}
           <div className={card}>
-            <p role="status" className={visible ? `flex items-start gap-2 text-sm ${res?.k === 'gym' || res?.k === 'trk' || res?.k === 'created' ? 'font-semibold' : ''} ${branch ? '' : t.text}` : 'sr-only'}>
+            <p role="status" className={visible ? `flex items-start gap-2 text-sm ${res?.k === 'gym' || res?.k === 'trk' || res?.k === 'created' || res?.k === 'food' ? 'font-semibold' : ''} ${branch ? '' : t.text}` : 'sr-only'}>
               {(res?.k === 'other-day' || res?.k === 'unknown' || (mode === 'text' && message !== null)) && <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />}{statusText}
             </p>
             {(res?.k === 'trk' || res?.k === 'form') && (
               <TrackerResult key={res.k} tracker={res.t} heard={res.text} note={res.k === 'trk' ? res.note : null} form={res.k === 'form'} amount={res.k === 'form' ? res.amount : null}
-                onUndo={undoTracker} onEdit={editTracker} onClose={close} onSubmit={applyAmount} onCancel={close} />
+                onUndo={undoTracker} onEdit={editTracker} onClose={close} onSubmit={applyAmount} onCancel={close} onFood={res.k === 'trk' && res.food && !res.fres ? attachFood : undefined} />
+            )}
+            {res?.k === 'trk' && res.fres && (
+              <div className="flex flex-col gap-2 border-t border-current/20 pt-2">
+                <p role="status" className="text-sm font-semibold">{foodStatus(res.fres, props.foods)}</p>
+                {res.fres.undone === null && (
+                  <FoodVoiceCard tone={res.t.branch} heard={res.text} saved={res.fres.saved} pending={res.fres.pending} rest="" own={props.foods}
+                    undoLabel="Deshacer comida" onUndo={res.fres.ids.length ? undoAttached : undefined} onComplete={() => ref.current.onOpenFood(res.fres!.pending, res.text)} onClose={() => setRes({ ...res, food: null, fres: null })} />
+                )}
+              </div>
+            )}
+            {res?.k === 'food' && (
+              <FoodVoiceCard tone="hero" heard={res.cmd.text} saved={res.done.saved} pending={res.done.pending} rest={res.cmd.rest} own={props.foods}
+                onUndo={res.done.ids.length ? undoFood : undefined} onComplete={() => ref.current.onOpenFood(res.done.pending, res.cmd.text)} onEdit={editFood} onClose={close} />
             )}
             {res?.k === 'created' && <CreatedResult branch={res.t.branch} onUndo={undoCreated} onGo={() => ref.current.onGoToMissions(res.t.branch)} onClose={close} />}
             {res?.k === 'new' && (
