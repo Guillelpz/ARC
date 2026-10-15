@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, DietChange, Exercise, Food, FoodData, FoodEntry, FoodGoal, GymData, GymSet, Portion, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
+import type { ActivityEvent, CustomData, Exercise, FoodData, GymData, GymSet, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
-import { DIET_TRACKER, dayTotals, dietActive, dietDays, dietSync, liveEntries, goalOn, makeEntry, mealEntries, mealFromEntries, MAX_MEALS, allFoods, quickEntry, setFoodGoal, undoEntries, withDiet } from './core/food'
-import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveFood, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { DIET_TRACKER, dietActive, dietDays, dietSync, withDiet } from './core/food'
+import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { useFood, foodCount } from './useFood'
 import { forget, learn } from './core/memory'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
 import type { CaptureCommand, NewHabit } from './core/capture'
@@ -54,7 +55,6 @@ export default function App() {
   const [events, setEvents] = useState<ActivityEvent[]>(loaded.events)
   const [custom, setCustom] = useState<CustomData>(loaded.custom)
   const [gym, setGym] = useState<GymData>(loaded.gym)
-  const [food, setFood] = useState<FoodData>(loaded.food)
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
   const [focusCard, setFocusCard] = useState<'gym' | 'food' | null>(null) // al volver de un módulo abierto desde «Yo»: el foco va a su tarjeta
@@ -99,10 +99,11 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
+  const { food, setFood, unsaved: foodUnsaved, foodToday, handlers: foodHandlers } = useFood(loaded.food, { events, today, stamp: nowStamp, pushDiet })
   const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0 || gym.log.length > 0 || gym.exercises.length > 0 || (gym.routines?.length ?? 0) > 0 || food.log.length > 0 || food.foods.length > 0 || (food.goals?.length ?? 0) > 0 || (food.meals?.length ?? 0) > 0
   const copy = backupDue(lastExport, now, hasData)
 
-  const [unsaved, setUnsaved] = useState({ events: false, custom: false, gym: false, food: false }) // false en cada clave con su siguiente guardado correcto
+  const [unsaved, setUnsaved] = useState({ events: false, custom: false, gym: false }) // false en cada clave con su siguiente guardado correcto
   // ponytail: setState dentro del efecto de guardado (aviso de lint aceptado); guardar en cada handler evitaría el render extra, a costa de tocar todos los setEvents/setCustom
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
@@ -110,9 +111,7 @@ export default function App() {
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveGym(gym); if (ok !== null) setUnsaved(u => (u.gym === !ok ? u : { ...u, gym: !ok })) }, [gym])
-  // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
-  useEffect(() => { const ok = saveFood(food); if (ok !== null) setUnsaved(u => (u.food === !ok ? u : { ...u, food: !ok })) }, [food])
-  const saveFailed = unsaved.events || unsaved.custom || unsaved.gym || unsaved.food
+  const saveFailed = unsaved.events || unsaved.custom || unsaved.gym || foodUnsaved
   // ponytail: si dos pestañas escriben en menos tiempo del que tarda en llegar el evento `storage`, la última escritura pisa a la otra.
   // Cerrarlo de verdad exige fusionar eventos o Web Locks.
   useEffect(() => {
@@ -127,7 +126,7 @@ export default function App() {
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  }, [setFood])
   useEffect(() => {
     if (!toast) return
     const id = setTimeout(() => setToast(null), 2400)
@@ -151,15 +150,13 @@ export default function App() {
     return () => clearTimeout(id)
   }, [overtake, toast])
 
+  const dietTracker = () => trackers.find(t => t.id === DIET_TRACKER)!
+  function pushDiet(evs: ActivityEvent[]) { push(evs, dietTracker()) }
   const active = dietActive(food, events) // B1: Dieta oculta mientras no haya objetivo ni eventos (derivado, no se persiste)
   const trackers = useMemo(() => withDiet(allTrackers(custom.trackers, custom.goals, custom.goalLog, custom.limits), active), [custom.trackers, custom.goals, custom.goalLog, custom.limits, active])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const weeks = useMemo(() => branchWeekly(events, trackers, today), [events, trackers, today])
   const gymToday = useMemo(() => gymDay(gym.log, today), [gym.log, today])
-  const foodToday = useMemo(() => {
-    const goal = goalOn(food.goals, today), kcal = dayTotals(food.log, today)
-    return goal || kcal.entries > 0 ? { kcal: Math.round(kcal.kcal), goal: goal?.kcal ?? null } : null
-  }, [food.log, food.goals, today])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
     () => PARTIES.map(p => derivePartyState(p, events, today, trackers, custom.proposals)),
@@ -224,69 +221,6 @@ export default function App() {
       : t.id === DIET_TRACKER && amount < 0 ? dietSync([...events, ev], food, [day], today, uuid) : [] // Dieta: «−» manual de un día en rango → se repone la automática (neto 0)
     push([ev, ...extra], t)
     return amount + extra.length
-  }
-
-  // Comida: toda la lógica está en core/food.ts; cada handler guarda el cambio y su `dietSync` juntos (§7.3)
-  const dietTracker = () => trackers.find(t => t.id === DIET_TRACKER)!
-  // días ya apuntados: Dieta puede sumar o restar; `diet` = signo del neto (+1 entra en rango, −1 sale, 0 nada)
-  function syncDiet(next: FoodData, days: string[]): DietChange {
-    setFood(next)
-    const evs = dietSync(events, next, days, today, uuid)
-    if (!evs.length) return 0
-    push(evs, dietTracker())
-    const net = evs.reduce((n, e) => n + e.amount, 0)
-    return net > 0 ? 1 : net < 0 ? -1 : 0
-  }
-  function addFoodEntry(f: Food, p: Portion, day: string): { id: string; diet: DietChange } {
-    if (day > today) day = today
-    const e = makeEntry(f, p, uuid(), nowStamp(day))
-    return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
-  }
-  function addQuick(input: { kcal: number; p?: number; c?: number; f?: number; name?: string }, day: string): { id: string; diet: DietChange } {
-    if (day > today) day = today
-    const e: FoodEntry = quickEntry(input, uuid(), nowStamp(day))
-    return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
-  }
-  // Alimentos propios: las entradas guardan su instantánea (T1), así que crear o archivar no toca Dieta
-  function createFood(input: Omit<Food, 'id'>): Food {
-    const f: Food = { id: `food-${uuid()}`, ...input }
-    setFood({ ...food, foods: [...food.foods, f] })
-    return f
-  }
-  function setFoodArchived(id: string, archived: boolean) {
-    setFood({ ...food, foods: food.foods.map(f => { if (f.id !== id) return f; const { archived: _a, ...rest } = f; return archived ? { ...rest, archived: true } : rest }) })
-  }
-  // Platos: guardar desde entradas vivas del día, borrar y añadir al día elegido (con su dietSync)
-  function saveMeal(name: string, ids: string[]): boolean {
-    const meals = food.meals ?? []
-    if (meals.length >= MAX_MEALS) return false
-    const live = liveEntries(food.log), m = mealFromEntries(ids.flatMap(id => live.filter(e => e.id === id)), name, `meal-${uuid()}`)
-    if (!m) return false
-    setFood({ ...food, meals: [...meals, m] })
-    return true
-  }
-  function deleteMeal(id: string) {
-    const meals = (food.meals ?? []).filter(m => m.id !== id)
-    const { meals: _m, ...rest } = food
-    setFood(meals.length ? { ...rest, meals } : rest)
-  }
-  function addMeal(id: string, day: string): { ids: string[]; missing: number; diet: DietChange } {
-    if (day > today) day = today
-    const m = (food.meals ?? []).find(x => x.id === id)
-    if (!m) return { ids: [], missing: 0, diet: 0 }
-    const { entries, missing } = mealEntries(m, allFoods(food.foods), uuid, nowStamp(day))
-    if (!entries.length) return { ids: [], missing, diet: 0 }
-    return { ids: entries.map(e => e.id), missing, diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
-  }
-  function undoFood(ids: string[]): { undone: number; diet: DietChange } {
-    const us = undoEntries(food.log, ids, uuid)
-    if (!us.length) return { undone: 0, diet: 0 }
-    return { undone: us.length, diet: syncDiet({ ...food, log: [...food.log, ...us] }, us.map(u => u.occurredAt.slice(0, 10))) }
-  }
-  // El objetivo rige desde hoy; los días pasados conservan el suyo (con el primer objetivo rige hacia atrás: T3 de la spec)
-  function saveFoodGoal(g: Omit<FoodGoal, 'from'>): DietChange {
-    const next = { ...food, goals: setFoodGoal(food.goals, g, today) }
-    return syncDiet(next, dietDays(next, events))
   }
 
   const r2 = (x: number) => Math.round(x * 100) / 100
@@ -413,7 +347,6 @@ export default function App() {
     const a = [...evs, ...ensureAuto(evs, g.log, setDays(g.log))]
     return [...a, ...dietSync(a, f, dietDays(f, a), today, uuid)]
   }
-  const foodCount = (f: FoodData) => liveEntries(f.log).length
 
   const loadExample = () => setEvents(seedFor(today))
 
@@ -537,7 +470,7 @@ export default function App() {
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
-      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onCreateFood={createFood} onArchiveFood={setFoodArchived} onSaveMeal={saveMeal} onDeleteMeal={deleteMeal} onAddMeal={addMeal} onSaveGoal={saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={foodHandlers.addFoodEntry} onAddQuick={foodHandlers.addQuick} onUndo={foodHandlers.undoFood} onCreateFood={foodHandlers.createFood} onArchiveFood={foodHandlers.setFoodArchived} onSaveMeal={foodHandlers.saveMeal} onDeleteMeal={foodHandlers.deleteMeal} onAddMeal={foodHandlers.addMeal} onSaveGoal={foodHandlers.saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
