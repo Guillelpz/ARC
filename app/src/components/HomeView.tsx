@@ -6,6 +6,7 @@ import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
 import { unitFor } from '../core/trackers'
 import { shortDate } from '../core/stats'
+import { fmtKcal } from '../core/food'
 import { PlayerHeader } from './PlayerHeader'
 import { VT } from './voiceTone'
 import { SaveFailBanner } from './SaveFailBanner'
@@ -16,6 +17,8 @@ type Props = {
   summary: TodaySummary
   gymToday: GymDay
   onOpenGym: () => void
+  foodToday: { kcal: number; goal: number | null } | null // fila «Comida» de «Hoy»: con objetivo o con entradas hoy
+  onOpenFood: () => void
   focusHoy: boolean
   onCapture: () => void // «+» y «Dictar»: abre la captura por voz
   onWriteNew: () => void // «Añadir algo nuevo»: el formulario a mano
@@ -73,7 +76,7 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
 const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
 const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
 
-export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, onCapture, onWriteNew, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+export function HomeView({ game, summary, gymToday, onOpenGym, foodToday, onOpenFood, focusHoy, onCapture, onWriteNew, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const mode = useRef<'replace' | 'merge'>('replace')
   const hoyRef = useRef<HTMLHeadingElement>(null)
@@ -155,16 +158,24 @@ export function HomeView({ game, summary, gymToday, onOpenGym, focusHoy, onCaptu
               })} onGo={onNavigate} />
             </>
           )}
-          {gymToday.sets > 0 && (
+          {(gymToday.sets > 0 || foodToday) && (
             <ul className="divide-y divide-app-border rounded-lg border border-app-border">
-              <li>
+              {gymToday.sets > 0 && <li>
                 <button type="button" onClick={onOpenGym}
                   className="flex min-h-11 w-full items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
                   <span className="flex-1 text-sm font-semibold">Gym</span>
                   <span className="text-sm text-app-muted tabular-nums">{`${gymToday.sets} ${gymToday.sets === 1 ? 'serie' : 'series'} · ${gymToday.exercises} ${gymToday.exercises === 1 ? 'ejercicio' : 'ejercicios'}`}</span>
                   <ChevronRight className="size-4 shrink-0 text-app-muted" aria-hidden />
                 </button>
-              </li>
+              </li>}
+              {foodToday && <li>
+                <button type="button" onClick={onOpenFood}
+                  className="flex min-h-11 w-full items-center gap-3 px-3 text-left hover:bg-app-bg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-app-text">
+                  <span className="flex-1 text-sm font-semibold">Comida</span>
+                  <span className="text-sm text-app-muted tabular-nums">{foodToday.goal === null ? `${fmtKcal(foodToday.kcal)} kcal` : `${fmtKcal(foodToday.kcal)} / ${fmtKcal(foodToday.goal)} kcal`}</span>
+                  <ChevronRight className="size-4 shrink-0 text-app-muted" aria-hidden />
+                </button>
+              </li>}
             </ul>
           )}
           {summary.best && (

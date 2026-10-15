@@ -1,5 +1,6 @@
 import type { ActivityEvent, Branch, GameState, LevelInfo, Tracker, TrackerStats } from './types'
 import { TRACKERS } from './trackers'
+import { withDiet } from './food'
 import { trackerStats } from './stats'
 
 export const THRESHOLD = { activity: 60, branch: 200, player: 250 } as const
@@ -11,7 +12,7 @@ export const levelInfo = (xp: number, threshold: number): LevelInfo => ({
   progress: (xp % threshold) / threshold,
 })
 
-export function deriveGame(events: ActivityEvent[], today: string, trackers: Tracker[] = TRACKERS): GameState {
+export function deriveGame(events: ActivityEvent[], today: string, trackers: Tracker[] = withDiet(TRACKERS, false)): GameState {
   const stats: TrackerStats[] = trackers.map(t => {
     const s = trackerStats(t, events, today)
     return { tracker: t, ...s, xp: levelInfo(s.allTime * t.xpPerUnit, THRESHOLD.activity) }

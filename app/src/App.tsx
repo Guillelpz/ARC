@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { transition } from './viewTransition'
-import type { ActivityEvent, CustomData, Exercise, GymData, GymSet, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
+import type { ActivityEvent, CustomData, DietChange, Exercise, Food, FoodData, FoodEntry, FoodGoal, GymData, GymSet, Portion, RecordKind, Routine, Tracker, WeightUnit } from './core/types'
 import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
-import { EMPTY_CUSTOM, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { DIET_TRACKER, dayTotals, dietActive, dietDays, dietSync, liveEntries, goalOn, makeEntry, quickEntry, setFoodGoal, undoEntries, withDiet } from './core/food'
+import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveFood, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { forget, learn } from './core/memory'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
 import type { CaptureCommand, NewHabit } from './core/capture'
@@ -25,6 +26,7 @@ import { editNote, incompleteNote } from './components/voiceNotes'
 import { MeView } from './components/MeView'
 import type { VoiceMissing } from './components/voiceNotes'
 import { GymView } from './components/GymView'
+import { FoodView } from './components/FoodView'
 import type { Gain } from './components/TrackerCard'
 import { SAVE_FAIL_TEXT } from './components/SaveFailBanner'
 import { STALE_TAB_TEXT, UpdateBanner } from './components/UpdateBanner'
@@ -32,6 +34,7 @@ import { registerSW } from './pwa'
 import { liveText } from './components/liveText'
 import { LevelUpToast, OvertakeBanner, PassedBanner, RecordBanner, type Overtake, type RecordNotice, type Toast } from './components/LevelUpToast'
 
+const uuid = () => crypto.randomUUID()
 // fuera del componente: solo se llama desde manejadores de eventos
 const nowStamp = (day?: string, d = new Date()) => `${day ?? localDate(d)}T${d.toTimeString().slice(0, 8)}`
 
@@ -51,11 +54,12 @@ export default function App() {
   const [events, setEvents] = useState<ActivityEvent[]>(loaded.events)
   const [custom, setCustom] = useState<CustomData>(loaded.custom)
   const [gym, setGym] = useState<GymData>(loaded.gym)
+  const [food, setFood] = useState<FoodData>(loaded.food)
   const [notice, setNotice] = useState<string | null>(() => noticeFor(loaded.problems))
   const [screen, setScreen] = useState<Screen>('home')
-  const [focusGym, setFocusGym] = useState(false) // true al volver de Gym: el foco va a su tarjeta en «Yo»
-  const [focusHoy, setFocusHoy] = useState(false) // true al volver de Gym abierto desde «Hoy»: el foco va al encabezado «Hoy»
-  const [gymFrom, setGymFrom] = useState<'me' | 'home'>('me')
+  const [focusCard, setFocusCard] = useState<'gym' | 'food' | null>(null) // al volver de un módulo abierto desde «Yo»: el foco va a su tarjeta
+  const [focusHoy, setFocusHoy] = useState(false) // true al volver de un módulo abierto desde «Hoy»: el foco va al encabezado «Hoy»
+  const [moduleFrom, setModuleFrom] = useState<'me' | 'home'>('me') // desde dónde se abrió Gym o Comida
   const [gymPrefill, setGymPrefill] = useState<{ draft: GymDraft; note: string } | null>(null) // borrador de la voz en «Hoy» que abre Gym prerrellenado
   const [newMode, setNewMode] = useState<'capture' | 'manual'>('capture') // pantalla «Nuevo»: captura por voz o formulario a mano
   const [manualText, setManualText] = useState('')
@@ -95,10 +99,10 @@ export default function App() {
   // pasada la medianoche y sin tocar nada, la pantalla muestra el día anterior hasta la siguiente
   // interacción. Añadir un timer a medianoche si molesta.
   const now = new Date(); const today = localDate(now)
-  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0 || gym.log.length > 0 || gym.exercises.length > 0 || (gym.routines?.length ?? 0) > 0
+  const hasData = events.length > 0 || custom.trackers.length > 0 || Object.keys(custom.goals ?? {}).length > 0 || (custom.goalLog?.length ?? 0) > 0 || Object.keys(custom.limits ?? {}).length > 0 || gym.log.length > 0 || gym.exercises.length > 0 || (gym.routines?.length ?? 0) > 0 || food.log.length > 0 || food.foods.length > 0 || (food.goals?.length ?? 0) > 0 || (food.meals?.length ?? 0) > 0
   const copy = backupDue(lastExport, now, hasData)
 
-  const [unsaved, setUnsaved] = useState({ events: false, custom: false, gym: false }) // false en cada clave con su siguiente guardado correcto
+  const [unsaved, setUnsaved] = useState({ events: false, custom: false, gym: false, food: false }) // false en cada clave con su siguiente guardado correcto
   // ponytail: setState dentro del efecto de guardado (aviso de lint aceptado); guardar en cada handler evitaría el render extra, a costa de tocar todos los setEvents/setCustom
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveEvents(events); if (ok !== null) setUnsaved(u => (u.events === !ok ? u : { ...u, events: !ok })) }, [events])
@@ -106,7 +110,9 @@ export default function App() {
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveGym(gym); if (ok !== null) setUnsaved(u => (u.gym === !ok ? u : { ...u, gym: !ok })) }, [gym])
-  const saveFailed = unsaved.events || unsaved.custom || unsaved.gym
+  // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
+  useEffect(() => { const ok = saveFood(food); if (ok !== null) setUnsaved(u => (u.food === !ok ? u : { ...u, food: !ok })) }, [food])
+  const saveFailed = unsaved.events || unsaved.custom || unsaved.gym || unsaved.food
   // ponytail: si dos pestañas escriben en menos tiempo del que tarda en llegar el evento `storage`, la última escritura pisa a la otra.
   // Cerrarlo de verdad exige fusionar eventos o Web Locks.
   useEffect(() => {
@@ -117,7 +123,7 @@ export default function App() {
       setCanRestore(hasLastBackup()); setLastExport(loadLastExport())
       if (r.problems.length) { lockStorage(); return setStale(true) } // no pisar lo de la otra pestaña: recargar lo lee (original en .backup.<stamp>)
       unlockStorage(); setStale(false) // lo guardado se ha leído entero: guardar ya no destruye nada
-      setEvents(r.events); setCustom(r.custom); setGym(r.gym)
+      setEvents(r.events); setCustom(r.custom); setGym(r.gym); setFood(r.food)
     }
     window.addEventListener('storage', onStorage)
     return () => window.removeEventListener('storage', onStorage)
@@ -145,10 +151,15 @@ export default function App() {
     return () => clearTimeout(id)
   }, [overtake, toast])
 
-  const trackers = useMemo(() => allTrackers(custom.trackers, custom.goals, custom.goalLog, custom.limits), [custom.trackers, custom.goals, custom.goalLog, custom.limits])
+  const active = dietActive(food, events) // B1: Dieta oculta mientras no haya objetivo ni eventos (derivado, no se persiste)
+  const trackers = useMemo(() => withDiet(allTrackers(custom.trackers, custom.goals, custom.goalLog, custom.limits), active), [custom.trackers, custom.goals, custom.goalLog, custom.limits, active])
   const game = useMemo(() => deriveGame(events, today, trackers), [events, today, trackers])
   const weeks = useMemo(() => branchWeekly(events, trackers, today), [events, trackers, today])
   const gymToday = useMemo(() => gymDay(gym.log, today), [gym.log, today])
+  const foodToday = useMemo(() => {
+    const goal = goalOn(food.goals, today), kcal = dayTotals(food.log, today)
+    return goal || kcal.entries > 0 ? { kcal: Math.round(kcal.kcal), goal: goal?.kcal ?? null } : null
+  }, [food.log, food.goals, today])
   const summary = useMemo(() => todaySummary(events, game.trackers, today), [events, game, today])
   const partyStates = useMemo(
     () => PARTIES.map(p => derivePartyState(p, events, today, trackers, custom.proposals)),
@@ -165,12 +176,14 @@ export default function App() {
     if (captureBusy.current && screen === 'new' && newMode === 'capture') return // ya escucha o procesa: solo se navega
     const start: CaptureStart = voiceAck ? beginListen() : { mode: 'privacy' }
     setCapture(c => ({ key: c.key + 1, start })); setNewMode('capture')
-    setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go('new')
+    setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new')
   }
-  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go('new') }
-  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusGym(false); setFocusHoy(false); setGymPrefill(null); go(s) }
-  const openGym = (from: 'me' | 'home') => { setGymFrom(from); goTo('gym') }
-  const backFromGym = () => { setGymPrefill(null); if (gymFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusGym(true); go('me') } }
+  const openManual = (text = '') => { setManualText(text); setNewMode('manual'); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go('new') }
+  const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go(s) }
+  const openGym = (from: 'me' | 'home') => { setModuleFrom(from); goTo('gym') }
+  const openFood = (from: 'me' | 'home') => { setModuleFrom(from); goTo('food') }
+  const backFromGym = () => { setGymPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('gym'); go('me') } }
+  const backFromFood = () => { if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
 
   // evs: uno o varios eventos de un mismo tracker ya validados (clampAmount) que se guardan juntos
   function push(evs: ActivityEvent[], t: Tracker, list = trackers) {
@@ -207,9 +220,42 @@ export default function App() {
     const ev: ActivityEvent = { id: crypto.randomUUID(), trackerId: t.id, amount,
       occurredAt: undo ? undo.occurredAt : nowStamp(day), ...(undo && { undoes: undo.id }) }
     // Regla: día con series vivas ⇒ al menos 1 sesión de Gym. Si el deshacer o el «−» la rompe, se repone en el mismo guardado (neto 0).
-    const extra = t.id === GYM_TRACKER && amount < 0 ? ensureAuto([...events, ev], gym.log, [day]) : []
+    const extra = t.id === GYM_TRACKER && amount < 0 ? ensureAuto([...events, ev], gym.log, [day])
+      : t.id === DIET_TRACKER && amount < 0 ? dietSync([...events, ev], food, [day], today, uuid) : [] // Dieta: «−» manual de un día en rango → se repone la automática (neto 0)
     push([ev, ...extra], t)
     return amount + extra.length
+  }
+
+  // Comida: toda la lógica está en core/food.ts; cada handler guarda el cambio y su `dietSync` juntos (§7.3)
+  const dietTracker = () => trackers.find(t => t.id === DIET_TRACKER)!
+  // días ya apuntados: Dieta puede sumar o restar; `diet` = signo del neto (+1 entra en rango, −1 sale, 0 nada)
+  function syncDiet(next: FoodData, days: string[]): DietChange {
+    setFood(next)
+    const evs = dietSync(events, next, days, today, uuid)
+    if (!evs.length) return 0
+    push(evs, dietTracker())
+    const net = evs.reduce((n, e) => n + e.amount, 0)
+    return net > 0 ? 1 : net < 0 ? -1 : 0
+  }
+  function addFoodEntry(f: Food, p: Portion, day: string): { id: string; diet: DietChange } {
+    if (day > today) day = today
+    const e = makeEntry(f, p, uuid(), nowStamp(day))
+    return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
+  }
+  function addQuick(input: { kcal: number; p?: number; c?: number; f?: number; name?: string }, day: string): { id: string; diet: DietChange } {
+    if (day > today) day = today
+    const e: FoodEntry = quickEntry(input, uuid(), nowStamp(day))
+    return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
+  }
+  function undoFood(ids: string[]): { undone: number; diet: DietChange } {
+    const us = undoEntries(food.log, ids, uuid)
+    if (!us.length) return { undone: 0, diet: 0 }
+    return { undone: us.length, diet: syncDiet({ ...food, log: [...food.log, ...us] }, us.map(u => u.occurredAt.slice(0, 10))) }
+  }
+  // El objetivo rige desde hoy; los días pasados conservan el suyo (con el primer objetivo rige hacia atrás: T3 de la spec)
+  function saveFoodGoal(g: Omit<FoodGoal, 'from'>): DietChange {
+    const next = { ...food, goals: setFoodGoal(food.goals, g, today) }
+    return syncDiet(next, dietDays(next, events))
   }
 
   const r2 = (x: number) => Math.round(x * 100) / 100
@@ -267,7 +313,7 @@ export default function App() {
   }) }))
 
   const activeExercises = allExercises(gym.exercises).filter(x => !x.archived)
-  const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setGymFrom('home'); setFocusGym(false); setFocusHoy(false); go('gym') }
+  const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
     interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo() }, loadAiKey(), navigator.onLine !== false)
   const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
@@ -331,6 +377,13 @@ export default function App() {
     setCustom(c => ({ ...c, proposals: proposeTo(c.proposals, trackerId, partyIds, allTrackers(c.trackers, c.goals), now) }))
   }
 
+  // Reglas vivas tras importar, fusionar o recuperar: «día con series ⇒ sesión de Gym» y «día en rango ⇒ +1 Dieta»
+  const withAutos = (evs: ActivityEvent[], g: GymData, f: FoodData): ActivityEvent[] => {
+    const a = [...evs, ...ensureAuto(evs, g.log, setDays(g.log))]
+    return [...a, ...dietSync(a, f, dietDays(f, a), today, uuid)]
+  }
+  const foodCount = (f: FoodData) => liveEntries(f.log).length
+
   const loadExample = () => setEvents(seedFor(today))
 
   function reset() {
@@ -342,12 +395,12 @@ export default function App() {
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha borrado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
     clearMemo()
-    setEvents([]); setCustom(EMPTY_CUSTOM); setGym(EMPTY_GYM); setToast(null); setGain(null); setOvertake(null); setRecord(null)
+    setEvents([]); setCustom(EMPTY_CUSTOM); setGym(EMPTY_GYM); setFood(EMPTY_FOOD); setToast(null); setGain(null); setOvertake(null); setRecord(null)
   }
 
   async function exportData(): Promise<boolean> {
     const stamp = new Date().toISOString(), name = `rpg-life-tracker-${stamp.slice(0, 10)}.json`
-    const text = exportBackup(events, custom, stamp, gym)
+    const text = exportBackup(events, custom, stamp, gym, food)
     const done = () => { saveLastExport(stamp); setLastExport(stamp); requestPersist(); return true } // requestPersist en el primer gesto (no al arrancar: Firefox muestra un diálogo)
     const file = new File([text], name, { type: 'application/json' })
     // ponytail: Chrome Android no comparte application/json (canShare = false) → descarga. Solo en la app instalada en táctil:
@@ -374,12 +427,15 @@ export default function App() {
       : kLocal + kCopia > 0 ? ` Series de gym: ${kLocal} → ${kCopia}.` : ''
     const rLocal = gym.routines?.length ?? 0, rCopia = b.gym?.routines?.length ?? 0
     const routinesText = rLocal + rCopia > 0 ? ` Rutinas: ${rLocal} → ${rCopia}.` : ''
-    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''}${gymText}${routinesText} Exporta antes si quieres conservar lo actual.`)) return
+    const fLocal = foodCount(food), fCopia = b.food ? foodCount(b.food) : 0
+    const foodText = b.food === null && fLocal > 0 ? ` Esta copia es anterior al módulo Comida: tus ${fLocal} entradas de comida también se reemplazan (quedan 0).`
+      : fLocal + fCopia > 0 ? ` Comida: ${fLocal} → ${fCopia} entradas.` : ''
+    if (!window.confirm(`¿Importar esta copia? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${n} y ${m}.${b.dropped ? ` Se ignorarán ${b.dropped} elementos no válidos.` : ''}${b.fixed ? ` Se corregirán ${b.fixed} elementos con campos no válidos.` : ''}${gymText}${routinesText}${foodText} Exporta antes si quieres conservar lo actual.`)) return
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha importado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup())
     unlockStorage()
-    const g = b.gym ?? EMPTY_GYM // la regla de sesiones también rige al importar (normalmente no añade nada)
-    setEvents([...b.events, ...ensureAuto(b.events, g.log, setDays(g.log))]); setCustom(b.custom); setGym(g); setToast(null); setGain(null); setOvertake(null)
+    const g = b.gym ?? EMPTY_GYM, f = b.food ?? EMPTY_FOOD // las reglas de sesiones y de Dieta también rigen al importar (normalmente no añaden nada)
+    setEvents(withAutos(b.events, g, f)); setCustom(b.custom); setGym(g); setFood(f); setToast(null); setGain(null); setOvertake(null)
     const nr = b.gym?.routines?.length ?? 0
     setNotice(`Copia importada: ${n} registros y ${m} misiones nuevas${nr > 0 ? ` y ${nr} rutinas` : ''}.`)
   }
@@ -388,10 +444,11 @@ export default function App() {
     if (stale) return setNotice(STALE_BLOCK_TEXT)
     const b = parseBackup(text)
     if (!b) return setNotice('Ese archivo no es una copia válida de RPG Life Tracker.')
-    const r = mergeBackup({ events, custom, gym }, { ...b, gym: b.gym ?? undefined })
+    const r = mergeBackup({ events, custom, gym, food }, { ...b, gym: b.gym ?? undefined })
     if (!r.changed) return setNotice(`Esa copia no trae nada nuevo: ya tienes todos sus registros.${r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios; se mantiene lo de este dispositivo.` : ''}`)
     const gymAdded = r.setsAdded + r.exercisesAdded
-    const gymText = (gymAdded > 0 ? ` y ${gymAdded} entradas de gym` : '') + (r.routinesAdded > 0 ? ` y ${r.routinesAdded} rutinas` : '')
+    const foodAdded = r.foodAdded + r.foodsAdded + r.mealsAdded
+    const gymText = (gymAdded > 0 ? ` y ${gymAdded} entradas de gym` : '') + (r.routinesAdded > 0 ? ` y ${r.routinesAdded} rutinas` : '') + (foodAdded > 0 ? ` y ${foodAdded} entradas de comida` : '')
     const msg = `¿Fusionar esta copia con tus datos? Se añaden ${r.added} registros nuevos (${r.existing} ya estaban) y ${r.trackersAdded} misiones nuevas${gymText}.`
       + (r.renamed > 0 ? ` ${r.renamed} registros coinciden en identificador con uno tuyo pero son distintos (p. ej. del ejemplo): se añaden aparte.` : '')
       + (r.conflicts.length ? ` En ${r.conflicts.join(', ')} la copia tiene otros cambios (nombre, incremento, objetivo, límite o archivado): se mantiene lo de este dispositivo.` : '')
@@ -401,7 +458,7 @@ export default function App() {
     if (hasData && !backupCurrent()) return setNotice('No se pudo guardar la copia interna, así que no se ha fusionado nada. Exporta una copia y vuelve a intentarlo.')
     setCanRestore(hasLastBackup()); unlockStorage()
     // una fusión puede juntar una serie viva de un dispositivo con la sesión retirada en el otro
-    setEvents([...r.events, ...ensureAuto(r.events, r.gym.log, setDays(r.gym.log))]); setCustom(r.custom); setGym(r.gym); setToast(null); setGain(null); setOvertake(null)
+    setEvents(withAutos(r.events, r.gym, r.food)); setCustom(r.custom); setGym(r.gym); setFood(r.food); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia fusionada: ${r.added} registros y ${r.trackersAdded} misiones nuevas${gymText}.`)
   }
 
@@ -412,20 +469,23 @@ export default function App() {
     if (r === 'unreadable') return setNotice('La copia interna está dañada y no se puede recuperar. Tus datos actuales no se han tocado.')
     const ev = r.events ?? events, cu = r.custom ?? custom
     // copia anterior al módulo Gym (r.gym null): se conserva el gym actual y se recrean las sesiones de los días con series
-    const ev2 = r.gym === null ? [...ev, ...ensureAuto(ev, gym.log, setDays(gym.log))] : ev
+    const gymF = r.gym ?? gym, foodF = r.food ?? food // copia anterior al módulo Comida (r.food null): se conserva la comida actual y se reevalúa Dieta
+    const ev2 = withAutos(ev, gymF, foodF)
+    const fLocal = foodCount(food)
+    const foodText = r.food ? ` Comida: ${fLocal} → ${foodCount(r.food)} entradas.` : fLocal > 0 ? ` Esta copia es anterior al módulo Comida: tus ${fLocal} entradas se conservan.` : ''
     const kLocal = liveSets(gym.log).length
     const gymText = r.gym ? ` Series de gym: ${kLocal} → ${liveSets(r.gym.log).length}.`
       : kLocal > 0 ? ` Esta copia es anterior al módulo Gym: tus ${kLocal} series de gym se conservan y los días con series vuelven a contar como sesión.` : ''
-    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''}${gymText} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
+    if (!window.confirm(`¿Recuperar la copia guardada antes de tu último «Importar» o «Borrar todo»? Se reemplazan tus ${events.length} registros y ${custom.trackers.length} misiones nuevas por ${ev.length} y ${cu.trackers.length}.${r.dropped ? ` Se ignorarán ${r.dropped} elementos no válidos.` : ''}${r.fixed ? ` Se corregirán ${r.fixed} elementos con campos no válidos.` : ''}${gymText}${foodText} Lo que tienes ahora queda guardado como copia: si cambias de idea, pulsa otra vez «Recuperar copia anterior».`)) return
     if (!restoreLast(r)) return setNotice('No se pudo recuperar la copia, así que no se ha cambiado nada. Exporta una copia y vuelve a intentarlo.')
-    setEvents(ev2); setCustom(cu); setGym(r.gym ?? gym); setToast(null); setGain(null); setOvertake(null)
+    setEvents(ev2); setCustom(cu); setGym(gymF); setFood(foodF); setToast(null); setGain(null); setOvertake(null)
     setNotice(`Copia recuperada: ${ev.length} registros y ${cu.trackers.length} misiones nuevas.`)
   }
 
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} foodToday={foodToday} onOpenFood={() => openFood('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />
@@ -444,16 +504,17 @@ export default function App() {
       {screen === 'party' && (
         <PartyView states={partyStates} selectedId={partyId} onSelect={setPartyId} global={game} today={today} />
       )}
-      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} focusGym={focusGym} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
+      {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onSaveGoal={saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
       {record && !toast && !overtake && <RecordBanner r={record} />}
       <p role="status" className="sr-only">{saveFailed ? SAVE_FAIL_TEXT : liveText(toast, overtake)}</p>
       <BottomNav screen={screen} onChange={goTo} />
-      {stale ? <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
-        : update && <UpdateBanner tone={screen === 'hero' || screen === 'gym' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
+      {stale ? <UpdateBanner tone={screen === 'hero' || screen === 'gym' || screen === 'food' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} text={STALE_TAB_TEXT} onReload={() => location.reload()} />
+        : update && <UpdateBanner tone={screen === 'hero' || screen === 'gym' || screen === 'food' ? 'hero' : screen === 'villain' ? 'villain' : 'app'} onReload={() => location.reload()} onClose={() => setUpdate(false)} />}
     </>
   )
 }

@@ -5,12 +5,15 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { parseBackup, parseCustom, readGym } from './storage'
+import { exportBackup, parseBackup, parseCustom, readFood, readGym } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
 import { capturePrompt, captureSchema, voicePrompt, voiceSchema } from './haiku'
 import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { CATALOG } from './foodCatalog'
+import { allFoods, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, goalOn, inRange, kcalRange, lastPortion, makeEntry, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, withDiet } from './food'
+import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
 // Oráculo de dominio. Si falla, se arregla el motor, nunca los asserts.
@@ -172,8 +175,8 @@ export function runSelfCheck() {
   ok(parseCustom('{roto').trackers.length === 0 && parseCustom(null).proposals.length === 0, 'clave corrupta → vacío')
   ok(parseCustom(JSON.stringify({ trackers: [med], proposals: pm })).proposals.length === 2, 'roundtrip custom')
 
-  ok(ids(byRecent(TRACKERS, SEED_EVENTS)) === 'gym,bjj,running,reading,beer,burgers', 'orden por uso: seed')
-  ok(ids(byRecent([...TRACKERS, med], [...tap(SEED_EVENTS, 'burgers'), { id: 'check-fix', trackerId: 'gym', amount: -1, occurredAt: `${DEMO_DATE}T13:00:00` }])) === 'custom-meditar,burgers,gym,bjj,running,reading,beer', 'orden por uso: sin uso primero, corrección no cuenta')
+  ok(ids(byRecent(TRACKERS, SEED_EVENTS)) === 'dieta,gym,bjj,running,reading,beer,burgers', 'orden por uso: seed')
+  ok(ids(byRecent([...TRACKERS, med], [...tap(SEED_EVENTS, 'burgers'), { id: 'check-fix', trackerId: 'gym', amount: -1, occurredAt: `${DEMO_DATE}T13:00:00` }])) === 'dieta,custom-meditar,burgers,gym,bjj,running,reading,beer', 'orden por uso: sin uso primero, corrección no cuenta')
 
   // A1 — un evento en un día pasado cuenta en su semana (mar 29 sep: tramo comparable de la semana anterior a DEMO_DATE)
   const past = get(deriveGame([...SEED_EVENTS, { id: 'check-past', trackerId: 'gym', amount: 1, occurredAt: '2026-09-29T20:00:00' }], DEMO_DATE), 'gym')
@@ -246,7 +249,7 @@ export function runSelfCheck() {
 
   // G1–G4 — objetivos editables de las fijas
   const ga = allTrackers([], { gym: 2 })
-  ok(ga[0].weeklyGoal === 2 && ga[1].weeklyGoal === 3 && TRACKERS[0].weeklyGoal === 4 && allTrackers([]).length === 6, 'G1 override sin mutar TRACKERS')
+  ok(ga[0].weeklyGoal === 2 && ga[1].weeklyGoal === 3 && TRACKERS[0].weeklyGoal === 4 && allTrackers([]).length === 7, 'G1 override sin mutar TRACKERS')
   ok(JSON.stringify(setGoal({}, 'gym', 2.6)) === '{"gym":3}' && [setGoal({ gym: 3 }, 'gym', null), setGoal({ gym: 3 }, 'gym', 4), setGoal({ gym: 3 }, 'gym', 0), setGoal({}, 'beer', 5), setGoal({}, 'custom-x', 5)].every(g => Object.keys(g).length === 0), 'G2 setGoal')
   ok(sumE(deriveGame(SEED_EVENTS, DEMO_DATE, allTrackers([], { gym: 1, running: 50 }))) === sumE(deriveGame(SEED_EVENTS, DEMO_DATE)), 'G3 XP invariante')
   const gt = allTrackers([], { gym: 3 }), gg = deriveGame(hv, DEMO_DATE, gt)
@@ -409,6 +412,27 @@ export function runSelfCheck() {
     const L2 = { ...L, gym: { ...lg, log: [gsx('s1', 100), { id: 'u0', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }] } }
     const dup = mergeBackup(L2, { events: [], custom: cu, gym: { log: [gsx('s1', 100), { id: 'u7', undoes: 's1', occurredAt: `${DEMO_DATE}T10:00:00` }], exercises: [] } })
     ok(dup.setsAdded === 0 && dup.gym.log.length === 2, 'GY12 deshacer duplicado = ya estaba')
+  }
+
+  // FD11 — comida en la fusión
+  {
+    const cu = { trackers: [] as Tracker[], proposals: [] as Proposal[] }, d = DEMO_DATE
+    const fl = (id: string, kcal: number): FoodEntry => ({ id, occurredAt: `${d}T10:00:00`, name: 'Arroz', kcal, qty: 100, p: 3, c: 20, f: 1, foodId: 'rice-white-cooked', base: 'g' })
+    const fo = (kcal: number) => ({ id: 'food-1', name: 'Mi tarta', base: 'g' as const, kcal, p: 5, c: 40, f: 12 })
+    const ml = { id: 'meal-1', name: 'Desayuno', items: [{ foodId: 'egg', qty: 100 }] }
+    const g1 = { from: '2026-10-01', kcal: 2000, p: 20, c: 50, f: 30 }
+    const lf: FoodData = { log: [fl('a', 195)], foods: [fo(300)], goals: [g1], meals: [ml] }
+    const L = { events: [] as ActivityEvent[], custom: cu, food: lf }
+    const inc = { events: [] as ActivityEvent[], custom: cu, food: { log: [fl('a', 250), { id: 'u1', undoes: 'a', occurredAt: `${d}T10:00:00` }, fl('b', 80)], foods: [fo(999), { ...fo(100), id: 'food-2', name: 'Otra' }],
+      goals: [{ ...g1, kcal: 2500 }, { ...g1, from: '2026-09-01' }], meals: [{ ...ml, items: [] }, { ...ml, id: 'meal-2' }] } as FoodData }
+    const before = JSON.stringify([L, inc]), m = mergeBackup(L, inc)
+    ok(m.food.log.map(x => x.id).join() === 'a,a~2,u1,b' && (m.food.log[2] as { undoes: string }).undoes === 'a~2' && m.foodAdded === 3 && m.foodsAdded === 1 && m.mealsAdded === 1 && m.goalsAdded === 1 &&
+      m.food.foods.map(x => x.id).join() === 'food-1,food-2' && m.food.foods[0].kcal === 300 && m.food.goals?.map(g => `${g.from}:${g.kcal}`).join() === '2026-09-01:2000,2026-10-01:2000' && m.food.meals?.map(x => x.id).join() === 'meal-1,meal-2' &&
+      m.conflicts.includes('Mi tarta') && m.conflicts.includes('Desayuno') && m.conflicts.includes('Objetivo de calorías') && m.changed && JSON.stringify([L, inc]) === before, 'FD11 fusión: colisión id~2, conflictos y sin mutar')
+    const again = mergeBackup({ ...L, food: m.food }, inc)
+    const none = mergeBackup(L, { events: [], custom: cu }), onlyGoal = mergeBackup(L, { events: [], custom: cu, food: { log: [], foods: [], goals: [{ ...g1, from: '2026-09-15' }] } })
+    ok(again.foodAdded === 0 && again.foodsAdded === 0 && again.mealsAdded === 0 && again.goalsAdded === 0 && !again.changed && JSON.stringify(none.food) === JSON.stringify(lf) && !none.changed && none.foodAdded === 0 &&
+      onlyGoal.changed && onlyGoal.goalsAdded === 1 && !mergeBackup({ events: [], custom: cu }, { events: [], custom: cu }).food.goals, 'FD11 idempotente, copia sin comida, solo objetivos')
   }
 
   // GY6–GY10, GY13 — sesión automática
@@ -703,6 +727,90 @@ export function runSelfCheck() {
       const sch = captureSchema(['a'], ['b']), pr = capturePrompt('hola <b>', ctx)
       ok(sch.properties.exerciseId.enum.join() === 'a,none' && sch.properties.trackerId.enum.join() === 'b,none' && sch.required.length === 17 && sch.required.every(k => k in sch.properties) &&
         sch.additionalProperties === false && !pr.includes('Ajedrez') && !pr.includes('<b>') && pr.includes('<habitos>') && pr.includes('reading: Reading · HERO · min'), 'CV9 esquema y prompt')
+    }
+  }
+
+  // FD — módulo Comida
+  {
+    const fd = DEMO_DATE, fdY = addDays(DEMO_DATE, -1)
+    const arroz = CATALOG.find(f => f.id === 'rice-white-cooked')!
+    const cat = CATALOG, uniq = (xs: string[]) => new Set(xs).size === xs.length
+    ok(cat.length >= 100 && cat.length <= 150 && uniq(cat.map(f => f.id)) && cat.every(f => /^[a-z0-9-]+$/.test(f.id) && !f.id.startsWith('food-')) && uniq(cat.map(f => fold(f.name))) &&
+      cat.every(f => [f.kcal, f.p, f.c, f.f].every(x => Number.isFinite(x) && x >= 0) && f.kcal <= 900 && f.p + f.c + f.f <= 100 && Math.abs(f.kcal - (4 * f.p + 4 * f.c + 9 * f.f)) <= Math.max(20, 0.12 * f.kcal) &&
+        (f.source === 'usda' || f.source === 'bedca') && !!f.ref && (f.source !== 'usda' || /^\d+$/.test(f.ref!)) && (f.servings ?? []).every(s => s.qty > 0) && uniq((f.servings ?? []).map(s => s.name))), 'FD1 catálogo coherente')
+    const fe = makeEntry({ ...arroz, kcal: 130 }, { qty: 100, serving: { name: 'Unidad', n: 2 } }, 'e', `${fd}T10:00:00`)
+    ok(portion({ ...arroz, kcal: 130 }, 150).kcal === 195 && fe.qty === 100 && fe.serving?.n === 2 && fe.name === arroz.name && fe.foodId === arroz.id && fe.base === 'g' && fe.kcal === 130 &&
+      !('via' in fe) && quickEntry({ kcal: 300 }, 'q', `${fd}T10:00:00`).name === 'Añadido rápido' && quickEntry({ kcal: 300 }, 'q', `${fd}T10:00:00`).qty === 0, 'FD2 portion/makeEntry')
+    const en = (id: string, kcal: number, day = fd, o: Partial<FoodEntry> = {}): FoodEntry => ({ id, occurredAt: `${day}T10:00:00`, name: 'x', kcal, qty: 100, p: 5, c: 10, f: 2, foodId: 'rice-white-cooked', base: 'g', ...o })
+    const log3: FoodLogEntry[] = [en('a', 100), en('b', 200), { id: 'u', undoes: 'b', occurredAt: `${fd}T10:00:00` }, quickEntry({ kcal: 300 }, 'q', `${fd}T11:00:00`), en('o', 500, fdY)]
+    const t3 = dayTotals(log3, fd)
+    ok(t3.kcal === 400 && t3.p === 5 && t3.c === 10 && t3.f === 2 && t3.entries === 2 && dayTotals(log3, fdY).kcal === 500 && dayTotals([], fd).entries === 0, 'FD3 dayTotals')
+    const g0: FoodGoal[] = [{ from: '2026-10-05', kcal: 2000, p: 20, c: 50, f: 30 }], g1 = setFoodGoal(g0, { kcal: 2200, p: 20, c: 50, f: 30 }, '2026-10-08'), g2 = setFoodGoal(g1, { kcal: 2400, p: 20, c: 50, f: 30 }, '2026-10-08')
+    ok(goalOn(g0, '2026-09-01')?.kcal === 2000 && goalOn(g1, fd)?.kcal === 2000 && goalOn(g1, '2026-10-08')?.kcal === 2200 && goalOn(g1, '2026-12-01')?.kcal === 2200 && g2.length === 2 && g2[1].kcal === 2400 && g1.length === 2 && g0.length === 1 && goalOn([], fd) === null &&
+      goalOn(undefined, fd) === null, 'FD4 goalOn/setFoodGoal')
+    const gd = (k: number, goal = 2200): FoodData => ({ log: [en('z', k)], foods: [], goals: [{ from: fd, kcal: goal, p: 20, c: 50, f: 30 }] })
+    ok(kcalRange(2200).min === 1980 && kcalRange(2200).max === 2420 && kcalRange(1990).min === 1791 && kcalRange(1990).max === 2189 && kcalRange(2000).min === 1800 && kcalRange(2000).max === 2200 &&
+      inRange(gd(1800, 2000), fd) && inRange(gd(2200, 2000), fd) && !inRange(gd(1799, 2000), fd) && !inRange(gd(2201, 2000), fd) && inRange(gd(1980), fd) && !inRange(gd(1979), fd) && !inRange({ log: [en('z', 2000)], foods: [] }, fd), 'FD5 kcalRange/inRange')
+    const mine = (id: string, name: string, o: Partial<Food> = {}): Food => ({ id, name, base: 'g', kcal: 100, p: 1, c: 1, f: 1, ...o })
+    const sf = (q: string, custom: Food[] = []) => searchFoods(q, allFoods(custom)).map(f => f.name)
+    const own = [mine('food-1', 'Arroz casero'), mine('food-2', 'Arroz viejo', { archived: true }), mine('food-3', 'Tarta de arroz')]
+    const ord = searchFoods('arroz', [mine('food-a', 'Pan de arroz'), mine('food-b', 'Arroz'), mine('food-c', 'Arroz con leche'), mine('food-d', 'Tortitas de arroz tostadas'), mine('food-e', 'Sopa de arroz y pollo')])
+    ok(sf('platano')[0] === 'Plátano' && sf('PLÁTANO ')[0] === 'Plátano' && sf('papa')[0].startsWith('Patata') && sf('judias verdes')[0] === 'Judías verdes' && sf('').length === 0 && sf('  ').length === 0 &&
+      ord.map(f => f.id).join() === 'food-b,food-c,food-a,food-d,food-e' && !sf('arroz', own).includes('Arroz viejo') && sf('arroz', own).indexOf('Arroz casero') < sf('arroz', own).indexOf('Arroz blanco cocido') &&
+      searchFoods('a', allFoods([]), 5).length === 5 && searchFoods('a', allFoods([])).length <= 20 && sf('zzzz').length === 0, 'FD12 searchFoods')
+    const l13: FoodLogEntry[] = [en('1', 100, '2026-10-01', { foodId: 'egg', qty: 50 }), en('2', 100, '2026-10-03', { foodId: 'oats', qty: 40 }), en('3', 100, '2026-10-03', { foodId: 'apple', qty: 90, serving: { name: 'Unidad', n: 0.5 } }),
+      en('4', 100, '2026-10-05', { foodId: 'egg', qty: 100, serving: { name: 'Unidad', n: 2 } }), en('5', 100, '2026-10-06', { foodId: 'milk-whole', qty: 250 }), { id: 'u5', undoes: '5', occurredAt: '2026-10-06T10:00:00' },
+      en('6', 100, '2026-08-01', { foodId: 'banana', qty: 120 }), quickEntry({ kcal: 50 }, 'q', '2026-10-06T12:00:00')]
+    const rc = recentFoods(l13), fr = frequentFoods(l13, fd)
+    ok(rc.map(r => r.foodId).join() === 'egg,apple,oats,banana' && rc[0].last.qty === 100 && rc[0].last.serving?.n === 2 && recentFoods(l13, 2).length === 2 && !rc.some(r => r.foodId === 'milk-whole') &&
+      fr.map(r => r.foodId).join() === 'egg,apple,oats' && !fr.some(r => r.foodId === 'banana') && lastPortion(l13, 'apple')?.serving?.n === 0.5 && lastPortion(l13, 'milk-whole') === null &&
+      frequentFoods(l13, '2026-10-30').map(r => r.foodId).join() === 'egg,apple,oats' && frequentFoods(l13, '2026-11-20').length === 0, 'FD13 recientes/frecuentes')
+    ok(parseQty('150,5') === 150.5 && parseQty('150.55') === 150.6 && parseQty('0') === null && parseQty('2001') === null && parseQty('2000') === 2000 && parseQty('x') === null && parseQty(' 12 ') === 12 &&
+      parseServings('1,3') === 1.25 && parseServings('0.1') === null && parseServings('51') === null && parseKcal('1000') === 1000 && parseKcal('0') === null && parseKcal('10001') === null &&
+      parseMacro('') === undefined && parseMacro('12,34') === 12.3 && parseMacro('x') === null && parsePct('30') === 30 && parsePct('101') === null && parsePct('3.5') === null &&
+      fmtKcal(1640) === '1.640' && fmtKcal(999) === '999' && fmtKcal(12345.4) === '12.345', 'FD17 parsers y fmtKcal')
+
+    // FD9, FD10 — persistencia de la comida
+    {
+      const fo = { id: 'food-1', name: 'Mi tarta', base: 'g', kcal: 300, p: 5, c: 40, f: 12, servings: [{ name: 'Trozo', qty: 80 }], source: 'off' }
+      const dat = { log: [{ ...en('e1', 195), via: 'voice' }, { id: 'u1', undoes: 'e1', occurredAt: `${fd}T10:00:00` }], foods: [fo], futuro: { a: 1 }, goals: [{ from: fd, kcal: 2000, p: 20, c: 50, f: 30 }], meals: [{ id: 'meal-1', name: 'Desayuno', items: [{ foodId: 'egg', qty: 100 }] }] }
+      const r9 = readFood(JSON.parse(JSON.stringify(dat)))
+      const bad9 = readFood({ log: [en('ok', 1), { ...en('b1', 1), kcal: -1 }, { ...en('b2', 1), qty: 0 }, null], foods: [{ ...fo, servings: [{ name: 'a', qty: 5 }, { name: '', qty: 5 }] }, fo, { ...fo, id: 'sin' }],
+        goals: [{ from: fd, kcal: 2000, p: 20, c: 50, f: 20 }], meals: [{ id: 'meal-1', name: 'a', items: [{ foodId: 'x', qty: 1 }] }, { id: 'meal-1', name: 'b', items: [{ foodId: 'x', qty: 1 }] }] })
+      ok(r9 !== null && r9.dropped === 0 && r9.fixed === 0 && JSON.stringify(r9.data) === JSON.stringify(dat) && bad9?.data.log.length === 1 && bad9.data.foods.length === 1 && bad9.data.foods[0].servings?.length === 1 &&
+        !bad9.data.goals && bad9.data.meals?.length === 1 && bad9.dropped === 7 && bad9.fixed === 1 && readFood('x') === null && readFood({ log: 3 }) === null, 'FD9 readFood')
+      const bk = parseBackup(exportBackup([], { trackers: [], proposals: [] }, 'x', undefined, dat as FoodData)), raw = (f: unknown) => JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt: 'x', events: [], custom: { trackers: [], proposals: [] }, food: f })
+      ok(JSON.stringify(bk?.food) === JSON.stringify(dat) && parseBackup(exportBackup([], { trackers: [], proposals: [] }, 'x'))?.food === null && parseBackup(raw('roto')) === null && parseBackup(raw({ log: [null] }))?.dropped === 1, 'FD10 copias con comida')
+    }
+
+    // FD6-FD8, FD16 — Dieta en vivo
+    {
+      let n = 0
+      const u = () => `fd-${++n}`, D = fd, goal = (kcal: number, from = '2026-10-01'): FoodGoal[] => [{ from, kcal, p: 20, c: 50, f: 30 }]
+      const fdata = (kcal: number, day = D, goals = goal(2000)): FoodData => ({ log: [en(`e-${day}`, kcal, day)], foods: [], goals })
+      const dev = (e: Partial<ActivityEvent>): ActivityEvent => ({ id: 'm', trackerId: 'dieta', amount: 1, occurredAt: `${D}T09:00:00`, ...e })
+      const add6 = dietSync([], fdata(1900), [D], D, u)
+      ok(add6.length === 1 && add6[0].id === `dieta-auto-${D}` && add6[0].occurredAt === `${D}T12:00:00` && add6[0].amount === 1 && add6[0].trackerId === 'dieta' &&
+        dietSync(add6, fdata(1900), [D], D, u).length === 0 && dietSync([dev({})], fdata(1900), [D], D, u).length === 0 &&
+        dietSync([], fdata(1900, addDays(D, 1)), [addDays(D, 1)], D, u).length === 0 && dietSync([], fdata(3000), [D], D, u).length === 0 && dietSync([], { log: [], foods: [] }, [D], D, u).length === 0, 'FD6 dietSync: añadir')
+      const auto = add6[0], out7 = dietSync(add6, fdata(3000), [D], D, u), after7 = [...add6, ...out7]
+      const mix = dietSync([auto, dev({})], fdata(3000), [D], D, u)
+      const minus = dev({ id: 'mm', amount: -1, undoes: auto.id, occurredAt: auto.occurredAt })
+      const back = dietSync(after7, fdata(1900), [D], D, u), rep = dietSync([auto, minus], fdata(1900), [D], D, u)
+      ok(out7.length === 1 && out7[0].amount === -1 && out7[0].undoes === auto.id && out7[0].occurredAt === auto.occurredAt && dayTotal(after7, 'dieta', D) === 0 && dietSync(after7, fdata(3000), [D], D, u).length === 0 &&
+        mix.length === 1 && mix[0].undoes === auto.id && dayTotal([auto, dev({}), ...mix], 'dieta', D) === 1 &&
+        back.length === 1 && back[0].id === `dieta-auto-${D}-2` && rep.length === 1 && rep[0].id === `dieta-auto-${D}-2` && dayTotal([auto, minus, ...rep], 'dieta', D) === 1, 'FD7 dietSync: retirar y reponer')
+      const d1 = addDays(D, -2), d2 = addDays(D, -1), tlog = [d1, d2, D].map(d => en(`t-${d}`, 1900, d))
+      const base8: FoodData = { log: tlog, foods: [], goals: goal(2000, addDays(D, -5)) }
+      const ev8 = dietSync([], base8, dietDays(base8, []), D, u)
+      const g8 = { ...base8, goals: setFoodGoal(base8.goals, { kcal: 1000, p: 20, c: 50, f: 30 }, D) }
+      const ch8 = dietSync(ev8, g8, dietDays(g8, ev8), D, u)
+      const first = { log: tlog, foods: [] } as FoodData, first2 = { ...first, goals: setFoodGoal(undefined, { kcal: 2000, p: 20, c: 50, f: 30 }, D) }
+      const fe8 = dietSync([], first2, dietDays(first2, []), D, u)
+      ok(ev8.length === 3 && ch8.length === 1 && ch8[0].undoes === `dieta-auto-${D}` && ch8[0].occurredAt.startsWith(D) && fe8.map(e => e.id.slice(-10)).join() === [d1, d2, D].join() && dietDays(g8, ev8).join() === [d1, d2, D].join(), 'FD8 cambio de objetivo')
+      const act = (f: FoodData, evs: ActivityEvent[] = []) => dietActive(f, evs), off = withDiet(TRACKERS, false), on = withDiet(TRACKERS, true)
+      ok(off.find(t => t.id === 'dieta')?.archived === true && !TRACKERS.find(t => t.id === 'dieta')?.archived && off.filter(t => t.id !== 'dieta').every(t => TRACKERS.includes(t)) && on === TRACKERS &&
+        !act({ log: [], foods: [] }) && !act({ log: [en('x', 1)], foods: [] }) && act({ log: [], foods: [], goals: goal(2000) }) && act({ log: [], foods: [] }, [dev({})]) && !act({ log: [], foods: [] }, [dev({ trackerId: 'gym' })]), 'FD16 withDiet/dietActive')
     }
   }
 

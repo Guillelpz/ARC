@@ -1,6 +1,6 @@
 import { House, Moon, Shield, Sparkles, User, Users, type LucideIcon } from 'lucide-react'
 
-export type Screen = 'home' | 'hero' | 'villain' | 'new' | 'party' | 'me' | 'gym'
+export type Screen = 'home' | 'hero' | 'villain' | 'new' | 'party' | 'me' | 'gym' | 'food'
 
 const ITEMS: { screen: Screen; label: string; Icon: LucideIcon }[] = [
   { screen: 'home', label: 'Inicio', Icon: House },
@@ -16,7 +16,7 @@ export function BottomNav({ screen, onChange }: { screen: Screen; onChange: (s: 
     <nav aria-label="Principal" className="vt-nav fixed inset-x-0 bottom-0 z-40 border-t border-app-border bg-app-surface pb-[env(safe-area-inset-bottom)]">
       <ul className="mx-auto grid max-w-md grid-cols-6">
         {ITEMS.map(({ screen: s, label, Icon }) => {
-          const active = screen === s || (s === 'me' && screen === 'gym') // Gym cuelga de «Yo»
+          const active = screen === s || (s === 'me' && (screen === 'gym' || screen === 'food')) // Gym y Comida cuelgan de «Yo»
           return (
           <li key={s}>
             <button

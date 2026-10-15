@@ -1,14 +1,16 @@
-import type { ActivityEvent, CustomData, Exercise, GoalLogEntry, Goals, GymData, GymEntry, Limits, Proposal, Routine, Tracker } from './types'
+import type { ActivityEvent, CustomData, Exercise, Food, FoodData, FoodGoal, FoodLogEntry, GoalLogEntry, Goals, GymData, GymEntry, Limits, Meal, Proposal, Routine, Tracker } from './types'
 import { defaultGoal, isFixedVillain } from './trackers'
 import { mondayOf } from './stats'
 import { EMPTY_GYM } from './gym'
+import { EMPTY_FOOD } from './food'
 import { readMemo, type Memo } from './memory'
 
 const KEY = 'life-rpg-demo-v1'
 const CUSTOM_KEY = 'life-rpg-custom-v1'
 export const GYM_KEY = 'life-rpg-gym-v1'
+export const FOOD_KEY = 'life-rpg-food-v1'
 export const EMPTY_CUSTOM: CustomData = { trackers: [], proposals: [] }
-export { EMPTY_GYM }
+export { EMPTY_GYM, EMPTY_FOOD }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 
@@ -151,16 +153,109 @@ export function readGym(v: unknown): Parsed<GymData> {
   return { data, dropped: rawL.length - log.length + rawE.length - exercises.length + rDropped, fixed: fixedN }
 }
 
+const KNOWN_FOOD = new Set(['log', 'foods', 'goals', 'meals', '__proto__'])
+const inRange = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi
+const strLen = (v: unknown, lo: number, hi: number): v is string => typeof v === 'string' && v.trim().length >= lo && v.length <= hi
+const validServing = (x: unknown) => isObj(x) && strLen(x.name, 1, 30) && typeof x.qty === 'number' && x.qty > 0 && x.qty <= 2000
+const validPortionServing = (x: unknown) => isObj(x) && strLen(x.name, 1, 30) && inRange(x.n, 0.25, 50)
+
+// Entradas no válidas → se descartan (`dropped`); la válida se guarda tal cual, con sus campos desconocidos.
+const validFoodEntry = (e: unknown): e is FoodLogEntry => {
+  if (!isObj(e)) return false
+  if ('undoes' in e) return isStr(e.id) && isStr(e.undoes) && typeof e.occurredAt === 'string' && STAMP.test(e.occurredAt)
+  if (!(isStr(e.id) && typeof e.occurredAt === 'string' && STAMP.test(e.occurredAt) && strLen(e.name, 1, 60) && inRange(e.kcal, 0, 20000) && inRange(e.qty, 0, 2000))) return false
+  if (e.qty === 0 && e.foodId !== undefined) return false
+  for (const k of ['p', 'c', 'f'] as const) if (e[k] !== undefined && !inRange(e[k], 0, 2000)) return false
+  if (e.foodId !== undefined && !isStr(e.foodId)) return false
+  if ((e.foodId !== undefined || e.base !== undefined) && e.base !== 'g' && e.base !== 'ml') return false
+  return e.serving === undefined || validPortionServing(e.serving)
+}
+
+// Alimento propio no válido → null; servings/aliases con elementos no válidos → se quitan (`fixed`); campos de tipo incorrecto → se quitan.
+function readFoodItem(x: unknown): { f: Food; fixed: number } | null {
+  if (!isObj(x) || typeof x.id !== 'string' || !x.id.startsWith('food-') || x.id.length <= 5 || !strLen(x.name, 1, 40) || (x.base !== 'g' && x.base !== 'ml') ||
+    !inRange(x.kcal, 0, 900) || !inRange(x.p, 0, 100) || !inRange(x.c, 0, 100) || !inRange(x.f, 0, 100)) return null
+  const f = { ...x } as Record<string, unknown>
+  let fixed = 0
+  const clean = (k: 'servings' | 'aliases', ok: (v: unknown) => boolean, max: number) => {
+    if (f[k] === undefined) return
+    const arr = Array.isArray(f[k]) ? (f[k] as unknown[]) : null
+    if (!arr) { delete f[k]; fixed++; return }
+    const good = arr.filter(ok).slice(0, max)
+    if (good.length !== arr.length) fixed++
+    if (good.length) f[k] = good; else delete f[k]
+  }
+  clean('servings', validServing, 5)
+  clean('aliases', v => strLen(v, 1, 40), 10)
+  if (f.archived !== undefined && typeof f.archived !== 'boolean') { delete f.archived; fixed++ }
+  if (f.source !== undefined && !(typeof f.source === 'string' && f.source.length <= 20)) { delete f.source; fixed++ }
+  if (f.ref !== undefined && !(typeof f.ref === 'string' && f.ref.length <= 100)) { delete f.ref; fixed++ }
+  return { f: f as unknown as Food, fixed }
+}
+
+const validGoal = (g: unknown): g is FoodGoal => isObj(g) && typeof g.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(g.from) && Number.isInteger(g.kcal) && inRange(g.kcal, 800, 10000) &&
+  [g.p, g.c, g.f].every(v => Number.isInteger(v) && inRange(v, 0, 100)) && (g.p as number) + (g.c as number) + (g.f as number) === 100
+
+function readMeal(x: unknown): { m: Meal; fixed: number } | null {
+  if (!isObj(x) || typeof x.id !== 'string' || !x.id.startsWith('meal-') || x.id.length <= 5 || !strLen(x.name, 1, 40) || !Array.isArray(x.items)) return null
+  const items: Meal['items'] = []
+  let fixed = 0
+  for (const i of x.items) {
+    if (isObj(i) && isStr(i.foodId) && typeof i.qty === 'number' && i.qty > 0 && i.qty <= 2000 && (i.serving === undefined || validPortionServing(i.serving)) && items.length < 20) items.push(i as Meal['items'][number])
+    else fixed++
+  }
+  return items.length ? { m: { ...x, items } as Meal, fixed } : null
+}
+
+export function readFood(v: unknown): Parsed<FoodData> {
+  if (!isObj(v)) return null
+  if ((v.log !== undefined && !Array.isArray(v.log)) || (v.foods !== undefined && !Array.isArray(v.foods))) return null
+  const rawL: unknown[] = v.log ?? [], rawF: unknown[] = v.foods ?? []
+  const log = rawL.filter(validFoodEntry)
+  let dropped = rawL.length - log.length, fixed = 0
+  const foods: Food[] = []
+  for (const x of rawF) {
+    const r = readFoodItem(x)
+    if (r && !foods.some(y => y.id === r.f.id)) { foods.push(r.f); fixed += r.fixed } else dropped++
+  }
+  const data = { log, foods } as FoodData
+  for (const [k, x] of Object.entries(v)) if (!KNOWN_FOOD.has(k)) (data as unknown as Record<string, unknown>)[k] = x
+  if (v.goals !== undefined) {
+    if (!Array.isArray(v.goals)) dropped++
+    else {
+      const goals: FoodGoal[] = []
+      for (const g of v.goals) {
+        if (!validGoal(g)) { dropped++; continue }
+        const at = goals.findIndex(y => y.from === g.from)
+        if (at >= 0) { goals[at] = g; fixed++ } else goals.push(g) // from repetido: gana el último
+      }
+      if (goals.length) data.goals = goals
+    }
+  }
+  if (v.meals !== undefined) {
+    if (!Array.isArray(v.meals)) dropped++
+    else {
+      const meals: Meal[] = []
+      for (const x of v.meals) {
+        const r = readMeal(x)
+        if (r && !meals.some(y => y.id === r.m.id)) { meals.push(r.m); fixed += r.fixed } else dropped++
+      }
+      if (meals.length) data.meals = meals
+    }
+  }
+  return { data, dropped, fixed }
+}
+
 export const parseCustom = (raw: string | null): CustomData => readCustom(json(raw ?? 'null'))?.data ?? EMPTY_CUSTOM
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>
 export type LoadProblem = { key: string; dropped: number | null; fixed: number; backupKey: string | null } // dropped null = ilegible (fixed 0); backupKey null = no se pudo copiar → clave bloqueada
-export type Loaded = { events: ActivityEvent[]; custom: CustomData; gym: GymData; problems: LoadProblem[] }
+export type Loaded = { events: ActivityEvent[]; custom: CustomData; gym: GymData; food: FoodData; problems: LoadProblem[] }
 
 const locked = new Set<string>() // claves que no se pueden escribir en esta sesión
 export const unlockStorage = () => locked.clear()
 // Solo desde onStorage: otra pestaña guardó datos que esta no ha podido leer. Al arrancar no se usa (bloquearía para siempre).
-export const lockStorage = (keys: readonly string[] = [KEY, CUSTOM_KEY, GYM_KEY]) => keys.forEach(k => locked.add(k))
+export const lockStorage = (keys: readonly string[] = [KEY, CUSTOM_KEY, GYM_KEY, FOOD_KEY]) => keys.forEach(k => locked.add(k))
 
 // ponytail: restaurar `.backup.<stamp>` es manual (DevTools); no se purgan; uno por incidente de datos dañados.
 export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
@@ -179,7 +274,8 @@ export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
   const events = load(KEY, readEvents, [], [])
   const custom = load(CUSTOM_KEY, readCustom, EMPTY_CUSTOM, EMPTY_CUSTOM)
   const gym = load(GYM_KEY, readGym, EMPTY_GYM, EMPTY_GYM)
-  return { events, custom, gym, problems }
+  const food = load(FOOD_KEY, readFood, EMPTY_FOOD, EMPTY_FOOD)
+  return { events, custom, gym, food, problems }
 }
 
 // true = escrito; false = setItem lanzó (cuota, modo privado…); null = clave bloqueada, no se intenta (lo avisa noticeFor)
@@ -197,18 +293,26 @@ export const saveGym = (g: GymData, store: Store = localStorage): boolean | null
   try { store.setItem(GYM_KEY, JSON.stringify(g)); return true } catch { return false }
 }
 
-export type Backup = { app: 'rpg-life-tracker'; version: 1; exportedAt: string; events: ActivityEvent[]; custom: CustomData; gym?: GymData }
+// ponytail: ~200 B por entrada y ~10 al día → ~0,7 MB al año; con el resto de claves, el límite de localStorage (~5 MB) llega a los ~5 años. El fallo se avisa con SaveFailBanner.
+export const saveFood = (d: FoodData, store: Store = localStorage): boolean | null => {
+  if (locked.has(FOOD_KEY)) return null
+  try { store.setItem(FOOD_KEY, JSON.stringify(d)); return true } catch { return false }
+}
 
-export const exportBackup = (events: ActivityEvent[], custom: CustomData, exportedAt: string, gym?: GymData): string =>
-  JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt, events, custom, ...(gym && { gym }) } satisfies Backup, null, 2)
+export type Backup = { app: 'rpg-life-tracker'; version: 1; exportedAt: string; events: ActivityEvent[]; custom: CustomData; gym?: GymData; food?: FoodData }
 
-export function parseBackup(raw: string): { events: ActivityEvent[]; custom: CustomData; gym: GymData | null; dropped: number; fixed: number } | null {
+export const exportBackup = (events: ActivityEvent[], custom: CustomData, exportedAt: string, gym?: GymData, food?: FoodData): string =>
+  JSON.stringify({ app: 'rpg-life-tracker', version: 1, exportedAt, events, custom, ...(gym && { gym }), ...(food && { food }) } satisfies Backup, null, 2)
+
+export function parseBackup(raw: string): { events: ActivityEvent[]; custom: CustomData; gym: GymData | null; food: FoodData | null; dropped: number; fixed: number } | null {
   const v = json(raw)
   if (!isObj(v) || v.app !== 'rpg-life-tracker' || v.version !== 1) return null
   const e = readEvents(v.events), c = readCustom(v.custom)
   const g = v.gym === undefined ? undefined : readGym(v.gym) // sin campo = copia anterior al módulo Gym (null); ilegible = copia inválida
   if (g === null) return null
-  return e && c ? { events: e.data, custom: c.data, gym: g?.data ?? null, dropped: e.dropped + c.dropped + (g?.dropped ?? 0), fixed: e.fixed + c.fixed + (g?.fixed ?? 0) } : null
+  const fo = v.food === undefined ? undefined : readFood(v.food) // sin campo = copia anterior al módulo Comida (null); ilegible = copia inválida
+  if (fo === null) return null
+  return e && c ? { events: e.data, custom: c.data, gym: g?.data ?? null, food: fo?.data ?? null, dropped: e.dropped + c.dropped + (g?.dropped ?? 0) + (fo?.dropped ?? 0), fixed: e.fixed + c.fixed + (g?.fixed ?? 0) + (fo?.fixed ?? 0) } : null
 }
 
 export type Meta = { lastExportAt: string } // ISO 8601 (Date.toISOString())
@@ -216,7 +320,7 @@ export type CopyStatus = { days: number | null; due: boolean } // days null = nu
 
 export const META_KEY = 'life-rpg-meta-v1'
 // null = localStorage.clear() en otra pestaña
-export const isDataKey = (k: string | null) => k === null || k === KEY || k === CUSTOM_KEY || k === GYM_KEY
+export const isDataKey = (k: string | null) => k === null || k === KEY || k === CUSTOM_KEY || k === GYM_KEY || k === FOOD_KEY
 // ponytail: recordatorio fijo a 14 días; hacerlo configurable si alguien lo pide o cuando haya copias automáticas.
 export const EXPORT_REMIND_DAYS = 14
 
@@ -241,7 +345,7 @@ export const backupDue = (lastExportAt: string | null, now: Date, hasData: boole
   return { days, due: hasData && (days === null || days >= EXPORT_REMIND_DAYS) }
 }
 
-const EMPTY_RAW: Record<string, string> = { [KEY]: '[]', [CUSTOM_KEY]: JSON.stringify(EMPTY_CUSTOM), [GYM_KEY]: JSON.stringify(EMPTY_GYM) }
+const EMPTY_RAW: Record<string, string> = { [KEY]: '[]', [CUSTOM_KEY]: JSON.stringify(EMPTY_CUSTOM), [GYM_KEY]: JSON.stringify(EMPTY_GYM), [FOOD_KEY]: JSON.stringify(EMPTY_FOOD) }
 type WStore = Store & Partial<Pick<Storage, 'removeItem'>>
 
 // Escribe todo o revierte lo escrito (removeItem si no existía). false si algo falla. No lanza.
@@ -263,7 +367,7 @@ function writeAll(store: WStore, writes: [string, string][]): boolean {
 export function backupCurrent(store: WStore = localStorage): boolean {
   const writes: [string, string][] = []
   try {
-    for (const k of [KEY, CUSTOM_KEY, GYM_KEY]) {
+    for (const k of [KEY, CUSTOM_KEY, GYM_KEY, FOOD_KEY]) {
       const raw = store.getItem(k)
       if (raw === null) continue
       const last = store.getItem(`${k}.backup.last`)
@@ -275,21 +379,22 @@ export function backupCurrent(store: WStore = localStorage): boolean {
 }
 
 // null en una rama = esa clave no tiene .backup.last
-export type LastBackup = { events: ActivityEvent[] | null; custom: CustomData | null; gym: GymData | null; dropped: number; fixed: number }
+export type LastBackup = { events: ActivityEvent[] | null; custom: CustomData | null; gym: GymData | null; food: FoodData | null; dropped: number; fixed: number }
 
 export function hasLastBackup(store: Pick<Storage, 'getItem'> = localStorage): boolean {
-  try { return [KEY, CUSTOM_KEY, GYM_KEY].some(k => store.getItem(`${k}.backup.last`) !== null) } catch { return false }
+  try { return [KEY, CUSTOM_KEY, GYM_KEY, FOOD_KEY].some(k => store.getItem(`${k}.backup.last`) !== null) } catch { return false }
 }
 
 export function readLast(store: Pick<Storage, 'getItem'> = localStorage): LastBackup | 'none' | 'unreadable' {
-  const out: LastBackup = { events: null, custom: null, gym: null, dropped: 0, fixed: 0 }
+  const out: LastBackup = { events: null, custom: null, gym: null, food: null, dropped: 0, fixed: 0 }
   try {
-    const ev = store.getItem(`${KEY}.backup.last`), cu = store.getItem(`${CUSTOM_KEY}.backup.last`), gy = store.getItem(`${GYM_KEY}.backup.last`)
+    const ev = store.getItem(`${KEY}.backup.last`), cu = store.getItem(`${CUSTOM_KEY}.backup.last`), gy = store.getItem(`${GYM_KEY}.backup.last`), fd = store.getItem(`${FOOD_KEY}.backup.last`)
     if (ev !== null) { const r = readEvents(json(ev)); if (!r) return 'unreadable'; out.events = r.data; out.dropped += r.dropped; out.fixed += r.fixed }
     if (cu !== null) { const r = readCustom(json(cu)); if (!r) return 'unreadable'; out.custom = r.data; out.dropped += r.dropped; out.fixed += r.fixed }
     if (gy !== null) { const r = readGym(json(gy)); if (!r) return 'unreadable'; out.gym = r.data; out.dropped += r.dropped; out.fixed += r.fixed }
+    if (fd !== null) { const r = readFood(json(fd)); if (!r) return 'unreadable'; out.food = r.data; out.dropped += r.dropped; out.fixed += r.fixed }
   } catch { return 'unreadable' }
-  return out.events === null && out.custom === null && out.gym === null ? 'none' : out
+  return out.events === null && out.custom === null && out.gym === null && out.food === null ? 'none' : out
 }
 
 // Intercambia `.backup.last` con el estado actual. No usa backupCurrent: machacaría la copia.
@@ -297,7 +402,7 @@ export function readLast(store: Pick<Storage, 'getItem'> = localStorage): LastBa
 export function restoreLast(r: LastBackup, store: WStore = localStorage): boolean {
   const writes: [string, string][] = [], keys: string[] = []
   try {
-    for (const [k, v] of [[KEY, r.events], [CUSTOM_KEY, r.custom], [GYM_KEY, r.gym]] as const) {
+    for (const [k, v] of [[KEY, r.events], [CUSTOM_KEY, r.custom], [GYM_KEY, r.gym], [FOOD_KEY, r.food]] as const) {
       if (v === null) continue
       writes.push([`${k}.backup.last`, store.getItem(k) ?? EMPTY_RAW[k]], [k, JSON.stringify(v)])
       keys.push(k)
