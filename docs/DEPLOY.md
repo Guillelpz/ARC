@@ -75,3 +75,10 @@ GitHub Pages está activo en `https://guillelpz.github.io/ARC/`. La app es un si
   - [ ] 320 px sin scroll horizontal en Gym, «Hoy» y «Yo».
 
 Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`. En Git Bash, antepón `MSYS_NO_PATHCONV=1` (si no, `/rpg/` se convierte en una ruta de Windows).
+
+## Comida: código de barras (Open Food Facts)
+
+- [ ] iPhone (Safari y PWA): teclear un EAN real de Hacendado → «Revisar alimento» con la atribución «Open Food Facts (ODbL)» y su enlace → guardar → apuntar. Repetir el mismo EAN → «Ya lo tienes» sin peticiones en Network.
+- [ ] Modo avión: «Código de barras» → «Sin conexión. Puedes crearlo a mano»; «Crear a mano» guarda y después el EAN lo encuentra.
+- [ ] El aviso de privacidad sale solo la primera vez; «Exportar copia» no incluye `life-rpg-food-privacy-v1` y «Borrar todo» no lo vuelve a mostrar.
+- [ ] 320 px sin scroll horizontal con el panel abierto.

@@ -1,0 +1,62 @@
+import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+
+const EAN = '8480000118837'
+const nav = (page: Page, name: string) => page.getByRole('navigation', { name: 'Principal' }).getByRole('button', { name }).click()
+const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+const yogur = { status: 1, product: { product_name_es: 'Yogur natural', brands: 'Hacendado, Mercadona', nutriments: { 'energy-kcal_100g': 61.4, proteins_100g: 3.46, carbohydrates_100g: 4.7, fat_100g: 3.3 }, serving_quantity: 125, quantity: '4 x 125 g' } }
+
+// Primero se aborta todo origen que no sea el de la app; las rutas concretas registradas después tienen prioridad.
+async function guard(context: BrowserContext) {
+  await context.route('**/*', route => (new URL(route.request().url()).hostname === 'localhost' ? route.continue() : route.abort()))
+}
+async function openBarcode(page: Page) {
+  await page.goto('./')
+  await nav(page, 'Yo')
+  await page.getByRole('button', { name: /^Comida/ }).click()
+  await page.getByRole('button', { name: 'Código de barras' }).click()
+  await page.getByRole('button', { name: 'Entendido' }).click()
+}
+
+test('E-FI1 OFF simulado: revisar, guardar, añadir y recargar', async ({ page, context }) => {
+  await page.setViewportSize({ width: 320, height: 640 })
+  await guard(context)
+  const seen: string[] = []
+  await context.route('https://world.openfoodfacts.org/**', route => { seen.push(route.request().url()); return route.fulfill({ json: yogur, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } }) })
+  await openBarcode(page)
+  await page.getByRole('textbox', { name: 'Código de barras' }).fill(EAN)
+  await page.getByRole('button', { name: 'Buscar' }).click()
+  await expect(page.getByRole('heading', { name: 'Revisar alimento' })).toBeVisible()
+  await expect(page.getByLabel('Nombre')).toHaveValue('Yogur natural (Hacendado)')
+  await expect(page.getByRole('link', { name: /Open Food Facts/ })).toBeVisible()
+  expect(await noOverflow(page)).toBe(true)
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click()
+  await page.getByRole('button', { name: 'Añadir', exact: true }).click()
+  const diary = page.getByRole('region', { name: 'Diario' })
+  await expect(diary.getByText('Yogur natural (Hacendado)')).toBeVisible()
+  expect(seen.length).toBeGreaterThan(0)
+
+  await page.reload()
+  await nav(page, 'Yo')
+  await page.getByRole('button', { name: /^Comida/ }).click()
+  await expect(page.getByRole('region', { name: 'Diario' }).getByText('Yogur natural (Hacendado)')).toBeVisible()
+  // el aviso ya está aceptado y el EAN guardado se resuelve sin red
+  const before = seen.length
+  await page.getByRole('button', { name: 'Código de barras' }).click()
+  await page.getByRole('textbox', { name: 'Código de barras' }).fill(EAN)
+  await page.getByRole('button', { name: 'Buscar' }).click()
+  await expect(page.getByText('Ya lo tienes: Yogur natural (Hacendado)')).toBeVisible()
+  expect(seen.length).toBe(before)
+})
+
+test('E-FI2 sin conexión: alternativas y ninguna petición a OFF', async ({ page, context }) => {
+  await guard(context)
+  const seen: string[] = []
+  page.on('request', r => { if (new URL(r.url()).hostname !== 'localhost') seen.push(r.url()) })
+  await openBarcode(page)
+  await context.setOffline(true)
+  await page.getByRole('textbox', { name: 'Código de barras' }).fill(EAN)
+  await page.getByRole('button', { name: 'Buscar' }).click()
+  await expect(page.getByText('Sin conexión. Puedes crearlo a mano')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Crear a mano' })).toBeVisible()
+  expect(seen).toEqual([])
+})
