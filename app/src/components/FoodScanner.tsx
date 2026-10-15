@@ -68,10 +68,17 @@ export function FoodScanner({ onCode, onError }: Props) {
       else t = setTimeout(tick, 250)
     }
     t = setTimeout(tick, 250)
+    return () => { off = true; clearTimeout(t) }
+  }, [phase, det])
+
+  // También durante la carga: invalida el start() en curso, que parará las pistas en cuanto lleguen.
+  const live = phase === 'loading' || phase === 'on'
+  useEffect(() => {
+    if (!live) return
     const hide = () => { if (document.hidden) { run.current++; stop(); setPhase('paused') } }
     document.addEventListener('visibilitychange', hide)
-    return () => { off = true; clearTimeout(t); document.removeEventListener('visibilitychange', hide) }
-  }, [phase, det])
+    return () => document.removeEventListener('visibilitychange', hide)
+  }, [live])
 
   if (phase === 'idle') return <button type="button" onClick={() => void start()} className={`${secondary} self-start`}><Camera className="size-4" aria-hidden />Escanear con la cámara</button>
   if (phase === 'paused') return (
