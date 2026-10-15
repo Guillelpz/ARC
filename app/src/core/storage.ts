@@ -433,6 +433,24 @@ export function saveVoicePrefs(p: VoicePrefs, store: Pick<Storage, 'setItem'> = 
   try { store.setItem(VOICE_KEY, JSON.stringify(p)); return true } catch { return false }
 }
 
+// Avisos de privacidad de las integraciones de Comida (ISO de aceptación): fuera de copias, fusión, `backupCurrent`, «Recuperar» y «Borrar todo».
+export const FOOD_PRIVACY_KEY = 'life-rpg-food-privacy-v1'
+export type FoodPrivacy = { off?: string; label?: string }
+
+export function loadFoodPrivacy(store: Pick<Storage, 'getItem'> = localStorage): FoodPrivacy {
+  try {
+    const raw = store.getItem(FOOD_PRIVACY_KEY)
+    if (raw === null) return {}
+    const v = json(raw)
+    if (!isObj(v)) return {}
+    return { ...(typeof v.off === 'string' && { off: v.off }), ...(typeof v.label === 'string' && { label: v.label }) }
+  } catch { return {} }
+}
+
+export function saveFoodPrivacy(p: FoodPrivacy, store: Pick<Storage, 'setItem'> = localStorage): boolean {
+  try { store.setItem(FOOD_PRIVACY_KEY, JSON.stringify(p)); return true } catch { return false }
+}
+
 // Clave de Anthropic del usuario (texto sin JSON), solo de este dispositivo: fuera de copias, fusión, `backupCurrent` y «Borrar todo».
 // Nunca se escribe en consola ni se muestra entera. `isDataKey` la ignora (se lee en el momento de usarla).
 export const AI_KEY = 'life-rpg-ai-key-v1'

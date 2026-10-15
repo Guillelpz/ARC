@@ -5,7 +5,7 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { exportBackup, parseBackup, parseCustom, readFood, readGym } from './storage'
+import { FOOD_PRIVACY_KEY, exportBackup, isDataKey, loadFoodPrivacy, parseBackup, parseCustom, readFood, readGym, saveFoodPrivacy } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
@@ -854,6 +854,16 @@ export function runSelfCheck() {
     const fo = (id: string, o: Partial<Food> = {}): Food => ({ id, name: id, base: 'g', kcal: 1, p: 0, c: 0, f: 0, ref: ean, ...o })
     ok(foodByRef(ean, [fo('food-a', { archived: true }), fo('food-b')])?.id === 'food-b' && foodByRef(ean, [fo('food-a', { archived: true })])?.id === 'food-a' &&
       foodByRef(ean, []) === null && foodByRef('0000000000000', [fo('food-b')]) === null && foodByRef(CATALOG[0].ref!, []) === null, 'FI7 foodByRef')
+  }
+
+  // FI8 (ciclo 32) — avisos de privacidad de Comida
+  {
+    const mem = (init: Record<string, string> = {}) => { const m = new Map(Object.entries(init)); return { m, getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => { m.set(k, v) } } }
+    const s = mem()
+    const absent = JSON.stringify(loadFoodPrivacy(s)) === '{}', saved = saveFoodPrivacy({ off: '2026-10-15T10:00:00.000Z', label: 'x' }, s)
+    const back = loadFoodPrivacy(s)
+    ok(absent && saved && back.off === '2026-10-15T10:00:00.000Z' && back.label === 'x' && ['5', '[]', '{roto', '{"off":3}'].every(raw => JSON.stringify(loadFoodPrivacy(mem({ [FOOD_PRIVACY_KEY]: raw }))) === '{}') &&
+      !exportBackup([], { trackers: [], proposals: [] }, 'x').includes('privacy') && !isDataKey(FOOD_PRIVACY_KEY), 'FI8 loadFoodPrivacy')
   }
 
   console.info('[selfcheck] done')
