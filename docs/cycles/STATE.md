@@ -9,6 +9,23 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–38 cerrados e implementados; workflow en paus
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`, en el historial de git). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
+## Ciclo 39 — Preparar iPhone, copiar día y saneamiento
+
+Aprobado por el usuario el 2026-10-15 (paso 3) a partir de `cycle-39/evaluation.md`, todo lo recomendado. Orden:
+1. **P39.5, parte preparatoria:** checklist unificada en `DEPLOY.md` y botón «Copiar resumen» en `VoiceCheck.tsx`, sin la clave. Fijar `KEYBOARD_ON_IOS` y arreglar lo que falle queda para un mini-ciclo cuando el usuario mande los resultados.
+2. **P39.1 Comida, «Copiar día anterior»:** el origen es siempre el día anterior al del selector. Helper puro `copyDay` con assert FD; copia también las entradas rápidas y las estimadas, con `via: 'copy'`.
+3. **P39.3 recortada:**
+   - `deviceSure` no debe guardar sin cantidad: «I ran out of milk» → Running.
+   - Rutinas duplicadas en `readGym`.
+   - Menores de los platos.
+   - Renombrar 3 filas USDA sin tocar `id` ni `ref`.
+
+Pospuestas: P39.2 (métricas de Haiku), P39.4 (temporizador de descanso, sin vibración en iOS) y olvidar la frase al deshacer desde misiones.
+
+**Ejecución:** tech-lead → implementer `cycle-39` → reviewer → merge → push → cycle-analyst.
+
+**Estado:** paso 4 (tech-lead).
+
 ## Ciclos 36+ — Comida fase 3: voz
 
 Arrancado por el usuario el 2026-10-15. Decisiones del usuario, que no se reabren:
