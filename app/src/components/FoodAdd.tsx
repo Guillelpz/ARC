@@ -4,6 +4,7 @@ import type { DietChange, Food, FoodData, Portion } from '../core/types'
 import { allFoods, dietNote, fmtKcal, fmtPortion, foodById, frequentFoods, lastPortion, parseKcal, parseMacro, portion, recentFoods, searchFoods } from '../core/food'
 import { Segmented } from './Segmented'
 import { FoodQty } from './FoodQty'
+import { FoodCustom } from './FoodCustom'
 import { card, field, primary, secondary } from './foodStyle'
 
 type Quick = { kcal: number; p?: number; c?: number; f?: number; name?: string }
@@ -13,15 +14,19 @@ type Props = {
   today: string
   onAdd: (f: Food, p: Portion, day: string) => { diet: DietChange }
   onQuick: (i: Quick, day: string) => { diet: DietChange }
+  onCreate: (f: Omit<Food, 'id'>) => Food
+  onArchive: (id: string, archived: boolean) => void
   onStatus: (text: string) => void // «Añadido: …», lo anuncia la región status de FoodView
 }
 
+const isOwn = (f: Food) => f.id.startsWith('food-')
 const defaultPortion = (f: Food, last: Portion | null): Portion => last ?? (f.servings?.[0] ? { qty: f.servings[0].qty, serving: { name: f.servings[0].name, n: 1 } } : { qty: 100 })
 
-export function FoodAdd({ food, day, today, onAdd, onQuick, onStatus }: Props) {
+export function FoodAdd({ food, day, today, onAdd, onQuick, onCreate, onArchive, onStatus }: Props) {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<'recent' | 'frequent'>('recent')
   const [picked, setPicked] = useState<Food | null>(null)
+  const [creating, setCreating] = useState<string | null>(null) // null = cerrado; si no, nombre prerrellenado
   const [quickOpen, setQuickOpen] = useState(false)
   const [q, setQ] = useState({ kcal: '', p: '', c: '', f: '', name: '' })
   const [qErr, setQErr] = useState('')
@@ -54,13 +59,29 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onStatus }: Props) {
     setQ({ kcal: '', p: '', c: '', f: '', name: '' }); setQErr(''); setQuickOpen(false)
     done(`Añadido: ${input.name ?? 'Añadido rápido'} (${fmtKcal(kcal)} kcal)`, r.diet)
   }
+  const create = (input: Omit<Food, 'id'>) => {
+    const f = onCreate(input)
+    setCreating(null); setQuery(''); setPicked(f)
+    onStatus(`Alimento creado: ${f.name}`)
+  }
+  const reactivate = (f: Food) => {
+    onArchive(f.id, false)
+    setCreating(null); setQuery(''); setPicked({ ...f, archived: false })
+    onStatus(`Reactivado: ${f.name}`)
+  }
+  const archive = (f: Food) => {
+    onArchive(f.id, true)
+    onStatus(`Archivado: ${f.name}`)
+    searchRef.current?.focus()
+  }
   const item = (f: Food, extra?: string) => (
-    <li key={f.id}>
+    <li key={f.id} className="flex items-center">
       <button type="button" onClick={() => setPicked(f)}
-        className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm outline-hero hover:bg-hero-bg focus-visible:outline-2 focus-visible:-outline-offset-2">
+        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 px-3 py-2 text-left text-sm outline-hero hover:bg-hero-bg focus-visible:outline-2 focus-visible:-outline-offset-2">
         <span className="min-w-0 flex-1 font-semibold">{f.name}</span>
         <span className="shrink-0 text-hero-muted tabular-nums">{extra ?? `${fmtKcal(f.kcal)} kcal/100 ${f.base}`}</span>
       </button>
+      {extra === undefined && isOwn(f) && <button type="button" onClick={() => archive(f)} aria-label={`Archivar ${f.name}`} className="m-1 inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-hero-border px-3 text-sm font-semibold text-hero-text outline-hero hover:bg-hero-bg focus-visible:outline-2 focus-visible:outline-offset-2">Archivar</button>}
     </li>
   )
   const qField = (key: 'kcal' | 'p' | 'c' | 'f', label: string, id: string) => (
@@ -77,11 +98,16 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onStatus }: Props) {
         <label htmlFor="food-search" className="text-xs font-medium">Buscar alimento</label>
         <input id="food-search" ref={searchRef} type="search" autoComplete="off" value={query} onChange={e => { setQuery(e.target.value); setPicked(null) }} className={field} />
       </div>
-      {picked
+      {creating !== null
+        ? <FoodCustom key="create" initialName={creating} custom={food.foods} onCreate={create} onReactivate={reactivate} onCancel={() => { setCreating(null); searchRef.current?.focus() }} />
+        : picked
         ? <FoodQty key={picked.id} food={picked} initial={defaultPortion(picked, lastPortion(food.log, picked.id))} onAdd={p => add(picked, p)} onCancel={() => { setPicked(null); searchRef.current?.focus() }} />
         : typing
           ? results.length === 0
-            ? <p className="text-sm text-hero-muted">Sin resultados para «{query.trim()}». Apunta las calorías con «Añadido rápido».</p>
+            ? <div className="flex flex-col items-start gap-2">
+                <p className="text-sm text-hero-muted">Sin resultados para «{query.trim()}». Apunta las calorías con «Añadido rápido».</p>
+                <button type="button" onClick={() => setCreating(query.trim())} className={secondary}><Plus className="size-4" aria-hidden />Crear alimento</button>
+              </div>
             : <ul className="divide-y divide-hero-border rounded-lg border border-hero-border">{results.map(f => item(f))}</ul>
           : (
             <div className="flex flex-col gap-2">
@@ -92,9 +118,14 @@ export function FoodAdd({ food, day, today, onAdd, onQuick, onStatus }: Props) {
                   </ul>}
             </div>
           )}
-      <button type="button" onClick={() => setQuickOpen(o => !o)} aria-expanded={quickOpen} aria-controls="food-quick" className={`${secondary} self-start`}>
-        <Plus className="size-4" aria-hidden />Añadido rápido
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setQuickOpen(o => !o)} aria-expanded={quickOpen} aria-controls="food-quick" className={secondary}>
+          <Plus className="size-4" aria-hidden />Añadido rápido
+        </button>
+        <button type="button" onClick={() => setCreating('')} className={secondary}>
+          <Plus className="size-4" aria-hidden />Crear alimento
+        </button>
+      </div>
       {quickOpen && (
         <form id="food-quick" onSubmit={submitQuick} noValidate className="flex flex-col gap-3 rounded-lg border border-hero-border p-3">
           {qField('kcal', 'Calorías (kcal)', 'food-q-kcal')}

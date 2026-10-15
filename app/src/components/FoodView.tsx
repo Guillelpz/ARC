@@ -8,6 +8,8 @@ import { ProgressBar } from './ProgressBar'
 import { SaveFailBanner } from './SaveFailBanner'
 import { FoodAdd } from './FoodAdd'
 import { FoodGoalCard } from './FoodGoalCard'
+import { FoodMeals } from './FoodMeals'
+import { FoodWeek } from './FoodWeek'
 import { card, secondary } from './foodStyle'
 
 type Props = {
@@ -16,13 +18,18 @@ type Props = {
   onAddEntry: (f: Food, p: Portion, day: string) => { diet: DietChange }
   onAddQuick: (i: { kcal: number; p?: number; c?: number; f?: number; name?: string }, day: string) => { diet: DietChange }
   onUndo: (ids: string[]) => { undone: number; diet: DietChange }
+  onCreateFood: (f: Omit<Food, 'id'>) => Food
+  onArchiveFood: (id: string, archived: boolean) => void
+  onSaveMeal: (name: string, ids: string[]) => boolean
+  onDeleteMeal: (id: string) => void
+  onAddMeal: (id: string, day: string) => { ids: string[]; missing: number; diet: DietChange }
   onSaveGoal: (g: Omit<FoodGoal, 'from'>) => unknown
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
 }
 
-export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onSaveGoal, onBack, saveFailed, onExport }: Props) {
+export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveMeal, onDeleteMeal, onAddMeal, onSaveGoal, onBack, saveFailed, onExport }: Props) {
   const [day, setDay] = useState(today)
   const [status, setStatus] = useState('')
   const diaryRef = useRef<HTMLHeadingElement>(null)
@@ -77,8 +84,12 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onSaveGo
         </section>
 
         <FoodGoalCard goal={todayGoal} onSave={onSaveGoal} />
-        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onStatus={setStatus} />
+        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} />
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>
+
+        <FoodMeals food={food} day={day} onSave={onSaveMeal} onDelete={onDeleteMeal} onAdd={onAddMeal} onUndo={onUndo} />
+
+        <FoodWeek food={food} today={today} />
 
         <section aria-labelledby="food-diary" className={card}>
           <h2 id="food-diary" ref={diaryRef} tabIndex={-1} className="text-base font-semibold outline-hero focus-visible:outline-2">Diario</h2>
