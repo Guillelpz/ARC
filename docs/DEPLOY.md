@@ -61,34 +61,59 @@ GitHub Pages está activo en `https://guillelpz.github.io/ARC/`. La app es un si
 - [ ] iOS/Safari: «Añadir a pantalla de inicio» usa el icono de 180. La app instalada arranca vacía y, al importar una copia exportada en Safari, aparecen los datos.
 - [ ] Kill switch, una vez: desplegar con `sw_kill`. Tras abrir y recargar, Application → Service Workers queda vacío y Cache Storage no tiene `rpg-life-*`. Desplegar de nuevo sin `sw_kill` para restaurar.
 - [ ] `npm run dev` no registra ningún service worker.
-- [ ] Voz en iPhone real (PWA instalada; hasta cerrar T8, y otra vez tras el merge a producción). Para una prueba previa sin desplegar: en `app/`, `npm run build && npx vite preview --host --port 4173` y `npx cloudflared tunnel --url http://localhost:4173` (sin `BASE_PATH`); cerrar el túnel al terminar.
-  - [ ] Siri y Dictado activados (Ajustes › Siri; Ajustes › General › Teclado › Activar dictado). Anotar la versión de iOS.
-  - [ ] Yo › Ajustes › «Probar voz» ×5 en Safari y ×5 en la PWA (decir «80 kilos press banca 5 repeticiones»); cerrar y reabrir la app y probar 2 veces más. Capturas con «Detalles técnicos».
-  - [ ] Primera vez: el aviso de privacidad; «Entendido» empieza a escuchar en el mismo toque.
-  - [ ] Gym: dictar «80 kilos press banca 5 repeticiones» → serie, sesión en HERO y aviso; «Deshacer» la quita y retira la sesión.
-  - [ ] «3 series de 5» → 3 series; «Editar» → formulario con el foco en el peso y el teclado abierto.
-  - [ ] Incompleto («press banca 80») → formulario con el foco en las repeticiones.
-  - [ ] «Hoy»: dictar → fila Gym; incompleto → abre Gym; «Volver» → foco en «Hoy».
-  - [ ] Modo avión → «Dictar serie» abre el campo; el dictado del teclado + «Registrar» funciona.
-  - [ ] Ajustes dentro de la PWA: pegar la clave, «Probar clave» → «La clave funciona»; dictar una frase rara («la máquina de piernas 100 10») → Prensa.
-  - [ ] Recargar y cerrar/abrir la app: las series y la clave siguen; «Exportar copia» no contiene la clave.
-  - [ ] 320 px sin scroll horizontal en Gym, «Hoy» y «Yo».
 
 Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run preview` → `http://localhost:4173/rpg/`. En Git Bash, antepón `MSYS_NO_PATHCONV=1` (si no, `/rpg/` se convierte en una ruta de Windows).
 
-## Comida: código de barras (Open Food Facts)
+## Prueba en iPhone (pendiente)
+
+Una sola pasada, ordenada por tiempo de prueba. Se hace en iPhone real, con la PWA instalada, y otra vez tras el merge a producción.
+
+### Preparación
+
+- [ ] Anotar la versión de iOS.
+- [ ] Siri y Dictado activados (Ajustes › Siri; Ajustes › General › Teclado › Activar dictado).
+- [ ] PWA instalada («Añadir a pantalla de inicio»).
+- [ ] Clave de Anthropic pegada en Yo › Ajustes (necesaria para los bloques con Haiku).
+- [ ] Opcional, para probar sin desplegar: en `app/`, `npm run build && npx vite preview --host --port 4173` y `npx cloudflared tunnel --url http://localhost:4173` (sin `BASE_PATH`); cerrar el túnel al terminar.
+
+### 1. «Probar voz» (~10 min)
+
+- [ ] Yo › Ajustes › «Probar voz» ×5 en Safari y ×5 en la PWA (decir «80 kilos press banca 5 repeticiones»); cerrar y reabrir la app y probar 2 veces más. Capturas con «Detalles técnicos».
+- [ ] Pulsar «Copiar resumen» y pegarlo en el chat (T8): están todos los campos y no está la clave.
+
+### 2. Voz de Gym (ciclo 26)
+
+- [ ] Primera vez: el aviso de privacidad; «Entendido» empieza a escuchar en el mismo toque.
+- [ ] Gym: dictar «80 kilos press banca 5 repeticiones» → serie, sesión en HERO y aviso; «Deshacer» la quita y retira la sesión.
+- [ ] «3 series de 5» → 3 series; «Editar» → formulario con el foco en el peso y el teclado abierto.
+- [ ] Incompleto («press banca 80») → formulario con el foco en las repeticiones.
+- [ ] «Hoy»: dictar → fila Gym; incompleto → abre Gym; «Volver» → foco en «Hoy».
+- [ ] Modo avión → «Dictar serie» abre el campo; el dictado del teclado + «Registrar» funciona.
+- [ ] Ajustes dentro de la PWA: pegar la clave, «Probar clave» → «La clave funciona»; dictar una frase rara («la máquina de piernas 100 10») → Prensa.
+- [ ] Recargar y cerrar/abrir la app: las series y la clave siguen; «Exportar copia» no contiene la clave.
+- [ ] 320 px sin scroll horizontal en Gym, «Hoy» y «Yo».
+
+### 3. Captura del «+» (ciclo 27)
+
+- [ ] «Read 50 pages…» → Reading +100 min; «ate a burguer» → Burgers +1; «grounding 30 min» → tarjeta de propuesta; «ayer…» → aviso.
+- [ ] Con clave, una propuesta de confianza «alta» con cuenta atrás de 10 s.
+
+### 4. Comida por voz (ciclos 36-38)
 
 - [ ] iPhone (PWA instalada), comida por voz desde el «+» (ciclo 36): dictar «200 gramos de arroz y dos huevos» → «Registrado en Comida: 2 alimentos · 403 kcal»; recargar y ver las 2 filas en el Diario; «Deshacer» las retira. Dictar «comí una hamburguesa» → Burgers +1 y «Apuntar también en Comida» abre Comida con la hamburguesa pendiente (sin mezclar paletas en la tarjeta VILLAIN).
 - [ ] iPhone (PWA instalada), «Dictar comida» dentro de Comida (ciclo 37): con el selector en «Ayer», dictar «200 gramos de arroz y dos huevos» → la escucha arranca en el toque y queda en el Diario de ayer (no en hoy); decir «ayer…» no guarda y pide cambiar el selector.
 - [ ] iPhone (PWA instalada) con la clave de Anthropic, comida con Haiku (ciclo 38): dictar «un bocadillo de calamares» → fila «Estimación» sin guardar; «Apuntar» la guarda («Bocadillo de calamares (200 g)»); con «Guardar también como alimento propio» queda como propio y «Deshacer» lo archiva. Repetir una frase de un solo alimento que Haiku resolvió → la segunda vez no tarda (memoria). Sin clave o sin conexión, la misma frase abre Comida o queda pendiente, sin llamadas.
+
+### 5. Código de barras tecleado (ciclo 32)
+
 - [ ] iPhone (Safari y PWA): teclear un EAN real de Hacendado → «Revisar alimento» con la atribución «Open Food Facts (ODbL)» y su enlace → guardar → apuntar. Repetir el mismo EAN → «Ya lo tienes» sin peticiones en Network.
 - [ ] Modo avión: «Código de barras» → «Sin conexión. Puedes crearlo a mano»; «Crear a mano» guarda y después el EAN lo encuentra.
 - [ ] El aviso de privacidad sale solo la primera vez; «Exportar copia» no incluye `life-rpg-food-privacy-v1` y «Borrar todo» no lo vuelve a mostrar.
 - [ ] 320 px sin scroll horizontal con el panel abierto.
 
-## Comida: escáner con cámara (ciclo 35)
+### 6. Escáner con cámara (ciclo 35)
 
-El escáner usa `barcode-detector` + `zxing-wasm` (runtime, versiones exactas). El `.wasm` (~1 MiB) no se precachea: el service worker lo guarda la primera vez que se abre el escáner con red y se vuelve a bajar tras cada despliegue. En Android/Chrome se usa la API nativa y no se descarga. Prueba pendiente en iPhone real (PWA instalada):
+El escáner usa `barcode-detector` + `zxing-wasm` (runtime, versiones exactas). El `.wasm` (~1 MiB) no se precachea: el service worker lo guarda la primera vez que se abre el escáner con red y se vuelve a bajar tras cada despliegue. En Android/Chrome se usa la API nativa y no se descarga.
 
 - [ ] Primer permiso de cámara al pulsar «Escanear con la cámara»; el indicador de cámara se enciende y se apunta a un EAN real: se rellena el campo y se busca.
 - [ ] Volver a abrir el escáner: puede volver a pedir permiso (aceptado; anotar si ocurre cada vez).
@@ -100,11 +125,11 @@ El escáner usa `barcode-detector` + `zxing-wasm` (runtime, versiones exactas). 
 - [ ] Network no muestra peticiones a jsdelivr/unpkg; el `.wasm` viene de `assets/` del propio sitio.
 - [ ] 320 px sin scroll horizontal con el escáner abierto.
 
-## Comida: foto de la etiqueta (Haiku)
+### 7. Foto de la etiqueta, I4 (ciclo 33, ~45 min)
 
 Validación manual (I4) que hace el usuario en el iPhone antes de cerrar el ciclo 33. Requiere la clave de Anthropic en Ajustes.
 
-- [ ] Primer uso: «Foto de la etiqueta» muestra el aviso («la app envía la foto, reducida y sin datos de ubicación, a Anthropic con tu clave»); «Entendido» abre la cámara/selector de una vez. No vuelve a salir; «Borrar todo» no lo restablece y «Exportar copia» no lo incluye.
+- [ ] Primer uso: «Foto de la etiqueta» muestra el aviso («la app envía la foto, reducida y sin datos de ubicación, a Anthropic con tu clave»); «Entendido» abre la cámara/selector de una vez (incluido el `click()` tras el aviso). No vuelve a salir; «Borrar todo» no lo restablece y «Exportar copia» no lo incluye.
 - [ ] Etiquetas: 10-20 etiquetas reales distintas (yogur, cereales, bebida en ml, producto solo por ración, etiqueta en otro idioma, foto torcida, con reflejos, HEIC de la cámara). Por cada una, anota kcal, P, C, G y base tras la revisión: acierto sin tocar nada, valor corregido o error. Objetivo: >= 8 de 10 sin corregir. Si >= 3 de cada 10 salen con algún valor mal, se anota para un ciclo aparte (no se cambia de modelo aquí).
 - [ ] Tabla en la foto: se rellena «Revisar alimento»; si las kcal no cuadran con los macros sale el aviso y no bloquea.
 - [ ] La foto sale reducida: DevTools (Safari remoto) → la petición a `api.anthropic.com` pesa < 1 MB y no lleva EXIF.
