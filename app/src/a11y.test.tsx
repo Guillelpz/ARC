@@ -268,3 +268,16 @@ test('A-FV2 Comida con pendientes por voz', async () => {
   expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
   expect(await serious()).toEqual([])
 })
+
+test('A-FV3 Comida con «Por voz» y una frase guardada', async () => {
+  localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' }))
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Yo' }))
+  fireEvent.click(screen.getByRole('button', { name: /^Comida/ }))
+  expect(await serious()).toEqual([])
+  fireEvent.click(screen.getByRole('button', { name: 'Escribir' }))
+  fireEvent.change(screen.getByLabelText('Comida'), { target: { value: '200 g de arroz y papa 100 g' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Apuntar' }))
+  expect(await screen.findByText(/^Registrado en Comida: 1 alimento/)).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

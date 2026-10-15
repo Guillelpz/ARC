@@ -1905,3 +1905,33 @@ test('U-FV6 «papa 100 g» es ambiguo: abre el buscador con «papa»', async () 
   expect(screen.getByText('«papa»: hay varios alimentos')).toBeTruthy()
   expect(foodLive()).toHaveLength(0)
 })
+
+// --- «Dictar» en Comida (ciclo 37) ---
+test('U-FV7 «Dictar comida» con el selector en «Ayer»: entrada de ayer y Deshacer la anula', async () => {
+  ackVoice(); setVoz('200 g de arroz y una manzana'); render(<App />); openFood()
+  fireEvent.click(btn('Ayer'))
+  fireEvent.click(btn('Dictar comida'))
+  expect(await screen.findByText('Registrado en Comida: 2 alimentos · 354 kcal (ayer).')).toBeTruthy()
+  expect(foodLive().map(e => [e.name, e.via])).toEqual([['Arroz blanco cocido', 'voice'], ['Manzana', 'voice']])
+  expect((foodStored().log as { occurredAt: string }[]).every(e => e.occurredAt.startsWith('2026-10-06'))).toBe(true)
+  expect(screen.getByText('354 kcal', { selector: 'p' })).toBeTruthy()
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: 2 alimentos (354 kcal).')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0)
+})
+
+test('U-FV8 frase con otro día en Comida: mensaje y nada guardado', async () => {
+  ackVoice(); setVoz('ayer comí 200 g de arroz'); render(<App />); openFood()
+  fireEvent.click(btn('Dictar comida'))
+  expect(await screen.findByText('Para otro día, cámbialo en el selector y dicta sin decir el día.')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0)
+})
+
+test('U-FV7b «Dictar comida» con un alimento sin cantidad: pasa a «Por voz: pendiente» sin guardar', async () => {
+  ackVoice(); setVoz('arroz y 150 g de pollo'); render(<App />); openFood()
+  fireEvent.click(btn('Dictar comida'))
+  expect(await screen.findByText(/^Registrado en Comida: 1 alimento ·/)).toBeTruthy()
+  fireEvent.click(btn('Completar en Comida'))
+  expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
+  expect(foodLive()).toHaveLength(1)
+})

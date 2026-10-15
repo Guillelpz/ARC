@@ -2,8 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { CircleAlert, Mic } from 'lucide-react'
 import type { ActivityEvent, Branch, DietChange, Exercise, Food, Tracker, WeightUnit } from '../core/types'
-import { dietNote, fmtKcal } from '../core/food'
-import { itemKcal, itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
+import { dietNote } from '../core/food'
+import { itemReady, voiceAdds, type FoodItem, type VoiceAdd } from '../core/foodVoice'
 import { VOICE_MAX_CHARS, draftText, isComplete, type GymDraft, type VoiceCommand } from '../core/voice'
 import { AUTO_CREATE_S, MAX_CAPTURE, convNote, type CaptureCommand, type NewHabit, type Problem } from '../core/capture'
 import { unitFor } from '../core/trackers'
@@ -15,6 +15,7 @@ import { missingOf, type VoiceMissing } from './voiceNotes'
 import { CARD, LABEL } from './branchTone'
 import { CreatedResult, NewHabitCard, TrackerResult } from './CaptureCards'
 import { FoodVoiceCard } from './FoodVoiceCard'
+import { foodCount, foodStatus, kcalOf } from './foodVoiceText'
 
 export type CaptureStart = ListenStart | { mode: 'privacy' } | { mode: 'idle' }
 
@@ -60,11 +61,6 @@ type Res =
   | { k: 'undone'; text: string }
 
 const WHAT = 'lo que has hecho'
-const foodCount = (n: number) => `${n} ${n === 1 ? 'alimento' : 'alimentos'}`
-const kcalOf = (items: FoodItem[], own: Food[]) => fmtKcal(items.reduce((n, i) => n + itemKcal(i, own), 0))
-const foodStatus = (d: FoodDone, own: Food[]) => d.undone ?? (d.ids.length
-  ? `Registrado en Comida: ${foodCount(d.ids.length)} · ${kcalOf(d.saved, own)} kcal${dietNote(d.diet)}`
-  : 'Revisa la propuesta: no se ha apuntado nada.')
 const OTHER_DAY_TEXT = 'Por voz solo se apunta hoy. Para otro día, hazlo a mano.'
 const UNKNOWN_TEXT = 'No se ha entendido qué apuntar. Prueba otra vez o escríbelo a mano.'
 
