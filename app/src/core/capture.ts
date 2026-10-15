@@ -1,6 +1,7 @@
 import type { Memo } from './memory'
-import type { Branch, Confidence, Exercise, Tracker, WeightUnit } from './types'
-import { STOPWORDS, classify, exactTracker, isValidName, isValidUnit, matchTracker, normalizeText, trackerName } from './classify'
+import type { Branch, Confidence, Exercise, Food, Tracker, WeightUnit } from './types'
+import { STOPWORDS, classify, exactHits, exactTracker, isValidName, isValidUnit, matchTracker, normalizeText, trackerName } from './classify'
+import { FOOD_UNIT_SET, foodReady, looksLikeFood, parseFoodVoice, type FoodItem } from './foodVoice'
 import { fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type HaikuError, type VoiceCommand } from './voice'
 
 export const PAGE_MIN = 2        // 1 página = 2 min (solo en Reading)
@@ -20,11 +21,12 @@ export type NewHabit = {
 export type Src = { text: string; source: 'ai' | 'parser' | 'memory'; aiError?: HaikuError }
 export type CaptureCommand =
   | VoiceCommand
-  | Src & { kind: 'tracker'; trackerId: string; amount: number | null; said: Measure | null; problem: Problem | null }
+  | Src & { kind: 'tracker'; trackerId: string; amount: number | null; said: Measure | null; problem: Problem | null; food?: FoodItem[] } // food = comida adjunta (FV4)
+  | Src & { kind: 'food'; items: FoodItem[]; rest: string }
   | Src & { kind: 'new'; habit: NewHabit; said: Measure | null }
   | Src & { kind: 'other-day' }
   | Src & { kind: 'unknown' }
-export type CaptureCtx = { exercises: Exercise[]; trackers: Tracker[] /* activos */; all: Tracker[] /* incl. archivados */; unit: WeightUnit; memo?: Memo }
+export type CaptureCtx = { exercises: Exercise[]; trackers: Tracker[] /* activos */; all: Tracker[] /* incl. archivados */; unit: WeightUnit; memo?: Memo; foods?: Food[] /* propios, también archivados */ }
 
 export const UNIT_WORDS: Record<Family, string[]> = {
   min: 'min mins minuto minutos minute minutes'.split(' '),
@@ -32,7 +34,8 @@ export const UNIT_WORDS: Record<Family, string[]> = {
   km: 'k km kms kilometro kilometros kilometer kilometers kilometre kilometres'.split(' '),
   pages: 'pag pags pagina paginas page pages'.split(' '),
   count: 'vez veces time times'.split(' '),
-  other: 'm metro metros meter meters milla millas mile miles seg segundo segundos second seconds kg kgs kilo kilos lb lbs libra libras pound pounds litro litros liter liters'.split(' '),
+  other: ('m metro metros meter meters milla millas mile miles seg segundo segundos second seconds kg kgs kilo kilos lb lbs libra libras pound pounds litro litros liter liters ' +
+    'g gr gramo gramos gram grams ml cl l mililitro mililitros milliliter milliliters litre litres kcal kcals caloria calorias calorie calories').split(' '), // las últimas son de comida: no cuentan como cantidad de un hábito
 }
 export const ALL_UNITS: ReadonlySet<string> = new Set(Object.values(UNIT_WORDS).flat())
 const familyOf = (w: string): Family | null => (Object.keys(UNIT_WORDS) as Family[]).find(f => UNIT_WORDS[f].includes(w)) ?? null
@@ -147,14 +150,26 @@ export function buildNew({ name, type, unit, ms, src, ctx, branch, confidence, r
   }
 }
 
-// Router determinista (también es el respaldo de la IA). Orden: otro día > gym > hábito existente > nuevo.
+// Router determinista (también es el respaldo de la IA). Orden: otro día > gym > hábito con coincidencia exacta (+ comida adjunta, FV4)
+// > comida (término o «kcal») > hábito aproximado > comida desconocida (verbo de comer o g/ml) > hábito nuevo.
 export function routeCapture(text: string, ctx: CaptureCtx): CaptureCommand {
-  const t = captureNorm(text)
+  const t = captureNorm(text), own = ctx.foods ?? []
   const src: Src = { text, source: 'parser' }
   if (isOtherDay(t)) return { ...src, kind: 'other-day' }
   if (matchExercise(normalizeVoice(text), ctx.exercises)) return { kind: 'gym', text, source: 'parser', draft: parseGym(text, ctx.exercises, ctx.unit) }
+  const fp = parseFoodVoice(text, own)
+  if (exactHits(t, ctx.trackers, ALL_UNITS).length) {
+    const tr = matchTracker(t, ctx.trackers, ALL_UNITS)!
+    const ms = fp.items.length ? measures(t).filter(m => !FOOD_UNIT_SET.has(m.word)) : measures(t)
+    return { ...src, kind: 'tracker', trackerId: tr.id, ...resolveAmount(tr, ms), ...(fp.items.length ? { food: fp.items } : {}) }
+  }
+  if (fp.items.length) return { ...src, kind: 'food', ...fp }
   const tr = matchTracker(t, ctx.trackers, ALL_UNITS)
   if (tr) return { ...src, kind: 'tracker', trackerId: tr.id, ...resolveAmount(tr, measures(t)) }
+  if (looksLikeFood(t)) {
+    const any = parseFoodVoice(text, own, { anyFood: true })
+    if (any.items.length) return { ...src, kind: 'food', ...any }
+  }
   return newFromText(text, ctx)
 }
 
@@ -163,6 +178,7 @@ export function routeCapture(text: string, ctx: CaptureCtx): CaptureCommand {
 export function deviceSure(c: CaptureCommand, ctx: CaptureCtx): boolean {
   if (c.kind === 'gym') return isComplete(c.draft, ctx.exercises)
   if (c.kind === 'tracker') return exactTracker(captureNorm(c.text), ctx.trackers, ALL_UNITS)?.id === c.trackerId
+  if (c.kind === 'food') return c.source === 'parser' && foodReady(c.items) && c.rest === ''
   return false
 }
 
@@ -171,6 +187,7 @@ export function isReady(c: CaptureCommand, ctx: CaptureCtx): boolean {
     case 'gym': return isComplete(c.draft, ctx.exercises)
     case 'tracker': return c.amount !== null && c.problem === null
     case 'new': return c.habit.amount !== null && !c.habit.archivedDup
+    case 'food': return foodReady(c.items)
     default: return false
   }
 }

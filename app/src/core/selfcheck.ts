@@ -916,6 +916,22 @@ export function runSelfCheck() {
       fz('half an apple') === 'food:apple:90:0.5' && fz('papa 100 g') === 'pend:papa:2', 'FVZ8 EN')
   }
 
+  // FVZ9-FVZ10 (ciclo 36) — router de comida y deviceSure
+  {
+    const ctx: CaptureCtx = { exercises: EXERCISES, trackers: TRACKERS, all: TRACKERS, unit: 'kg' }
+    const items = (c: CaptureCommand) => (c.kind === 'food' ? c.items : c.kind === 'tracker' ? c.food ?? [] : []).map(i =>
+      i.k === 'quick' ? `quick:${i.kcal}` : i.k === 'pending' ? `pend:${i.query}:${i.ids.length}` : i.portion ? `food:${i.foodId}:${i.portion.qty}` : `miss:${i.foodId}:${i.problem}`).join('|')
+    const r = (t: string) => routeCapture(t, ctx)
+    const burger = r('comí una hamburguesa'), burger200 = r('hamburguesa 200 g')
+    ok(burger.kind === 'tracker' && burger.trackerId === 'burgers' && burger.amount === 1 && burger.problem === null && items(burger) === 'miss:beef-burger:missing' &&
+      burger200.kind === 'tracker' && burger200.trackerId === 'burgers' && burger200.amount === 1 && items(burger200) === 'food:beef-burger:200' &&
+      r('200 g de arroz').kind === 'food' && items(r('2 peras')) === 'food:pear:360' && r('2 peras').kind === 'food' && r('ayer comí arroz').kind === 'other-day' && r('80kg bench press 5 reps').kind === 'gym' &&
+      r('comí un bocadillo').kind === 'food' && items(r('comí un bocadillo')) === 'pend:bocadillo:0' && r('3 vasos de agua').kind === 'new', 'FVZ9 routeCapture')
+    const sure = (t: string) => deviceSure(r(t), ctx)
+    ok(['200 g de arroz', '500 kcal', 'two eggs and a banana'].every(sure) && !['arroz', 'papa 100 g', 'comí un bocadillo', 'café con leche'].some(sure) &&
+      isReady(r('200 g de arroz'), ctx) && !isReady(r('arroz'), ctx), 'FVZ10 deviceSure/isReady')
+  }
+
   // FVZ3 (ciclo 36) — tabla de alias de voz de Comida
   {
     const fnorm = foodNorm
