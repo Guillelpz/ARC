@@ -83,6 +83,20 @@ Prueba local del build con base: `BASE_PATH=/rpg/ npm run build && npm run previ
 - [ ] El aviso de privacidad sale solo la primera vez; «Exportar copia» no incluye `life-rpg-food-privacy-v1` y «Borrar todo» no lo vuelve a mostrar.
 - [ ] 320 px sin scroll horizontal con el panel abierto.
 
+## Comida: escáner con cámara (ciclo 35)
+
+El escáner usa `barcode-detector` + `zxing-wasm` (runtime, versiones exactas). El `.wasm` (~1 MiB) no se precachea: el service worker lo guarda la primera vez que se abre el escáner con red y se vuelve a bajar tras cada despliegue. En Android/Chrome se usa la API nativa y no se descarga. Prueba pendiente en iPhone real (PWA instalada):
+
+- [ ] Primer permiso de cámara al pulsar «Escanear con la cámara»; el indicador de cámara se enciende y se apunta a un EAN real: se rellena el campo y se busca.
+- [ ] Volver a abrir el escáner: puede volver a pedir permiso (aceptado; anotar si ocurre cada vez).
+- [ ] Modo avión tras un primer uso con red: el escáner arranca (wasm en caché) y lee el código; la búsqueda dice «Sin conexión. Puedes crearlo a mano».
+- [ ] Tras un despliegue nuevo y sin red: «No se ha podido cargar el lector. Teclea el código.» y el campo de texto sigue funcionando.
+- [ ] Centro de control o cambio de app con la cámara abierta: se apaga y sale «Reanudar cámara».
+- [ ] «Cancelar» y salir de Comida con la cámara abierta apagan el indicador de cámara.
+- [ ] Sin permiso: «Sin permiso para la cámara. Teclea el código.» y el foco va al campo.
+- [ ] Network no muestra peticiones a jsdelivr/unpkg; el `.wasm` viene de `assets/` del propio sitio.
+- [ ] 320 px sin scroll horizontal con el escáner abierto.
+
 ## Comida: foto de la etiqueta (Haiku)
 
 Validación manual (I4) que hace el usuario en el iPhone antes de cerrar el ciclo 33. Requiere la clave de Anthropic en Ajustes.

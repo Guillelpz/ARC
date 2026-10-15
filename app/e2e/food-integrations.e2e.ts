@@ -93,3 +93,50 @@ test('E-FI3 foto de la etiqueta con Haiku simulado: revisar, guardar y añadir',
   await page.getByRole('button', { name: 'Añadir', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Diario' }).getByText('Galletas')).toBeVisible()
 })
+
+// --- Escáner con cámara (ciclo 35): cámara falsa de Chromium (a nivel de archivo: launchOptions fuerza worker nuevo), ninguna petición fuera del origen de la app ---
+test.use({ permissions: ['camera'], launchOptions: { args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] } })
+test.describe('escáner', () => {
+  const openFood = async (page: Page) => {
+    await page.goto('./')
+    await nav(page, 'Yo')
+    await page.getByRole('button', { name: /^Comida/ }).click()
+  }
+
+  test('E-FI4 cámara falsa y BarcodeDetector simulado: busca el EAN', async ({ page, context }) => {
+    await guard(context)
+    await context.route('https://world.openfoodfacts.org/**', route => route.fulfill({ json: yogur, headers: { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*' } }))
+    await page.addInitScript(ean => {
+      (window as unknown as Record<string, unknown>).BarcodeDetector = class {
+        static getSupportedFormats() { return Promise.resolve(['ean_13']) }
+        detect() { return Promise.resolve([{ rawValue: ean }]) }
+      }
+    }, EAN)
+    await openBarcode(page)
+    await page.getByRole('button', { name: 'Escanear con la cámara' }).click()
+    await expect(page.getByRole('heading', { name: 'Revisar alimento' })).toBeVisible()
+    await expect(page.getByLabel('Nombre')).toHaveValue('Yogur natural (Hacendado)')
+  })
+
+  test('E-FI5 al abrir Comida no se pide el wasm ni el chunk del escáner', async ({ page, context }) => {
+    await guard(context)
+    await openFood(page)
+    await page.getByRole('button', { name: 'Código de barras' }).click()
+    await expect(page.getByRole('heading', { name: 'Privacidad del código de barras' })).toBeVisible()
+    const names = await page.evaluate(() => performance.getEntriesByType('resource').map(r => r.name))
+    expect(names.filter(n => /\.wasm|ponyfill|scanwasm/.test(n))).toEqual([])
+  })
+
+  test('E-FI6 sin BarcodeDetector nativo: el wasm sale del propio origen', async ({ page, context }) => {
+    await guard(context)
+    const urls: string[] = []
+    page.on('request', r => urls.push(r.url()))
+    await page.addInitScript(() => { delete (window as unknown as Record<string, unknown>).BarcodeDetector })
+    await openBarcode(page)
+    const wasm = page.waitForResponse(r => /\/ARC\/assets\/.*\.wasm$/.test(new URL(r.url()).pathname))
+    await page.getByRole('button', { name: 'Escanear con la cámara' }).click()
+    expect((await wasm).status()).toBe(200)
+    await expect(page.getByText('Apunta al código de barras')).toBeVisible()
+    expect(urls.filter(u => new URL(u).hostname !== 'localhost' && !u.startsWith('data:') && !u.startsWith('blob:'))).toEqual([])
+  })
+})
