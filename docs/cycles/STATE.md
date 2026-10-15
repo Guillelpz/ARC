@@ -15,7 +15,21 @@ Arrancado por el usuario el 2026-10-15 («adelante con lo siguiente»). Dos lín
 - **31a Refactor:** extraer la lógica de comida de `App.tsx` a `src/useFood.ts` sin cambiar comportamiento (deuda del ciclo 30). Rama `cycle-31`; implementer → reviewer → merge → push.
 - **31b Investigación:** informe `docs/cycles/cycle-31/research-integrations.md` (fuentes de datos, código de barras, importación desde otras apps, viabilidad sin backend, licencias, privacidad, coste). Después, preguntas al usuario → tech-lead → implementación en ciclos siguientes. MyFitnessPal descartado como fuente (API cerrada).
 
-**Estado:** 31a en implementación; 31b investigando.
+**Estado:** 31a **cerrado** (merge 7a793d6, push; review APROBADO). 31b terminado: informe en `cycle-31/research-integrations.md`.
+
+## Ciclos 32+ — Comida fase 2: integraciones
+
+Decisiones del usuario (2026-10-15), a partir del informe del 31b; no se reabren:
+- **I1 Alcance (las cuatro):** (A) código de barras **tecleado** → Open Food Facts (`/api/v2/product/{EAN}.json`, sin clave); (B) **foto de la etiqueta** → Haiku 5.5 con la clave del usuario (patrón `askHaiku`), revisión antes de guardar, alternativa cuando OFF no tiene el producto o le falta nutrición; (C) **escáner con cámara** — **okay a la dependencia de runtime** `barcode-detector` (polyfill sobre `zxing-wasm`, MIT, ~1 MiB de wasm cargado solo al abrir el escáner; la versión exacta la fija el tech-lead); (D) **ampliar el catálogo USDA** estático (solo USDA FDC; BEDCA no sin permiso).
+- **I2 Privacidad:** aviso en línea **una vez** por integración (como la voz); después, directo.
+- **I3 Dato externo:** se **copia al dispositivo** como `Food` propio con `source`/`ref` de origen (funciona offline, sin migración); no se consulta cada vez.
+- **I4 Modelo de la foto:** Haiku 5.5; validar con 10-20 etiquetas reales (checklist manual).
+- **I5 Descartado por ahora:** búsqueda OFF por texto (sin CORS), FatSecret/Edamam/Nutritionix/MyFitnessPal, HealthKit/Atajos, importador CSV.
+- **I6:** `X-User-Agent` con la URL del repo, no un email. Atribución ODbL con enlace a OFF.
+
+**Ejecución:** tech-lead (spec `docs/TECH_SPEC-food-integrations.md`, partida en ciclos) → okay del usuario si hay decisiones nuevas → implementer → reviewer → merge → push → cycle-analyst, por ciclo.
+
+**Estado:** paso 4 (tech-lead).
 
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
