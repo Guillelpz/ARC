@@ -1517,3 +1517,93 @@ test('U-FD8 Dieta oculta sin objetivo ni eventos; aparece al fijar el objetivo',
   go('Inicio')
   expect(screen.getByRole('button', { name: /^Dieta 5 días/ })).toBeTruthy()
 })
+
+// --- Comida (ciclo 30) ---
+const type = (label: string | RegExp, value: string) => fireEvent.change(screen.getByLabelText(label), { target: { value } })
+const fieldv = (k: string, v: string) => fireEvent.change(document.getElementById('food-c-' + k)!, { target: { value: v } })
+const createFood = (name: string, kcal = '300') => {
+  fireEvent.click(btn('Crear alimento'))
+  type('Nombre', name); type(/^Calorías \(kcal\)/, kcal); fieldv('p', '10'); fieldv('c', '40'); fieldv('f', '5')
+}
+
+test('U-FD9 alimentos propios: crear, buscar primero, archivar y reactivar; nombre único', async () => {
+  render(<App />); openFood()
+  createFood('Arroz', '300')
+  fireEvent.click(btn('Guardar'))
+  expect(screen.getByText('Alimento creado: Arroz')).toBeTruthy()
+  fireEvent.click(btn('Añadir'))
+  expect(diary().getByText('Arroz')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().foods).toMatchObject([{ name: 'Arroz', base: 'g', kcal: 300, p: 10, c: 40, f: 5 }]))
+  expect(foodStored().foods[0].id).toMatch(/^food-/)
+  search('arroz')
+  const names = screen.getAllByRole('button', { name: /kcal\/100/ }).map(b => b.textContent)
+  expect(names[0]).toMatch(/^Arroz300/) // el propio antes que el catálogo
+  fireEvent.click(btn('Archivar Arroz'))
+  expect(screen.getByText('Archivado: Arroz')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: /^Arroz300/ })).toBeNull()
+  await vi.waitFor(() => expect(foodStored().foods[0].archived).toBe(true))
+  // crear con el mismo nombre → «Reactivar»; con el del catálogo → no se permite
+  createFood('arroz'); expect(screen.getByText('Ya existe, archivado.')).toBeTruthy()
+  fireEvent.click(btn('Guardar'))
+  expect(screen.getByRole('alert').textContent).toMatch(/Reactivar/)
+  type('Nombre', 'Plátano'); expect(screen.getByText('Ya existe en el catálogo.')).toBeTruthy()
+  type('Nombre', 'arroz'); fireEvent.click(btn('Reactivar'))
+  expect(screen.getByText('Reactivado: Arroz')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().foods[0].archived).toBeUndefined())
+  fireEvent.click(btn('Cancelar'))
+  // los macros no pueden sumar más de 100
+  createFood('Raro'); fieldv('f', '60'); fireEvent.click(btn('Guardar'))
+  expect(screen.getByText('Los macros suman más de 100 g por 100 g.')).toBeTruthy()
+})
+
+test('U-FD10 platos: guardar, añadir de un toque, deshacer todo, borrar', async () => {
+  render(<App />); openFood()
+  search('arroz'); fireEvent.click(btn(/^Arroz blanco cocido/)); fireEvent.click(btn('Añadir'))
+  search('huevo'); fireEvent.click(btn(/^Huevo/)); fireEvent.click(btn('Añadir'))
+  quick('100')
+  fireEvent.click(btn('Guardar como plato'))
+  const group = within(screen.getByRole('group', { name: 'Alimentos del día' }))
+  expect(group.getAllByRole('checkbox')).toHaveLength(2) // el añadido rápido no entra
+  expect(group.getAllByRole('checkbox').every(c => !(c as HTMLInputElement).checked)).toBe(true)
+  fireEvent.click(btn('Guardar'))
+  expect(screen.getByText('Marca al menos un alimento.')).toBeTruthy()
+  fireEvent.click(group.getByLabelText(/^Arroz blanco cocido/)); fireEvent.click(group.getByLabelText(/^Huevo/))
+  type('Nombre del plato', 'Comida típica'); fireEvent.click(btn('Guardar'))
+  expect(screen.getByText('Plato guardado: Comida típica')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().meals).toMatchObject([{ name: 'Comida típica', items: [{ foodId: 'rice-white-cooked' }, { foodId: 'egg' }] }]))
+  fireEvent.click(btn('Añadir plato Comida típica'))
+  expect(screen.getByText(/^Añadido: Comida típica \(2 alimentos\)/)).toBeTruthy()
+  expect(diary().getAllByRole('button', { name: /^Deshacer/ })).toHaveLength(5)
+  await vi.waitFor(() => expect(foodStored().log.filter((e: { via?: string }) => e.via === 'meal')).toHaveLength(2))
+  fireEvent.click(within(screen.getByRole('region', { name: 'Platos' })).getByRole('button', { name: 'Deshacer' }))
+  expect(screen.getByText(/^Deshecho: 2 entradas del plato/)).toBeTruthy()
+  expect(diary().getAllByRole('button', { name: /^Deshacer/ })).toHaveLength(3)
+  fireEvent.click(btn('Borrar plato Comida típica'))
+  expect(screen.getByText('Plato borrado: Comida típica')).toBeTruthy()
+  await vi.waitFor(() => expect(foodStored().meals).toBeUndefined())
+})
+
+test('U-FD11 plato con alimentos que ya no existen y máximo de 20 platos', () => {
+  const meal = (i: number, items = [{ foodId: 'egg', qty: 50 }]) => ({ id: `meal-${i}`, name: `Plato ${i}`, items })
+  localStorage.setItem(FD, JSON.stringify({ log: [], foods: [], meals: [meal(0, [{ foodId: 'egg', qty: 50 }, { foodId: 'ya-no-existe', qty: 10 }]), ...Array.from({ length: 19 }, (_, i) => meal(i + 1))] }))
+  render(<App />); openFood()
+  fireEvent.click(btn('Añadir plato Plato 0'))
+  expect(screen.getByText(/1 alimento del plato ya no existe y no se ha añadido/)).toBeTruthy()
+  expect(diary().getAllByRole('button', { name: /^Deshacer/ })).toHaveLength(1)
+  expect((btn('Guardar como plato') as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByText('Máximo 20 platos: borra alguno para guardar otro.')).toBeTruthy()
+})
+
+test('U-FD12 resumen semanal: media sobre días con registros y lista equivalente al gráfico', () => {
+  const e = (id: string, day: string, kcal: number) => ({ id, occurredAt: `${day}T10:00:00`, name: 'Pizza', kcal, qty: 0 })
+  localStorage.setItem(FD, JSON.stringify({ log: [e('a', '2026-10-05', 1900), e('b', '2026-10-06', 2100), e('c', '2026-09-29', 3000)], foods: [], goals: [{ from: '2026-09-01', kcal: 2000, p: 20, c: 50, f: 30 }] }))
+  render(<App />); openFood()
+  const week = within(screen.getByRole('region', { name: 'Semana' }))
+  expect(week.getByText('2.000 / 2.000 kcal/día')).toBeTruthy() // 2 días con registros, no 7
+  expect(week.getByText('2 días · 2 en rango')).toBeTruthy()
+  const items = week.getAllByRole('listitem').map(li => li.textContent)
+  expect(items).toHaveLength(8)
+  expect(items[7]).toMatch(/\(en curso\): media 2\.000 kcal en 2 días · objetivo 2\.000 · 2 en rango$/)
+  expect(items[6]).toMatch(/: media 3\.000 kcal en 1 día · objetivo 2\.000 · 0 en rango$/)
+  expect(items[0]).toMatch(/: sin registros$/)
+})
