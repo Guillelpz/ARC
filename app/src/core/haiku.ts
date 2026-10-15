@@ -1,7 +1,7 @@
-import type { Exercise, WeightUnit } from './types'
+import type { Exercise, Food, WeightUnit } from './types'
 import { VOICE_MAX_CHARS, fromAI, parseGym, pickDraft, type GymDraft, type HaikuError, type VoiceCommand } from './voice'
 import { localCapture } from './memory'
-import { captureFromAI, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { captureFromAI, localFood, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
 
 export type { HaikuError } from './voice'
 export type HaikuResult = { ok: true; draft: GymDraft } | { ok: false; error: HaikuError }
@@ -155,4 +155,9 @@ export async function interpretCapture(text: string, ctx: CaptureCtx, key: strin
   const ai = key && online ? await askCapture(text, ctx, key, fetchImpl) : null
   const c = pickCapture(ai?.ok ? ai.cmd : null, cmd, ctx)
   return ai && !ai.ok ? { ...c, aiError: ai.error } : c
+}
+
+// Comida de «Dictar» en Comida: solo el parser (la rama de Haiku llega en el ciclo 38; sin clave ya es el comportamiento final).
+export async function interpretFood(text: string, own: Food[]): Promise<ReturnType<typeof localFood>> {
+  return localFood(text, own)
 }

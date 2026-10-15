@@ -150,6 +150,8 @@ export function buildNew({ name, type, unit, ms, src, ctx, branch, confidence, r
   }
 }
 
+const MEASURE_G_ML = /\d (?:g|gr|gramos?|grams?|ml|cl|l|mililitros?|litros?|liters?|litres?|milliliters?|millilitres?)(?![a-z])/
+
 // Router determinista (también es el respaldo de la IA). Orden: otro día > gym > hábito con coincidencia exacta (+ comida adjunta, FV4)
 // > comida (término o «kcal») > hábito aproximado > comida desconocida (verbo de comer o g/ml) > hábito nuevo.
 export function routeCapture(text: string, ctx: CaptureCtx): CaptureCommand {
@@ -165,7 +167,11 @@ export function routeCapture(text: string, ctx: CaptureCtx): CaptureCommand {
   }
   if (fp.items.length) return { ...src, kind: 'food', ...fp }
   const tr = matchTracker(t, ctx.trackers, ALL_UNITS)
-  if (tr) return { ...src, kind: 'tracker', trackerId: tr.id, ...resolveAmount(tr, measures(t)) }
+  if (tr) {
+    const a = resolveAmount(tr, measures(t))
+    // Guardia de unidad: g/ml nunca es una cantidad válida de un hábito de unidades («beef 200 g» no es Beer): va a comida.
+    if (!(a.problem === 'unit' && MEASURE_G_ML.test(t))) return { ...src, kind: 'tracker', trackerId: tr.id, ...a }
+  }
   if (looksLikeFood(t)) {
     const any = parseFoodVoice(text, own, { anyFood: true })
     if (any.items.length) return { ...src, kind: 'food', ...any }
@@ -242,4 +248,13 @@ export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, c
   }
   const sameHabit = ai.kind === 'tracker' && parsed.kind === 'tracker' && ai.trackerId === parsed.trackerId
   return sameHabit && !isReady(ai, ctx) && isReady(parsed, ctx) ? parsed : ai
+}
+
+// Comida del día elegido (Comida → «Dictar»): solo entiende comida. Otro día → no guarda (A7); sin nada reconocible → unknown.
+// ponytail: sin Haiku hasta el ciclo 38; no pasa por hábitos ni gym.
+export function localFood(text: string, own: Food[]): Extract<CaptureCommand, { kind: 'food' | 'other-day' | 'unknown' }> {
+  const src: Src = { text, source: 'parser' }
+  if (isOtherDay(captureNorm(text))) return { ...src, kind: 'other-day' }
+  const p = parseFoodVoice(text, own, { anyFood: true })
+  return p.items.length ? { ...src, kind: 'food', ...p } : { ...src, kind: 'unknown' }
 }
