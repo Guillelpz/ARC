@@ -1,8 +1,9 @@
-import type { Food, Portion } from './types'
+import type { Food, FoodEntry, Portion } from './types'
 import { STOPWORDS, normalizeText } from './classify'
 import { normalizeVoice } from './voice'
 import { CATALOG } from './foodCatalog'
 import { fmtKcal, fmtPortion, fold, foodById, portion as nutrients } from './food'
+import { trimName } from './off'
 import { GENERIC_SERVING, SERVING_WORDS, VOICE_ALIASES } from './foodAliases'
 
 export const MAX_FOOD_ITEMS = 8
@@ -12,9 +13,10 @@ export type FoodProblem = 'missing' | 'range' | 'unit' | 'guess'
 export type FoodItem =
   | { k: 'food'; said: string; foodId: string; qty: FoodQty | null; portion: Portion | null; problem: FoodProblem | null }
   | { k: 'quick'; said: string; kcal: number; name: string }
+  | { k: 'estimate'; said: string; draft: Omit<Food, 'id'>; portion: Portion } // solo Haiku (FV3); nunca está listo: se guarda al confirmar
   | { k: 'pending'; said: string; query: string; ids: string[]; qty: FoodQty | null } // ids ≥ 2 ambiguo; [] desconocido
 export type FoodParse = { items: FoodItem[]; rest: string } // rest = palabras de contenido sin reconocer ('' si ninguna)
-export type VoiceAdd = { food: Food; portion: Portion } | { quick: { kcal: number; name: string } }
+export type VoiceAdd = { food: Food; portion: Portion } | { quick: { kcal: number; name: string } } | { estimate: Omit<Food, 'id'>; portion: Portion; own: boolean }
 
 type FoodUnit = { kind: 'g' | 'ml' | 'kcal'; mul: number }
 const unitsOf = (words: string, u: FoodUnit): [string, FoodUnit][] => words.split(' ').map(w => [w, u])
@@ -228,9 +230,11 @@ const MEASURE_RE = /\d(?: (?:g|gr|gramos?|grams?|ml|cl|l|mililitros?|litros?|lit
 export const looksLikeFood = (norm: string): boolean => EAT_RE.test(norm) || MEASURE_RE.test(norm)
 
 // Alimentos ya listos o confirmados → lo que se guarda. Lo que no tiene ración se ignora.
-export function voiceAdds(items: FoodItem[], own: Food[]): VoiceAdd[] {
-  return items.flatMap((i): VoiceAdd[] => {
+// Una estimación solo entra con `ownFlags` (la confirmación del usuario; `ownFlags[k]` = guardarla también como alimento propio): nunca se guarda sola.
+export function voiceAdds(items: FoodItem[], own: Food[], ownFlags?: boolean[]): VoiceAdd[] {
+  return items.flatMap((i, k): VoiceAdd[] => {
     if (i.k === 'quick') return [{ quick: { kcal: i.kcal, name: i.name } }]
+    if (i.k === 'estimate') return ownFlags ? [{ estimate: i.draft, portion: i.portion, own: ownFlags[k] === true }] : []
     if (i.k !== 'food' || !i.portion || (i.problem !== null && i.problem !== 'guess')) return []
     const food = foodById(i.foodId, own)
     return food ? [{ food, portion: i.portion }] : []
@@ -241,6 +245,7 @@ export function voiceAdds(items: FoodItem[], own: Food[]): VoiceAdd[] {
 export function itemText(i: FoodItem, own: Food[]): string {
   if (i.k === 'quick') return `${i.name} · ${fmtKcal(i.kcal)} kcal`
   if (i.k === 'pending') return i.query
+  if (i.k === 'estimate') return [i.draft.name, fmtPortion(i.portion, i.draft.base), `${fmtKcal(nutrients({ id: '', ...i.draft }, i.portion.qty).kcal)} kcal`].filter(Boolean).join(' · ')
   const f = foodById(i.foodId, own)
   if (!f) return i.said
   if (!i.portion) return f.name
@@ -250,6 +255,7 @@ export function itemText(i: FoodItem, own: Food[]): string {
 // Kcal de un ítem listo (0 si no tiene ración)
 export function itemKcal(i: FoodItem, own: Food[]): number {
   if (i.k === 'quick') return i.kcal
+  if (i.k === 'estimate') return nutrients({ id: '', ...i.draft }, i.portion.qty).kcal
   if (i.k !== 'food' || !i.portion) return 0
   const f = foodById(i.foodId, own)
   return f ? nutrients(f, i.portion.qty).kcal : 0
@@ -260,7 +266,74 @@ export function pendingText(i: FoodItem, own: Food[]): string {
   if (i.k === 'pending') return i.ids.length >= 2 ? `«${i.query}»: hay varios alimentos` : `«${i.query}»: no está en tus alimentos`
   if (i.k === 'food' && !itemReady(i)) {
     const name = foodById(i.foodId, own)?.name ?? i.said
+    if (i.problem === 'guess') return itemText(i, own)
     return `${name} · ${i.problem === 'range' ? 'cantidad fuera de rango' : i.problem === 'unit' ? 'no sé esa medida' : 'falta la cantidad'}`
   }
   return itemText(i, own)
+}
+
+// ¿Hay algo que confirmar con «Apuntar»? Una estimación de Haiku o una ración típica propuesta.
+export const isConfirmable = (i: FoodItem): boolean => i.k === 'estimate' || (i.k === 'food' && i.problem === 'guess' && i.portion !== null)
+
+// Entrada de una estimación confirmada sin guardarla como propio (A4): tipo añadido rápido con macros, nombre «X (200 g)».
+export function estimateEntry(draft: Omit<Food, 'id'>, p: Portion, id: string, at: string): FoodEntry {
+  const n = nutrients({ id: '', ...draft }, p.qty)
+  return { id, occurredAt: at, name: trimName(`${draft.name} (${fmtPortion({ qty: p.qty }, draft.base)})`, 60), kcal: n.kcal, p: n.p, c: n.c, f: n.f, qty: 0, via: 'voice' }
+}
+
+const AI_UNITS: readonly unknown[] = ['g', 'kg', 'ml', 'l', 'kcal', 'serving', 'none']
+const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+const per100 = (n: number, max: number) => n >= 0 && n <= max
+
+// Lista de alimentos de Haiku (ya parseada) → ítems. Haiku da nombres, no ids: se resuelven con los mismos términos que el parser.
+// null si algún elemento (de los 8 primeros) no cumple tipos o enums: entonces manda el parser.
+// ponytail: el nombre solo cuenta como alimento del catálogo si el término empieza la frase («arroz blanco» sí; «bocadillo de calamares» no, es una estimación): sin erratas ni plurales raros.
+export function foodItemsFromAI(v: unknown, own: Food[] = NO_OWN): FoodItem[] | null {
+  if (!Array.isArray(v)) return null
+  const terms = foodTerms(own), out: FoodItem[] = []
+  for (const x of v.slice(0, MAX_FOOD_ITEMS) as unknown[]) {
+    if (typeof x !== 'object' || x === null || Array.isArray(x)) return null
+    const o = x as Record<string, unknown>
+    if (typeof o.name !== 'string' || !AI_UNITS.includes(o.unit) || typeof o.servingWord !== 'string' || (o.base !== 'g' && o.base !== 'ml') ||
+      !(o.amount === null || fin(o.amount)) || !(o.typicalQty === null || fin(o.typicalQty)) || !fin(o.kcal100) || !fin(o.p100) || !fin(o.c100) || !fin(o.f100)) return null
+    const name = o.name.trim().replace(/\s+/g, ' ')
+    if (name.length < 1 || name.length > 60) return null
+    const amount = o.amount, unit = o.unit as 'g' | 'kg' | 'ml' | 'l' | 'kcal' | 'serving' | 'none'
+    const tq = o.typicalQty !== null && rangeOk(o.typicalQty) ? r1(o.typicalQty) : null
+    const word = normalizeText(o.servingWord).split(' ')[0] || 'unidad'
+    const qty: FoodQty | null = amount === null || unit === 'kcal' ? null
+      : unit === 'g' || unit === 'kg' ? { n: amount * (unit === 'kg' ? 1000 : 1), unit: 'g', word: unit }
+      : unit === 'ml' || unit === 'l' ? { n: amount * (unit === 'l' ? 1000 : 1), unit: 'ml', word: unit }
+      : unit === 'serving' ? { n: amount, unit: 'serving', word }
+      : { n: amount, unit: null, word: '' }
+    const hit = findFoods(foodNorm(name).split(' '), terms)[0]
+    const head = hit && hit.s === 0 ? hit : null
+    if (unit === 'kcal' && amount !== null && Math.round(amount) >= 1 && Math.round(amount) <= 10000) {
+      out.push({ k: 'quick', said: name, kcal: Math.round(amount), name: head && head.ids.length === 1 ? foodById(head.ids[0], own)!.name : cap(name).slice(0, 60) })
+      continue
+    }
+    if (head) {
+      if (head.ids.length >= 2) { out.push({ k: 'pending', said: name, query: name, ids: head.ids, qty }); continue }
+      const f = foodById(head.ids[0], own)!
+      let pf = portionFor(f, qty)
+      if (pf.problem === 'missing' && tq !== null) {
+        const n = qty?.unit === 'serving' ? qty.n : 1
+        if (tq * n <= 2000) pf = { portion: { qty: r1(tq * n) }, problem: 'guess' }
+      }
+      out.push({ k: 'food', said: name, foodId: f.id, qty, ...pf })
+      continue
+    }
+    // sin alimento conocido: estimación de Haiku (si los números son plausibles) o pendiente para buscarlo a mano
+    const macros = per100(o.kcal100, 900) && per100(o.p100, 100) && per100(o.c100, 100) && per100(o.f100, 100) && o.p100 + o.c100 + o.f100 <= 100
+    let portion: Portion | null = null
+    if (macros) {
+      if (qty && (qty.unit === 'g' || qty.unit === 'ml')) { const q = r1(qty.n); if (rangeOk(q)) portion = { qty: q } }
+      else if (tq !== null) portion = byServing({ name: 'Ración', qty: tq }, qty ? qty.n : 1).portion
+    }
+    if (macros && portion) {
+      const draft: Omit<Food, 'id'> = { name: trimName(cap(name), 40), base: o.base, kcal: r1(o.kcal100), p: r1(o.p100), c: r1(o.c100), f: r1(o.f100), ...(tq !== null ? { servings: [{ name: 'Ración', qty: tq }] } : {}), source: 'estimate' }
+      out.push({ k: 'estimate', said: name, draft, portion })
+    } else out.push({ k: 'pending', said: name, query: name, ids: [], qty })
+  }
+  return out
 }

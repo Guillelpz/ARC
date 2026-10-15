@@ -16,7 +16,7 @@ import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, di
 import { kcalCoherent, normEan, parseOff } from './off'
 import { labelContent, labelFromAI, labelSchema } from './label'
 import { VOICE_ALIASES, SERVING_WORDS, GENERIC_SERVING } from './foodAliases'
-import { MAX_FOOD_ITEMS, foodNorm, itemText, parseFoodVoice, pluralEq, voiceAdds } from './foodVoice'
+import { MAX_FOOD_ITEMS, estimateEntry, foodItemsFromAI, foodNorm, itemReady, itemText, parseFoodVoice, pluralEq, voiceAdds } from './foodVoice'
 import type { Food, FoodData, FoodEntry, FoodGoal, FoodLogEntry } from './types'
 import { EXERCISES, GROUPS, LB_KG, autoSession, beaten, convert, e1rm, ensureAuto, fmtWeight, fromKg, liveSets, parseWeight, retractAuto, recordText, records, groupVolume, undoMany, gymDay, routineFromDay, routineProgress, setDays, stepWeight, toKg, weeklyBest1rm } from './gym'
 
@@ -892,7 +892,7 @@ export function runSelfCheck() {
   // FVZ1-FVZ8 (ciclo 36) — parser de comida por voz
   {
     const fz = (text: string, own: Food[] = [], o?: { anyFood?: boolean }) => parseFoodVoice(text, own, o).items.map(i =>
-      i.k === 'quick' ? `quick:${i.kcal}:${i.name}` : i.k === 'pending' ? `pend:${i.query}:${i.ids.length}` :
+      i.k === 'quick' ? `quick:${i.kcal}:${i.name}` : i.k === 'estimate' ? `est:${i.draft.name}:${i.portion.qty}` : i.k === 'pending' ? `pend:${i.query}:${i.ids.length}` :
         i.portion ? `food:${i.foodId}:${i.portion.qty}${i.portion.serving ? ':' + i.portion.serving.n : ''}` : `miss:${i.foodId}:${i.problem}`).join('|')
     const kc = (text: string) => parseFoodVoice(text).items.map(i => i.k === 'food' && i.portion ? nutrientsOf(i.foodId, i.portion.qty) : -1)
     const nutrientsOf = (id: string, qty: number) => portion(CATALOG.find(f => f.id === id)!, qty).kcal
@@ -920,7 +920,7 @@ export function runSelfCheck() {
   {
     const ctx: CaptureCtx = { exercises: EXERCISES, trackers: TRACKERS, all: TRACKERS, unit: 'kg' }
     const items = (c: CaptureCommand) => (c.kind === 'food' ? c.items : c.kind === 'tracker' ? c.food ?? [] : []).map(i =>
-      i.k === 'quick' ? `quick:${i.kcal}` : i.k === 'pending' ? `pend:${i.query}:${i.ids.length}` : i.portion ? `food:${i.foodId}:${i.portion.qty}` : `miss:${i.foodId}:${i.problem}`).join('|')
+      i.k === 'quick' ? `quick:${i.kcal}` : i.k === 'estimate' ? 'est' : i.k === 'pending' ? `pend:${i.query}:${i.ids.length}` : i.portion ? `food:${i.foodId}:${i.portion.qty}` : `miss:${i.foodId}:${i.problem}`).join('|')
     const r = (t: string) => routeCapture(t, ctx)
     const burger = r('comí una hamburguesa'), burger200 = r('hamburguesa 200 g')
     ok(burger.kind === 'tracker' && burger.trackerId === 'burgers' && burger.amount === 1 && burger.problem === null && items(burger) === 'miss:beef-burger:missing' &&
@@ -948,7 +948,7 @@ export function runSelfCheck() {
   {
     const own: Food[] = []
     const adds = voiceAdds(parseFoodVoice('200 g de arroz y dos huevos y 500 kcal', own).items, own)
-    const es = adds.map((a, i) => 'quick' in a ? quickEntry(a.quick, `q${i}`, '2026-10-15T10:00:00', 'voice') : makeEntry(a.food, a.portion, `f${i}`, '2026-10-15T10:00:00', 'voice'))
+    const es = adds.map((a, i) => 'quick' in a ? quickEntry(a.quick, `q${i}`, '2026-10-15T10:00:00', 'voice') : 'estimate' in a ? quickEntry({ kcal: 0 }, `e${i}`, '2026-10-15T10:00:00') : makeEntry(a.food, a.portion, `f${i}`, '2026-10-15T10:00:00', 'voice'))
     const raw = quickEntry({ kcal: 300 }, 'q', '2026-10-15T10:00:00')
     ok(es.length === 3 && es.every(e => e.via === 'voice') && es[0].foodId === 'rice-white-cooked' && es[0].qty === 200 && es[1].foodId === 'egg' && es[1].qty === 100 && es[1].serving?.n === 2 &&
       es[2].kcal === 500 && es[2].qty === 0 && !('foodId' in es[2]) && !('via' in raw) && raw.qty === 0 &&
@@ -964,6 +964,35 @@ export function runSelfCheck() {
       foodItemSchema.required.every(k => k in foodItemSchema.properties) && foodSchema.required.join() === 'otherDay,foods' &&
       !pr.includes('<b>') && pr.includes('<propios>') && pr.includes('Mi tarta') && !pr.includes('Vieja') && !pr.includes('Arroz blanco') && fp.includes('<propios>') && !fp.includes('Vieja') && !fp.includes('<b>') &&
       !capturePrompt('x', { ...ctx, foods: [] }).includes('<propios>') && CAPTURE_SYSTEM.includes('foods') && CAPTURE_SYSTEM.includes('"food"') && FOOD_SYSTEM.includes('otherDay'), 'FVZ17 esquemas y prompts')
+  }
+
+  // FVZ13-FVZ14, FVZ16 (ciclo 38) — la lista de alimentos de Haiku y su combinación con el parser
+  {
+    const ctx: CaptureCtx = { exercises: EXERCISES, trackers: TRACKERS, all: TRACKERS, unit: 'kg' }
+    const fi = (o: Record<string, unknown>) => ({ name: 'arroz blanco', amount: null, unit: 'none', servingWord: '', base: 'g', kcal100: 130, p100: 3, c100: 28, f100: 0, typicalQty: null, ...o })
+    const calamares = fi({ name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 })
+    const one = (o: Record<string, unknown>) => foodItemsFromAI([fi(o)])
+    const rice = one({ amount: 200, unit: 'g' }), est = one(calamares), guess = one({ name: 'arroz', typicalQty: 150 }), bad = one({ kcal100: 950, name: 'sopa mágica', amount: 300, unit: 'g' })
+    const nine = foodItemsFromAI(Array.from({ length: 9 }, () => fi({ name: 'manzana', amount: 1, unit: 'serving' })))
+    ok(rice?.length === 1 && rice[0].k === 'food' && rice[0].foodId === 'rice-white-cooked' && rice[0].portion?.qty === 200 && itemReady(rice[0]) &&
+      est?.[0].k === 'estimate' && est[0].draft.source === 'estimate' && est[0].draft.name === 'Bocadillo de calamares' && est[0].portion.qty === 200 && !itemReady(est[0]) && est[0].draft.servings?.[0].qty === 200 &&
+      guess?.[0].k === 'food' && guess[0].problem === 'guess' && guess[0].portion?.qty === 150 && !itemReady(guess[0]) &&
+      bad?.[0].k === 'pending' && bad[0].ids.length === 0 && one({ unit: 'galones' }) === null && foodItemsFromAI('x') === null && foodItemsFromAI([null]) === null && nine?.length === MAX_FOOD_ITEMS &&
+      one({ name: 'tostada', unit: 'kcal', amount: 300 })?.[0].k === 'quick' && one({ name: 'mi tarta', amount: 100, unit: 'g' })?.[0].k === 'estimate', 'FVZ13 foodItemsFromAI')
+    const base = { kind: 'tracker', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'reading', amount: 50, amountUnit: 'pages', unitWord: 'pages',
+      name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }
+    const ca = (o: Record<string, unknown>) => captureFromAI({ ...base, ...o }, 'x', ctx)
+    const noFoods = ca({}), fKind = ca({ kind: 'food', foods: [fi({ amount: 200, unit: 'g' })] }), withBurger = ca({ trackerId: 'burgers', amount: null, amountUnit: 'none', unitWord: '', foods: [fi({ amount: 200, unit: 'g' })] })
+    const aiOne = ca({ kind: 'food', foods: [fi({ amount: 200, unit: 'g' })] })!, par2 = routeCapture('200 g de arroz y 150 g de pollo', ctx)
+    const pp = (a: CaptureCommand | null, b: CaptureCommand) => pickCapture(a, b, ctx)
+    ok(noFoods?.kind === 'tracker' && !('food' in noFoods) && ca({ kind: 'food', foods: [] })?.kind === 'unknown' && fKind?.kind === 'food' && fKind.source === 'ai' &&
+      withBurger?.kind === 'tracker' && withBurger.food?.length === 1 && ca({ foods: [{ name: 'x' }] }) === null && ca({ otherDay: true, kind: 'food', foods: [fi({})] })?.kind === 'other-day' &&
+      pp(aiOne, par2) === par2 && pp(aiOne, routeCapture('arroz', ctx)) === aiOne && pp(aiOne, routeCapture('read 30 min', ctx)) === aiOne && pp({ kind: 'other-day', text: 'x', source: 'ai' }, par2).kind === 'other-day' &&
+      pp({ kind: 'unknown', text: 'x', source: 'ai' }, routeCapture('arroz', ctx)).kind === 'food' && pp({ kind: 'unknown', text: 'x', source: 'ai' }, routeCapture('comí un bocadillo', ctx)).kind === 'unknown', 'FVZ14 captureFromAI/pickCapture de comida')
+    const e = estimateEntry({ name: 'Bocadillo de calamares', base: 'g', kcal: 260, p: 10, c: 30, f: 10, source: 'estimate' }, { qty: 200 }, 'e1', '2026-10-15T10:00:00')
+    const long = estimateEntry({ name: 'N'.repeat(40), base: 'g', kcal: 100, p: 1, c: 1, f: 1, source: 'estimate' }, { qty: 1500 }, 'e2', '2026-10-15T10:00:00')
+    ok(e.name === 'Bocadillo de calamares (200 g)' && e.kcal === 520 && e.p === 20 && e.qty === 0 && !('foodId' in e) && e.via === 'voice' && long.name.length <= 60 &&
+      voiceAdds([est![0]], []).length === 0 && voiceAdds([est![0]], [], [true]).length === 1 && voiceAdds([guess![0]], []).length === 1, 'FVZ16 estimateEntry y confirmación')
   }
 
   // FVZ3 (ciclo 36) — tabla de alias de voz de Comida

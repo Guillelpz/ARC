@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ActivityEvent, DietChange, Food, FoodData, FoodEntry, FoodGoal, Portion } from './core/types'
-import { MAX_MEALS, allFoods, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
+import { MAX_MEALS, allFoods, nameTaken, dayTotals, dietDays, dietSync, goalOn, liveEntries, makeEntry, mealEntries, mealFromEntries, quickEntry, setFoodGoal, undoEntries } from './core/food'
 import { saveFood } from './core/storage'
-import type { VoiceAdd } from './core/foodVoice'
+import { estimateEntry, type VoiceAdd } from './core/foodVoice'
 
 const uuid = () => crypto.randomUUID()
 
@@ -48,13 +48,22 @@ export function useFood(initial: FoodData, { events, today, stamp, pushDiet }: D
     const e: FoodEntry = quickEntry(input, uuid(), stamp(day))
     return { id: e.id, diet: syncDiet({ ...food, log: [...food.log, e] }, [day]) }
   }
-  // Varias entradas de una frase (voz): un solo setFood y un solo dietSync (nunca dos push en el mismo manejador). `created` queda vacío hasta las estimaciones (ciclo 38).
+  // Varias entradas de una frase (voz): un solo setFood y un solo dietSync (nunca dos push en el mismo manejador).
+  // `created` = propios creados desde una estimación confirmada (A4/A5); si el nombre ya existe, la estimación se apunta sin crearlo.
   function addVoice(adds: VoiceAdd[], day: string): { ids: string[]; created: string[]; diet: DietChange } {
     if (!adds.length) return { ids: [], created: [], diet: 0 }
     if (day > today) day = today
     const at = stamp(day)
-    const entries = adds.map(a => 'quick' in a ? quickEntry(a.quick, uuid(), at, 'voice') : makeEntry(a.food, a.portion, uuid(), at, 'voice'))
-    return { ids: entries.map(e => e.id), created: [], diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
+    const created: Food[] = []
+    const entries = adds.map(a => {
+      if ('quick' in a) return quickEntry(a.quick, uuid(), at, 'voice')
+      if ('food' in a) return makeEntry(a.food, a.portion, uuid(), at, 'voice')
+      if (!a.own || nameTaken(a.estimate.name, [...food.foods, ...created])) return estimateEntry(a.estimate, a.portion, uuid(), at)
+      const f: Food = { id: `food-${uuid()}`, ...a.estimate }
+      created.push(f)
+      return makeEntry(f, a.portion, uuid(), at, 'voice')
+    })
+    return { ids: entries.map(e => e.id), created: created.map(f => f.id), diet: syncDiet({ ...food, foods: [...food.foods, ...created], log: [...food.log, ...entries] }, [day]) }
   }
   // Deshace varias entradas y archiva `archive` (propios creados por la frase) en el mismo guardado
   function undoVoice(ids: string[], archive: string[]): { undone: number; diet: DietChange } {
