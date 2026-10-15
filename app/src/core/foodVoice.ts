@@ -307,8 +307,10 @@ export function foodItemsFromAI(v: unknown, own: Food[] = NO_OWN): FoodItem[] | 
       : unit === 'ml' || unit === 'l' ? { n: amount * (unit === 'l' ? 1000 : 1), unit: 'ml', word: unit }
       : unit === 'serving' ? { n: amount, unit: 'serving', word }
       : { n: amount, unit: null, word: '' }
-    const hit = findFoods(foodNorm(name).split(' '), terms)[0]
-    const head = hit && hit.s === 0 ? hit : null
+    const nt = foodNorm(name).split(' ')
+    const hit = findFoods(nt, terms)[0]
+    // un propio solo cuenta si el nombre entero es el suyo («tarta de queso» no es «Tarta»): si no, estimación o pendiente, nunca guardado directo
+    const head = hit && hit.s === 0 && (hit.e === nt.length || !hit.ids.some(id => id.startsWith('food-'))) ? hit : null
     if (unit === 'kcal' && amount !== null && Math.round(amount) >= 1 && Math.round(amount) <= 10000) {
       out.push({ k: 'quick', said: name, kcal: Math.round(amount), name: head && head.ids.length === 1 ? foodById(head.ids[0], own)!.name : cap(name).slice(0, 60) })
       continue

@@ -971,6 +971,7 @@ export function runSelfCheck() {
     const ctx: CaptureCtx = { exercises: EXERCISES, trackers: TRACKERS, all: TRACKERS, unit: 'kg' }
     const fi = (o: Record<string, unknown>) => ({ name: 'arroz blanco', amount: null, unit: 'none', servingWord: '', base: 'g', kcal100: 130, p100: 3, c100: 28, f100: 0, typicalQty: null, ...o })
     const calamares = fi({ name: 'bocadillo de calamares', amount: 1, unit: 'serving', servingWord: 'bocadillo', kcal100: 260, p100: 10, c100: 30, f100: 10, typicalQty: 200 })
+    const tartaOwn: Food = { id: 'food-1', name: 'Tarta', base: 'g', kcal: 300, p: 3, c: 40, f: 10 }
     const one = (o: Record<string, unknown>) => foodItemsFromAI([fi(o)])
     const rice = one({ amount: 200, unit: 'g' }), est = one(calamares), guess = one({ name: 'arroz', typicalQty: 150 }), bad = one({ kcal100: 950, name: 'sopa mágica', amount: 300, unit: 'g' })
     const nine = foodItemsFromAI(Array.from({ length: 9 }, () => fi({ name: 'manzana', amount: 1, unit: 'serving' })))
@@ -978,7 +979,8 @@ export function runSelfCheck() {
       est?.[0].k === 'estimate' && est[0].draft.source === 'estimate' && est[0].draft.name === 'Bocadillo de calamares' && est[0].portion.qty === 200 && !itemReady(est[0]) && est[0].draft.servings?.[0].qty === 200 &&
       guess?.[0].k === 'food' && guess[0].problem === 'guess' && guess[0].portion?.qty === 150 && !itemReady(guess[0]) &&
       bad?.[0].k === 'pending' && bad[0].ids.length === 0 && one({ unit: 'galones' }) === null && foodItemsFromAI('x') === null && foodItemsFromAI([null]) === null && nine?.length === MAX_FOOD_ITEMS &&
-      one({ name: 'tostada', unit: 'kcal', amount: 300 })?.[0].k === 'quick' && one({ name: 'mi tarta', amount: 100, unit: 'g' })?.[0].k === 'estimate', 'FVZ13 foodItemsFromAI')
+      one({ name: 'tostada', unit: 'kcal', amount: 300 })?.[0].k === 'quick' && one({ name: 'mi tarta', amount: 100, unit: 'g' })?.[0].k === 'estimate' &&
+      foodItemsFromAI([fi({ name: 'tarta', amount: 100, unit: 'g' })], [tartaOwn])?.[0].k === 'food' && foodItemsFromAI([fi({ name: 'tarta de queso', amount: 100, unit: 'g' })], [tartaOwn])?.[0].k === 'estimate', 'FVZ13 foodItemsFromAI (un propio solo con el nombre entero)')
     const base = { kind: 'tracker', otherDay: false, exerciseId: 'none', weight: null, weightUnit: 'none', reps: null, sets: 1, trackerId: 'reading', amount: 50, amountUnit: 'pages', unitWord: 'pages',
       name: '', branch: 'hero', confidence: 'baja', type: 'count', customUnit: '', reason: '' }
     const ca = (o: Record<string, unknown>) => captureFromAI({ ...base, ...o }, 'x', ctx)
