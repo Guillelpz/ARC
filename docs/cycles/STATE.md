@@ -9,6 +9,14 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–30 cerrados e implementados. Las specs y docu
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`, en el historial de git). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
+## Ciclo 31 — Comida fase 2: investigar integraciones (+ extraer `useFood`)
+
+Arrancado por el usuario el 2026-10-15 («adelante con lo siguiente»). Dos líneas en paralelo:
+- **31a Refactor:** extraer la lógica de comida de `App.tsx` a `src/useFood.ts` sin cambiar comportamiento (deuda del ciclo 30). Rama `cycle-31`; implementer → reviewer → merge → push.
+- **31b Investigación:** informe `docs/cycles/cycle-31/research-integrations.md` (fuentes de datos, código de barras, importación desde otras apps, viabilidad sin backend, licencias, privacidad, coste). Después, preguntas al usuario → tech-lead → implementación en ciclos siguientes. MyFitnessPal descartado como fuente (API cerrada).
+
+**Estado:** 31a en implementación; 31b investigando.
+
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
 Arrancado por el usuario el 2026-10-15 (pasos 1-2 omitidos; decisiones F1-F12 aprobadas en el chat, no se reabren). El tech-lead divide en fases/ciclos (`docs/TECH_SPEC-food.md`). Fases siguientes, **fuera de este alcance**: integraciones con apps/bases de comida (fase 2, investigación) y registro por voz (fase 3). El modelo de datos debe dejarlas encajar sin migraciones.
