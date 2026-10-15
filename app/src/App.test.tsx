@@ -89,7 +89,7 @@ test('U6 importar', async () => {
   const { container } = render(<App />)
   importFile(container, '{roto')
   expect(await screen.findByText('Ese archivo no es una copia válida de RPG Life Tracker.')).toBeTruthy()
-  expect(stored()).toEqual([])
+  await vi.waitFor(() => expect(stored()).toEqual([]))
   const ev = [{ id: 'x1', trackerId: 'gym', amount: 1, occurredAt: '2026-10-05T09:00:00' }]
   const copia = exportBackup(ev, { trackers: [], proposals: [] }, 'x')
   vi.mocked(window.confirm).mockReturnValueOnce(false)
@@ -1224,7 +1224,7 @@ test('U-C1 «+»: Reading con páginas, conversión y Deshacer deja el neto en 0
   expect(stored()[0]).toMatchObject({ trackerId: 'reading', amount: 100 })
   fireEvent.click(btn('Deshacer'))
   expect(await screen.findByText('Deshecho: +100 min en Reading.')).toBeTruthy()
-  expect(net('reading')).toBe(0)
+  await vi.waitFor(() => expect(net('reading')).toBe(0))
 })
 
 test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto en 2', async () => {
@@ -1239,19 +1239,19 @@ test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto
   fireEvent.change(q, { target: { value: '2' } })
   fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+2 unidades/)).toBeTruthy()
-  expect(net('burgers')).toBe(2)
+  await vi.waitFor(() => expect(net('burgers')).toBe(2))
 })
 
 test('U-C6 unidad que no encaja: no guarda y pide la cantidad en la unidad del hábito', async () => {
   ackVoice(); setVoz('corrí 30 minutos'); render(<App />)
   fireEvent.click(btn('Dictar'))
   expect(await screen.findByText('Running se mide en km: no se ha apuntado nada.')).toBeTruthy()
-  expect(stored()).toHaveLength(0)
+  await vi.waitFor(() => expect(stored()).toHaveLength(0))
   await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Cantidad (km)')))
   fireEvent.change(screen.getByLabelText('Cantidad (km)'), { target: { value: '5' } })
   fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Running · \+5 km/)).toBeTruthy()
-  expect(net('running')).toBe(5)
+  await vi.waitFor(() => expect(net('running')).toBe(5))
 })
 
 const customTrackers = () => JSON.parse(localStorage.getItem(CU) ?? '{"trackers":[]}').trackers as { id: string; name: string; branch: string; type: string; unit: string; archived?: boolean }[]
@@ -1270,7 +1270,7 @@ test('U-C3 sin clave, un hábito nuevo nunca se crea solo: propuesta editable', 
   expect(screen.getByRole('heading', { name: 'Propuesta: VILLAIN' })).toBeTruthy()
   fireEvent.click(btn('Crear y apuntar'))
   expect(await screen.findByText(/^Creada: Grounding \(VILLAIN\) · \+30 min\.$/)).toBeTruthy()
-  expect(customTrackers()).toHaveLength(1)
+  await vi.waitFor(() => expect(customTrackers()).toHaveLength(1))
   expect(customTrackers()[0]).toMatchObject({ name: 'Grounding', branch: 'villain', type: 'duration' })
   expect(stored()).toHaveLength(1)
   expect(stored()[0]).toMatchObject({ trackerId: customTrackers()[0].id, amount: 30 })
@@ -1832,11 +1832,11 @@ test('U-FV1 «200 g de arroz y una manzana»: 2 entradas por voz; Deshacer las a
   ackVoice(); setVoz('200 g de arroz y una manzana'); render(<App />)
   fireEvent.click(btn('Dictar'))
   expect(await screen.findByText('Registrado en Comida: 2 alimentos · 354 kcal')).toBeTruthy()
-  expect(foodLive().map(e => [e.name, e.via])).toEqual([['Arroz blanco cocido', 'voice'], ['Manzana', 'voice']])
+  await vi.waitFor(() => expect(foodLive().map(e => [e.name, e.via])).toEqual([['Arroz blanco cocido', 'voice'], ['Manzana', 'voice']]))
   expect(screen.getByText('Arroz blanco cocido · 200 g · 260 kcal')).toBeTruthy()
   fireEvent.click(btn('Deshacer'))
   expect(await screen.findByText('Deshecho: 2 alimentos (354 kcal).')).toBeTruthy()
-  expect(foodLive()).toHaveLength(0)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(0))
   expect((foodStored().log as { undoes?: string }[]).filter(e => e.undoes)).toHaveLength(2)
   await vi.waitFor(() => expect(document.activeElement).toBe(btn('Dictar')))
 })
@@ -1891,7 +1891,7 @@ test('U-FV5 «Editar» deshace las entradas y las deja pendientes en Comida', as
   await screen.findByText('Registrado en Comida: 2 alimentos · 403 kcal')
   fireEvent.click(btn('Editar'))
   expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
-  expect(foodLive()).toHaveLength(0)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(0))
   expect(screen.getAllByRole('button', { name: /^Revisar / })).toHaveLength(2)
   fireEvent.click(screen.getAllByRole('button', { name: /^Quitar / })[0])
   expect(screen.getAllByRole('button', { name: /^Revisar / })).toHaveLength(1)
@@ -1913,19 +1913,20 @@ test('U-FV7 «Dictar comida» con el selector en «Ayer»: entrada de ayer y Des
   fireEvent.click(btn('Ayer'))
   fireEvent.click(btn('Dictar comida'))
   expect(await screen.findByText('Registrado en Comida: 2 alimentos · 354 kcal (ayer).')).toBeTruthy()
-  expect(foodLive().map(e => [e.name, e.via])).toEqual([['Arroz blanco cocido', 'voice'], ['Manzana', 'voice']])
+  // El guardado va en un efecto: se espera a localStorage en vez de leerlo justo tras el texto (fallaba ~1 de cada 6).
+  await vi.waitFor(() => expect(foodLive().map(e => [e.name, e.via])).toEqual([['Arroz blanco cocido', 'voice'], ['Manzana', 'voice']]))
   expect((foodStored().log as { occurredAt: string }[]).every(e => e.occurredAt.startsWith('2026-10-06'))).toBe(true)
   expect(screen.getByText('354 kcal', { selector: 'p' })).toBeTruthy()
   fireEvent.click(btn('Deshacer'))
   expect(await screen.findByText('Deshecho: 2 alimentos (354 kcal).')).toBeTruthy()
-  expect(foodLive()).toHaveLength(0)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(0))
 })
 
 test('U-FV8 frase con otro día en Comida: mensaje y nada guardado', async () => {
   ackVoice(); setVoz('ayer comí 200 g de arroz'); render(<App />); openFood()
   fireEvent.click(btn('Dictar comida'))
   expect(await screen.findByText('Para otro día, cámbialo en el selector y dicta sin decir el día.')).toBeTruthy()
-  expect(foodLive()).toHaveLength(0)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(0))
 })
 
 test('U-FV7b «Dictar comida» con un alimento sin cantidad: pasa a «Por voz: pendiente» sin guardar', async () => {
@@ -1934,7 +1935,7 @@ test('U-FV7b «Dictar comida» con un alimento sin cantidad: pasa a «Por voz: p
   expect(await screen.findByText(/^Registrado en Comida: 1 alimento ·/)).toBeTruthy()
   fireEvent.click(btn('Completar en Comida'))
   expect(await screen.findByRole('heading', { level: 2, name: 'Por voz: pendiente' })).toBeTruthy()
-  expect(foodLive()).toHaveLength(1)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(1))
 })
 
 // --- Comida por voz con Haiku y memoria (ciclo 38). La API se simula: nunca se llama a la real. ---
@@ -1953,7 +1954,7 @@ test('U-FV9 con clave, «un bocadillo de calamares»: chip «Estimación» y nad
   expect(foodLive()).toHaveLength(0); expect(f).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getByRole('button', { name: /^Apuntar Bocadillo de calamares/ }))
   expect(await screen.findByText('Registrado en Comida: 1 alimento · 520 kcal')).toBeTruthy()
-  expect(foodLive().map(e => [e.name, e.via, e.kcal])).toEqual([['Bocadillo de calamares (200 g)', 'voice', 520]])
+  await vi.waitFor(() => expect(foodLive().map(e => [e.name, e.via, e.kcal])).toEqual([['Bocadillo de calamares (200 g)', 'voice', 520]]))
   expect((foodStored().foods as unknown[]).length).toBe(0) // sin la casilla, no se crea un propio (A4)
 })
 
@@ -1970,7 +1971,7 @@ test('U-FV10 «Guardar también como alimento propio»: propio con source estima
   expect(foodLive().map(e => [e.name, e.via])).toEqual([['Bocadillo de calamares', 'voice']])
   fireEvent.click(btn('Deshacer'))
   expect(await screen.findByText('Deshecho: 1 alimento (520 kcal).')).toBeTruthy()
-  expect(foodLive()).toHaveLength(0)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(0))
   expect((foodStored().foods as { archived?: boolean }[])[0].archived).toBe(true)
 })
 
@@ -2010,6 +2011,6 @@ test('U-FV13 doble clic en «Apuntar» de «Dictar comida» guarda una sola vez 
   const ap = await screen.findByRole('button', { name: /^Apuntar Bocadillo de calamares/ })
   act(() => { ap.click(); ap.click() }) // los dos en el mismo lote: ambos ven el mismo `done`
   await screen.findByText(/^Registrado en Comida: 1 alimento · 800 kcal/)
-  expect(foodLive()).toHaveLength(1)
+  await vi.waitFor(() => expect(foodLive()).toHaveLength(1))
   await vi.waitFor(() => expect(net('dieta')).toBe(1))
 })
