@@ -995,6 +995,22 @@ export function runSelfCheck() {
       voiceAdds([est![0]], []).length === 0 && voiceAdds([est![0]], [], [true]).length === 1 && voiceAdds([guess![0]], []).length === 1, 'FVZ16 estimateEntry y confirmación')
   }
 
+  // FVZ15 (ciclo 38) — memoria de frases de comida (O1)
+  {
+    const ctx: CaptureCtx = { exercises: EXERCISES, trackers: TRACKERS, all: TRACKERS, unit: 'kg' }
+    const tarta = (o: Partial<Food> = {}): Food => ({ id: 'food-1', name: 'Mi tarta', base: 'g', kcal: 300, p: 3, c: 40, f: 10, ...o })
+    const cmd = (text: string, source: 'ai' | 'parser' | 'memory'): CaptureCommand => ({ ...(routeCapture(text, ctx) as Extract<CaptureCommand, { kind: 'food' }>), source })
+    const empty: Memo = []
+    const m1 = learn(empty, cmd('200 g de arroz', 'ai')), m2 = learn(empty, cmd('200 g de arroz', 'parser')), m3 = learn(empty, cmd('200 g de arroz y 2 huevos', 'ai')), m4 = learn(empty, cmd('arroz', 'ai'))
+    const r1 = recall('arroz 300 g', { ...ctx, memo: m1 }), r2 = recall('mi tarta 150 g', { ...ctx, memo: [{ k: 'tarta', kind: 'food', id: 'food-1' }], foods: [tarta()] })
+    ok(memoKey('200 gramos de arroz') === 'arroz' && m1.length === 1 && m1[0].kind === 'food' && m1[0].id === 'rice-white-cooked' && m2 === empty && m3 === empty && m4 === empty &&
+      r1?.kind === 'food' && r1.source === 'memory' && r1.items[0].k === 'food' && r1.items[0].portion?.qty === 300 &&
+      r2?.kind === 'food' && r2.items[0].k === 'food' && r2.items[0].portion?.qty === 150 &&
+      recall('mi tarta 150 g', { ...ctx, memo: [{ k: 'tarta', kind: 'food', id: 'food-1' }], foods: [tarta({ archived: true })] }) === null &&
+      recall('mi tarta 150 g', { ...ctx, memo: [{ k: 'tarta', kind: 'food', id: 'food-1' }] }) === null &&
+      readMemo({ v: 1, entries: [{ k: 'arroz', kind: 'food', id: 'rice-white-cooked' }, { k: 'x', kind: 'otra', id: 'y' }] }).length === 1, 'FVZ15 memoria de comida')
+  }
+
   // FVZ3 (ciclo 36) — tabla de alias de voz de Comida
   {
     const fnorm = foodNorm

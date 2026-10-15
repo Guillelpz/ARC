@@ -263,4 +263,16 @@ describe('comida (ciclo 38)', () => {
     expect(await interpretFood('ayer un bocadillo', own, KEY, true, [], f)).toMatchObject({ kind: 'other-day', source: 'parser' })
     expect(f).not.toHaveBeenCalled()
   })
+  test('O1: una frase de comida recordada y lista no llama a fetch; sin cantidad sí', async () => {
+    const f = mock(() => ok(reply(cap)))
+    const memo: Memo = [{ k: 'arroz', kind: 'food', id: 'rice-white-cooked' }]
+    const r = await interpretFood('arroz 300 g', [], KEY, true, memo, f)
+    expect(f).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ kind: 'food', source: 'parser' }) // «arroz 300 g» ya es deviceSure
+    const m = await interpretFood('arroz de todos los dias 300 g', [], KEY, true, [{ k: 'arroz todos dias', kind: 'food', id: 'rice-white-cooked' }], f)
+    expect(f).not.toHaveBeenCalled()
+    expect(m).toMatchObject({ kind: 'food', source: 'memory', items: [{ foodId: 'rice-white-cooked', portion: { qty: 300 } }] })
+    await interpretFood('arroz de todos los dias', [], KEY, true, [{ k: 'arroz todos dias', kind: 'food', id: 'rice-white-cooked' }], f)
+    expect(f).toHaveBeenCalledTimes(1)
+  })
 })
