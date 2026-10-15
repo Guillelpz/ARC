@@ -20,3 +20,8 @@ build, lint y test (286) en verde sobre cycle-38.
 - Esquema: 10 campos obligatorios por alimento, `foods` obligatorio en `captureSchema` (18 campos), `additionalProperties: false`, `max_tokens` 1000 (captura) y 800 (comida). Salida validada por tipos, enums y rangos; si algo falla, manda el parser.
 - Prompt injection: el texto va recortado y sin `<`/`>`, el sistema dice que es dato, y la salida solo llega a la app como datos validados; nada se ejecuta.
 - UI: tokens y paletas bien, chip de texto «Estimación», casilla con `min-h-11` y botón con `aria-label`.
+
+## Segunda vuelta
+Veredicto final: APROBADO. build, lint y test (287) en verde.
+- Privacidad, guard con ref (`confirmed`, por ítem, sin fugas: los ítems son objetos nuevos por comando) y causa de U-C2/U-FV4 (lectura de localStorage antes del efecto, corregida con `vi.waitFor`): correctos. Mi hipótesis anterior sobre el timeout de `findBy*` quedaba descartada.
+- Excepción del catálogo (`foodItemsFromAI`, `head`): aceptable, hallazgo menor residual. «arroz con pollo» puede resolverse a «Arroz» y guardarse con cantidad en gramos, pero el parser determinista ya hace lo mismo con el catálogo, el usuario ve el resultado con «Deshacer»/«Editar» y los propios (nombres libres, más ambiguos) quedan cubiertos. Si el uso real muestra errores, exigir nombre entero también en el catálogo.
