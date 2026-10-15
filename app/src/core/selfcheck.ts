@@ -939,7 +939,9 @@ export function runSelfCheck() {
     const bocadillo = lf('un bocadillo'), beef = routeCapture('beef 200 g', ctx), ate = routeCapture('ate 200 g of beef', ctx)
     ok(bocadillo.kind === 'food' && bocadillo.items.length === 1 && bocadillo.items[0].k === 'pending' && bocadillo.items[0].ids.length === 0 &&
       lf('ayer 200 g de arroz').kind === 'other-day' && lf('200 g de arroz').kind === 'food' && lf('').kind === 'unknown' && lf('hola').kind === 'food', 'FVZ12 localFood')
-    ok(beef.kind === 'food' && ate.kind === 'food' && routeCapture('beer', ctx).kind === 'tracker', 'FVZ12b guardia g/ml: «beef 200 g» no es Beer')
+    ok(beef.kind === 'food' && ate.kind === 'food' && routeCapture('beer', ctx).kind === 'tracker' &&
+      routeCapture('beef 200g', ctx).kind === 'food' && routeCapture('ran 5 km', ctx).kind === 'tracker' && routeCapture('read 30 min', ctx).kind === 'tracker',
+      'FVZ12b guardia g/ml: «beef 200 g»/«200g» no es Beer; Running km y Reading min siguen siendo hábitos')
   }
 
   // FVZ11 (ciclo 36) — entradas de voz

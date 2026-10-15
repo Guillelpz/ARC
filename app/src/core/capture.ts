@@ -150,7 +150,7 @@ export function buildNew({ name, type, unit, ms, src, ctx, branch, confidence, r
   }
 }
 
-const MEASURE_G_ML = /\d (?:g|gr|gramos?|grams?|ml|cl|l|mililitros?|litros?|liters?|litres?|milliliters?|millilitres?)(?![a-z])/
+const MEASURE_G_ML = /\d ?(?:g|gr|gramos?|grams?|ml|cl|l|mililitros?|litros?|liters?|litres?|milliliters?|millilitres?)(?![a-z])/
 
 // Router determinista (también es el respaldo de la IA). Orden: otro día > gym > hábito con coincidencia exacta (+ comida adjunta, FV4)
 // > comida (término o «kcal») > hábito aproximado > comida desconocida (verbo de comer o g/ml) > hábito nuevo.
