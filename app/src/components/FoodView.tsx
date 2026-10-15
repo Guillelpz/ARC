@@ -16,13 +16,15 @@ type Props = {
   onAddEntry: (f: Food, p: Portion, day: string) => { diet: DietChange }
   onAddQuick: (i: { kcal: number; p?: number; c?: number; f?: number; name?: string }, day: string) => { diet: DietChange }
   onUndo: (ids: string[]) => { undone: number; diet: DietChange }
+  onCreateFood: (f: Omit<Food, 'id'>) => Food
+  onArchiveFood: (id: string, archived: boolean) => void
   onSaveGoal: (g: Omit<FoodGoal, 'from'>) => unknown
   onBack: () => void
   saveFailed: boolean
   onExport: () => void
 }
 
-export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onSaveGoal, onBack, saveFailed, onExport }: Props) {
+export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onCreateFood, onArchiveFood, onSaveGoal, onBack, saveFailed, onExport }: Props) {
   const [day, setDay] = useState(today)
   const [status, setStatus] = useState('')
   const diaryRef = useRef<HTMLHeadingElement>(null)
@@ -77,7 +79,7 @@ export function FoodView({ food, today, onAddEntry, onAddQuick, onUndo, onSaveGo
         </section>
 
         <FoodGoalCard goal={todayGoal} onSave={onSaveGoal} />
-        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onStatus={setStatus} />
+        <FoodAdd food={food} day={day} today={today} onAdd={onAddEntry} onQuick={onAddQuick} onCreate={onCreateFood} onArchive={onArchiveFood} onStatus={setStatus} />
         <p role="status" className="text-sm text-hero-muted empty:sr-only">{status}</p>
 
         <section aria-labelledby="food-diary" className={card}>
