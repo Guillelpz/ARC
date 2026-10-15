@@ -8,6 +8,7 @@ import { liveText } from './components/liveText'
 import { downscale } from './image'
 
 vi.mock('./image', () => ({ downscale: vi.fn() }))
+vi.setConfig({ testTimeout: 20000 })
 
 beforeEach(() => {
   localStorage.clear(); unlockStorage()

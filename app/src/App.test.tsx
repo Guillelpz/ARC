@@ -11,6 +11,7 @@ vi.mock('./image', () => ({ downscale: vi.fn() })) // la foto no se decodifica e
 
 // La suite completa corre en paralelo: con carga, el 1 s por defecto de findBy* se queda corto (U-C1 fallaba ~1 de cada 6).
 configure({ asyncUtilTimeout: 3000 })
+vi.setConfig({ testTimeout: 20000 }) // el 5 s por defecto de cada test también se queda corto con la suite en paralelo (U-C2, U-FV4)
 const EV = 'life-rpg-demo-v1', CU = 'life-rpg-custom-v1'
 const stored = () => JSON.parse(localStorage.getItem(EV) ?? '[]')
 beforeEach(() => {
@@ -1998,4 +1999,17 @@ test('U-FV12 «Editar» una estimación abre Comida en «Revisar alimento» con 
   expect(screen.getByText('Estimación', { selector: 'span' })).toBeTruthy()
   expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('Bocadillo de calamares')
   expect(foodLive()).toHaveLength(0)
+})
+
+test('U-FV13 doble clic en «Apuntar» de «Dictar comida» guarda una sola vez (también el +1 de Dieta)', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [], foods: [], goals: [{ from: '2026-10-01', kcal: 800, p: 30, c: 40, f: 30 }] }))
+  ackVoice(); withKey(); setVoz('un bocadillo de calamares')
+  stubFetch(() => Promise.resolve(capFood([{ ...calamares, kcal100: 400 }])))
+  render(<App />); openFood()
+  fireEvent.click(btn('Dictar comida'))
+  const ap = await screen.findByRole('button', { name: /^Apuntar Bocadillo de calamares/ })
+  act(() => { ap.click(); ap.click() }) // los dos en el mismo lote: ambos ven el mismo `done`
+  await screen.findByText(/^Registrado en Comida: 1 alimento · 800 kcal/)
+  expect(foodLive()).toHaveLength(1)
+  await vi.waitFor(() => expect(net('dieta')).toBe(1))
 })
