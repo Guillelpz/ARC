@@ -16,11 +16,12 @@ function serviceWorker(kill: boolean): Plugin {
       const files = (readdirSync(outDir, { recursive: true }) as string[])
         .map(f => f.replaceAll('\\', '/'))
         .filter(f => f !== 'sw.js' && statSync(join(outDir, f)).isFile()).sort()
+      // el .wasm del escáner (~1 MiB) entra en el hash pero no en el precache: el SW lo guarda al primer uso (sw.js)
       const h = createHash('sha256')
       for (const f of files) h.update(f).update(readFileSync(join(outDir, f)))
       const tpl = readFileSync(resolve(root, 'sw.js'), 'utf8')
       if (!tpl.includes(HEAD)) throw new Error('sw.js: falta la cabecera reemplazable')
-      const head = `const BUILD_ID = ${JSON.stringify(h.digest('hex').slice(0, 12))}, ASSETS = ${JSON.stringify(files.map(f => './' + f))}, KILL = ${kill}`
+      const head = `const BUILD_ID = ${JSON.stringify(h.digest('hex').slice(0, 12))}, ASSETS = ${JSON.stringify(files.filter(f => !f.endsWith('.wasm')).map(f => './' + f))}, KILL = ${kill}`
       writeFileSync(join(outDir, 'sw.js'), tpl.replace(HEAD, head))
     },
   }
