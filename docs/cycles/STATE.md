@@ -30,7 +30,7 @@ Arrancado por el usuario el 2026-10-15 (pasos 1-2 omitidos; decisiones F1-F12 ap
 
 **Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food.md`, ciclos 29 (núcleo) y 30 (propios, platos, resumen semanal), seguidos; decisiones A1, B1, C1, D1, E1 (las recomendadas).
 
-**Estado:** ciclo 29 en implementación (rama `cycle-29`).
+**Estado:** ciclo 29 **cerrado** (merge d3c4ddd, push; review APROBADO; análisis en `cycle-29/analysis.md`). Ciclo 30 en implementación (rama `cycle-30`).
 
 ## Ciclo 28 — Menos llamadas a Haiku en la captura por voz
 
