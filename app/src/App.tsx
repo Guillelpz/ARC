@@ -14,6 +14,7 @@ import { askLabel, type LabelResult } from './core/label'
 import { downscale } from './image'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
 import type { CaptureCommand, NewHabit } from './core/capture'
+import type { FoodItem } from './core/foodVoice'
 import { TYPE_DEFAULTS, createTracker } from './core/classify'
 import { beginListen } from './speech'
 import type { GymDraft, VoiceCommand } from './core/voice'
@@ -191,6 +192,8 @@ export default function App() {
   const goTo = (s: Screen) => { if (s === 'new') return openCapture(); setFocusCard(null); setFocusHoy(false); setGymPrefill(null); go(s) }
   const openGym = (from: 'me' | 'home') => { setModuleFrom(from); goTo('gym') }
   const openFood = (from: 'me' | 'home') => { setModuleFrom(from); goTo('food') }
+  // Comida prerrellenada por la voz (captura): los ítems llegan como pendientes. Vuelve a «Hoy», como Gym con `openGymWith`.
+  const openFoodWith = (_items: FoodItem[], _heard: string) => { setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('food') }
   const backFromGym = () => { setGymPrefill(null); if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('gym'); go('me') } }
   const backFromFood = () => { if (moduleFrom === 'home') { setFocusHoy(true); go('home') } else { setFocusCard('food'); go('me') } }
 
@@ -292,7 +295,7 @@ export default function App() {
   const activeExercises = allExercises(gym.exercises).filter(x => !x.archived)
   const openGymWith = (draft: GymDraft, note: string) => { setGymPrefill({ draft, note }); setModuleFrom('home'); setFocusCard(null); setFocusHoy(false); go('gym') }
   const interpretCapt = (text: string): Promise<CaptureCommand> =>
-    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo() }, loadAiKey(), navigator.onLine !== false)
+    interpretCapture(text, { exercises: activeExercises, trackers: trackers.filter(t => !t.archived), all: trackers, unit: gym.unit ?? 'kg', memo: loadMemo(), foods: food.foods }, loadAiKey(), navigator.onLine !== false)
   const learnCapture = (c: CaptureCommand) => { const m = loadMemo(), n = learn(m, c); if (n !== m) saveMemo(n) }
   const forgetCapture = (text: string) => { const m = loadMemo(), n = forget(m, text); if (n !== m) saveMemo(n) }
 
@@ -474,7 +477,8 @@ export default function App() {
           ? <CaptureView key={capture.key} start={capture.start} onConsumed={() => setCapture(c => ({ ...c, start: { mode: 'idle' } }))} ack={voiceAck} onAck={ackVoice}
               trackers={trackers} exercises={activeExercises} unit={gym.unit ?? 'kg'} onAdd={captureAdd} onUndoEvent={(t, ev) => { undo(t, ev) }} onInterpret={interpretCapt} onLearn={learnCapture} onForget={forgetCapture} onSaveGym={cmd => saveVoice(cmd, today)} onUndoGym={undoSets}
               onGymEdit={d => openGymWith(d, editNote(d, activeExercises, gym.unit ?? 'kg'))} onGymIncomplete={(d, missing: VoiceMissing[]) => openGymWith(d, incompleteNote(missing))}
-              onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }} />
+              onCreate={captureCreate} onUndoCreate={undoCreate} onGoToMissions={go} onManual={openManual} onBusy={b => { captureBusy.current = b }}
+              foods={food.foods} onSaveFood={adds => foodHandlers.addVoice(adds, today)} onUndoFood={foodHandlers.undoVoice} onOpenFood={openFoodWith} />
           : <UnknownView key={manualText} initialText={manualText} trackers={trackers} parties={PARTIES} onCreate={create} onAdd={add} onPropose={propose} onGoToMissions={go} onUnarchive={unarchive} />
       )}
       {screen === 'party' && (

@@ -234,6 +234,8 @@ export function pickCapture(ai: CaptureCommand | null, parsed: CaptureCommand, c
   if (ai?.kind === 'other-day') return ai
   if (parsed.kind === 'other-day') return parsed
   if (!ai) return parsed
+  // ponytail: hasta que Haiku sepa de comida (ciclo 38), si el parser reconoce alimentos y la IA solo ve un hábito nuevo o nada, manda el parser
+  if (parsed.kind === 'food' && (ai.kind === 'new' || ai.kind === 'unknown')) return parsed
   if (ai.kind === 'gym' && parsed.kind === 'gym') {
     const { draft, source } = pickDraft(ai.draft, parsed.draft, ctx.exercises)
     return { kind: 'gym', text: ai.text, draft, source }

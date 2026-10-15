@@ -1823,3 +1823,39 @@ test('U-FI13 «Exportar copia» no contiene el aviso de OFF', () => {
   ack(); render(<App />)
   expect(exportBackup([], { trackers: [], proposals: [] } as never, 'x')).not.toContain(PK)
 })
+
+// --- Comida por voz (ciclo 36). Sin clave ni fetch: todo en el dispositivo; voz simulada. ---
+const foodLive = () => { const l = foodStored().log as { id: string; undoes?: string; via?: string; name: string; kcal: number }[]; const u = new Set(l.filter(e => e.undoes).map(e => e.undoes)); return l.filter(e => !e.undoes && !u.has(e.id)) }
+
+test('U-FV1 «200 g de arroz y una manzana»: 2 entradas por voz; Deshacer las anula las dos', async () => {
+  ackVoice(); setVoz('200 g de arroz y una manzana'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Registrado en Comida: 2 alimentos · 354 kcal')).toBeTruthy()
+  expect(foodLive().map(e => [e.name, e.via])).toEqual([['Arroz blanco cocido', 'voice'], ['Manzana', 'voice']])
+  expect(screen.getByText('Arroz blanco cocido · 200 g · 260 kcal')).toBeTruthy()
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: 2 alimentos (354 kcal).')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0)
+  expect((foodStored().log as { undoes?: string }[]).filter(e => e.undoes)).toHaveLength(2)
+  await vi.waitFor(() => expect(document.activeElement).toBe(btn('Dictar')))
+})
+
+test('U-FV2 con objetivo, la frase pone el día en rango: nota de Dieta y Deshacer la retira', async () => {
+  localStorage.setItem(FD, JSON.stringify({ log: [], foods: [], goals: [{ from: '2026-10-01', kcal: 2000, p: 30, c: 40, f: 30 }] }))
+  ackVoice(); setVoz('1900 kcal'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText('Registrado en Comida: 1 alimento · 1.900 kcal · Día dentro del objetivo: +1 Dieta')).toBeTruthy()
+  await vi.waitFor(() => expect(net('dieta')).toBe(1))
+  fireEvent.click(btn('Deshacer'))
+  expect(await screen.findByText('Deshecho: 1 alimento (1.900 kcal). · Fuera del rango: se retira el +1 de Dieta')).toBeTruthy()
+  await vi.waitFor(() => expect(net('dieta')).toBe(0))
+})
+
+test('U-FV4 «comí una hamburguesa»: Burgers +1 y el botón «Apuntar también en Comida»', async () => {
+  ackVoice(); setVoz('comí una hamburguesa'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad/)).toBeTruthy()
+  expect(net('burgers')).toBe(1)
+  expect(btn('Apuntar también en Comida')).toBeTruthy()
+  expect(foodLive()).toHaveLength(0)
+})
