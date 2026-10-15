@@ -5,7 +5,7 @@ import { seedFor } from './core/seed'
 import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
-import { DIET_TRACKER, dayTotals, dietActive, dietDays, dietSync, liveEntries, goalOn, makeEntry, quickEntry, setFoodGoal, undoEntries, withDiet } from './core/food'
+import { DIET_TRACKER, dayTotals, dietActive, dietDays, dietSync, liveEntries, goalOn, makeEntry, mealEntries, mealFromEntries, MAX_MEALS, allFoods, quickEntry, setFoodGoal, undoEntries, withDiet } from './core/food'
 import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveFood, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
 import { forget, learn } from './core/memory'
 import { askHaiku, interpretCapture, interpretGym, type HaikuError } from './core/haiku'
@@ -255,6 +255,28 @@ export default function App() {
   }
   function setFoodArchived(id: string, archived: boolean) {
     setFood({ ...food, foods: food.foods.map(f => { if (f.id !== id) return f; const { archived: _a, ...rest } = f; return archived ? { ...rest, archived: true } : rest }) })
+  }
+  // Platos: guardar desde entradas vivas del día, borrar y añadir al día elegido (con su dietSync)
+  function saveMeal(name: string, ids: string[]): boolean {
+    const meals = food.meals ?? []
+    if (meals.length >= MAX_MEALS) return false
+    const live = liveEntries(food.log), m = mealFromEntries(ids.flatMap(id => live.filter(e => e.id === id)), name, `meal-${uuid()}`)
+    if (!m) return false
+    setFood({ ...food, meals: [...meals, m] })
+    return true
+  }
+  function deleteMeal(id: string) {
+    const meals = (food.meals ?? []).filter(m => m.id !== id)
+    const { meals: _m, ...rest } = food
+    setFood(meals.length ? { ...rest, meals } : rest)
+  }
+  function addMeal(id: string, day: string): { ids: string[]; missing: number; diet: DietChange } {
+    if (day > today) day = today
+    const m = (food.meals ?? []).find(x => x.id === id)
+    if (!m) return { ids: [], missing: 0, diet: 0 }
+    const { entries, missing } = mealEntries(m, allFoods(food.foods), uuid, nowStamp(day))
+    if (!entries.length) return { ids: [], missing, diet: 0 }
+    return { ids: entries.map(e => e.id), missing, diet: syncDiet({ ...food, log: [...food.log, ...entries] }, [day]) }
   }
   function undoFood(ids: string[]): { undone: number; diet: DietChange } {
     const us = undoEntries(food.log, ids, uuid)
@@ -515,7 +537,7 @@ export default function App() {
       )}
       {screen === 'me' && <MeView onOpenGym={() => openGym('me')} onOpenFood={() => openFood('me')} focusCard={focusCard} voiceAck={voiceAck} onVoiceAck={ackVoice} aiKey={{ ...aiKey, onSave: saveKey, onClear: clearKey, onTest: testKey }} />}
       {screen === 'gym' && <GymView gym={gym} today={today} prefill={gymPrefill ?? undefined} onAddSet={addSet} onUndoSet={undoSet} voice={{ ack: voiceAck, onAck: ackVoice, onInterpret: interpretVoice, onSave: saveVoice, onUndo: undoSets }} onSetUnit={setUnit} onCreateExercise={createExercise} onArchiveExercise={setExerciseArchived} onSaveRoutine={saveRoutine} onDeleteRoutine={deleteRoutine} onBack={backFromGym} saveFailed={saveFailed} onExport={exportData} />}
-      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onCreateFood={createFood} onArchiveFood={setFoodArchived} onSaveGoal={saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} />}
+      {screen === 'food' && <FoodView food={food} today={today} onAddEntry={addFoodEntry} onAddQuick={addQuick} onUndo={undoFood} onCreateFood={createFood} onArchiveFood={setFoodArchived} onSaveMeal={saveMeal} onDeleteMeal={deleteMeal} onAddMeal={addMeal} onSaveGoal={saveFoodGoal} onBack={backFromFood} saveFailed={saveFailed} onExport={exportData} />}
       {toast && <LevelUpToast toast={toast} />}
       {overtake && !toast && (overtake.lost ? <PassedBanner o={overtake} lost={overtake.lost} /> : <OvertakeBanner o={overtake} />)}
       {/* ponytail: dos avisos seguidos con el mismo texto pueden no repetirse en el lector; añadir la key como texto oculto si molesta. */}
