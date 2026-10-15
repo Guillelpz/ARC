@@ -1231,7 +1231,7 @@ test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto
   ackVoice(); setVoz('ate a burguer'); render(<App />)
   go('Nuevo')
   expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad · \+20 VILLAIN XP$/)).toBeTruthy()
-  expect(net('burgers')).toBe(1)
+  await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   fireEvent.click(btn('Editar'))
   const q = screen.getByLabelText('Cantidad (unidades)') as HTMLInputElement
   expect(q.value).toBe('1'); expect(document.activeElement).toBe(q)
@@ -1856,7 +1856,7 @@ test('U-FV4 «comí una hamburguesa»: Burgers +1 y el botón «Apuntar también
   ackVoice(); setVoz('comí una hamburguesa'); render(<App />)
   fireEvent.click(btn('Dictar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad/)).toBeTruthy()
-  expect(net('burgers')).toBe(1)
+  await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   expect(btn('Apuntar también en Comida')).toBeTruthy()
   expect(foodLive()).toHaveLength(0)
 })
@@ -1881,7 +1881,7 @@ test('U-FV4b «Apuntar también en Comida» abre Comida con la hamburguesa pendi
   fireEvent.click(btn('Apuntar también en Comida'))
   expect(await screen.findByRole('heading', { level: 1, name: 'Comida' })).toBeTruthy()
   expect(screen.getByRole('heading', { level: 3, name: 'Hamburguesa de ternera cocinada' })).toBeTruthy()
-  expect(net('burgers')).toBe(1)
+  await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   expect(foodLive()).toHaveLength(0)
 })
 
