@@ -151,7 +151,7 @@ export type WeekBest = { monday: string; kg: number | null; current: boolean } /
 export type GroupVolume = { group: MuscleGroup; label: string; sets: number; kg: number; prevSets: number; prevKg: number }
 export type GymDay = { sets: number; exercises: number } // series vivas de un día y ejercicios distintos
 
-// Comida (ver docs/TECH_SPEC-food.md §5)
+// Comida (spec eliminada en el ciclo 30; ver git)
 export type FoodBase = 'g' | 'ml'
 export type Nutrients = { kcal: number; p: number; c: number; f: number } // p/c/f en g
 export type Serving = { name: string; qty: number } // qty en g o ml de la base, (0, 2000]

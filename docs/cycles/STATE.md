@@ -1,13 +1,13 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–28 cerrados e implementados. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–27 el 2026-10-15; todos están en el historial de git. Se conserva `cycle-28/` como entrada del siguiente ciclo.
+Ver `docs/WORKFLOW.md`. Ciclos 1–30 cerrados e implementados. Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 y la spec de Comida el 2026-10-15; todos están en el historial de git.
 
 ## En curso
 
 - Ciclo 23 (P23.1, límite semanal VILLAIN) — **cerrado** (merge e042d2e; análisis en `cycle-23/analysis.md`, en el historial de git). Reactivado por el usuario el 2026-10-12 solo para esto; pasos 1-2 omitidos. Fuera de él, el workflow sigue en pausa hasta que el usuario lo reactive con datos de uso real.
 - Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 pendiente de la prueba en iPhone. El workflow vuelve a pausa.
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Pendiente la prueba del usuario en iPhone. El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
-- Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
+- Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`, en el historial de git). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
 
 ## Ciclo 29+ — Módulo Comida (fase 1: registro manual)
 
@@ -28,9 +28,9 @@ Arrancado por el usuario el 2026-10-15 (pasos 1-2 omitidos; decisiones F1-F12 ap
 
 **Ejecución:** tech-lead (spec + fases) → okay del usuario (resumen ≤15 líneas + decisiones abiertas) → implementer `cycle-29` (y siguientes si hay varias fases) → reviewer → merge `--no-ff` → push → cycle-analyst.
 
-**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food.md`, ciclos 29 (núcleo) y 30 (propios, platos, resumen semanal), seguidos; decisiones A1, B1, C1, D1, E1 (las recomendadas).
+**Spec aprobada (2026-10-15):** `docs/TECH_SPEC-food.md` (eliminada al cerrar el ciclo 30), ciclos 29 (núcleo) y 30 (propios, platos, resumen semanal), seguidos; decisiones A1, B1, C1, D1, E1 (las recomendadas).
 
-**Estado:** ciclo 29 **cerrado** (merge d3c4ddd, push; review APROBADO; análisis en `cycle-29/analysis.md`). Ciclo 30 en implementación (rama `cycle-30`).
+**Estado:** ciclo 29 **cerrado** (merge d3c4ddd, push; review APROBADO; análisis en `cycle-29/analysis.md`). Ciclo 30 **cerrado** (merge 788e9ce; review APROBADO; análisis en `cycle-30/analysis.md`). Fase 1 de Comida completa; el workflow vuelve a pausa hasta decidir las fases 2 (integraciones) y 3 (voz).
 
 ## Ciclo 28 — Menos llamadas a Haiku en la captura por voz
 
@@ -41,7 +41,7 @@ Aprobado por el usuario el 2026-10-14 (pasos 1-2 omitidos). Motivo: rapidez (res
 - **No entra:** alias aprendidos (O2), recorte del prompt (O4).
 - **Decisión M (usuario, 2026-10-14): M-B.** La memoria de frases es caché del dispositivo, como la clave de Anthropic: fuera de Exportar/Importar, fusión y «Recuperar copia anterior»; «Borrar todo» la vacía igualmente.
 
-**Estado:** **cerrado** (merge ea67c15, push a origin; review APROBADO en `cycle-28/review.md`; análisis en `cycle-28/analysis.md`). La spec se eliminó al cerrar (está en el historial de git). El workflow vuelve a pausa hasta que el usuario lo reactive.
+**Estado:** **cerrado** (merge ea67c15, push a origin; review APROBADO en `cycle-28/review.md`, en git; análisis en `cycle-28/analysis.md`, en el historial de git). La spec se eliminó al cerrar (está en el historial de git). El workflow vuelve a pausa hasta que el usuario lo reactive.
 
 ## Ciclo 27 — Captura rápida por voz: gym, hábito existente o hábito nuevo
 
