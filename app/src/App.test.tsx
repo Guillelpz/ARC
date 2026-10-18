@@ -1392,6 +1392,16 @@ test('U-C4b tocar la tarjeta cancela la cuenta atrás', async () => {
   } finally { vi.unstubAllGlobals() }
 })
 
+test('U-C4c con la pestaña ya oculta al aparecer la propuesta, la cuenta atrás no arranca', async () => {
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+  try {
+    await dictateNewWithKey()
+    for (let i = 0; i < 12; i++) await tick(1000)
+    expect(customTrackers()).toHaveLength(0)
+    expect(screen.getByText('Cuenta atrás parada. Revisa la propuesta.')).toBeTruthy()
+  } finally { vi.unstubAllGlobals() }
+})
+
 test('U-C7 Deshacer un hábito recién creado lo archiva y anula el registro', async () => {
   ackVoice(); setVoz('grounding 30 min'); render(<App />)
   fireEvent.click(btn('Dictar'))

@@ -137,6 +137,7 @@ export function NewHabitCard({ habit, heard, trackers, auto, stopped, onStop, on
   }, [live, secs])
   useEffect(() => {
     if (!live) return
+    if (document.visibilityState === 'hidden') { onStop(); return } // la tarjeta aparece con la pestaña ya oculta
     const hidden = () => { if (document.visibilityState === 'hidden') onStop() }
     document.addEventListener('visibilitychange', hidden)
     return () => document.removeEventListener('visibilitychange', hidden)
