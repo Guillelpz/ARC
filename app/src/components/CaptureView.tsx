@@ -13,7 +13,7 @@ import { VoicePrivacy } from './VoicePrivacy'
 import { noApiText, offlineText, speechErrorText } from './voiceErrors'
 import { missingOf, type VoiceMissing } from './voiceNotes'
 import { CARD, LABEL } from './branchTone'
-import { CreatedResult, NewHabitCard, TrackerResult } from './CaptureCards'
+import { ConfirmTracker, CreatedResult, NewHabitCard, TrackerResult } from './CaptureCards'
 import { FoodVoiceCard } from './FoodVoiceCard'
 import { confirmDone, foodCount, foodStatus, kcalOf, type FoodDone } from './foodVoiceText'
 
@@ -50,6 +50,7 @@ type Mode = 'idle' | 'privacy' | 'listening' | 'processing' | 'text'
 type Res =
   | { k: 'gym'; cmd: VoiceCommand; ids: string[]; auto: boolean }
   | { k: 'trk'; text: string; t: Tracker; ev: ActivityEvent; note: string | null; food: FoodItem[] | null; fres: FoodDone | null }
+  | { k: 'ask'; cmd: Extract<CaptureCommand, { kind: 'tracker' }>; t: Tracker }
   | { k: 'food'; cmd: Extract<CaptureCommand, { kind: 'food' }>; done: FoodDone }
   | { k: 'form'; text: string; t: Tracker; problem: Problem | null; amount: number | null }
   | { k: 'new'; cmd: Extract<CaptureCommand, { kind: 'new' }>; auto: boolean }
@@ -118,6 +119,7 @@ export function CaptureView(props: Props) {
       case 'tracker': {
         const tr = r.trackers.find(x => x.id === cmd.trackerId)
         if (!tr) { setRes({ k: 'unknown' }); setMode('idle'); focusMic(); return }
+        if (cmd.confirm && cmd.amount !== null) { setMode('idle'); setRes({ k: 'ask', cmd, t: tr }); return }
         const ev = cmd.amount !== null && cmd.problem === null ? r.onAdd(tr.id, cmd.amount) : null
         setMode('idle')
         if (ev) { r.onLearn(cmd); setRes({ k: 'trk', text: cmd.text, t: tr, ev, note: convNote(cmd.said, cmd.amount), food: cmd.food ?? null, fres: null }); focusMic() }
@@ -192,6 +194,14 @@ export function CaptureView(props: Props) {
     ref.current.onUndoEvent(res.t, res.ev)
     ref.current.onForget(res.text) // ponytail: deshacer después desde la pantalla de misiones no olvida la frase
     setRes({ k: 'undone', text: `Deshecho: +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)} en ${res.t.name}.` }); focusMic()
+  }
+  // D1: «Apuntar» de «¿Apuntar en X?». No aprende (la frase no la ha confirmado Haiku).
+  function confirmAsk() {
+    if (res?.k !== 'ask') return
+    const { cmd, t } = res
+    const ev = ref.current.onAdd(t.id, cmd.amount!)
+    if (ev) { setRes({ k: 'trk', text: cmd.text, t, ev, note: convNote(cmd.said, cmd.amount), food: cmd.food ?? null, fres: null }); focusMic() }
+    else setRes({ k: 'form', text: cmd.text, t, problem: null, amount: cmd.amount })
   }
   function editTracker() {
     if (res?.k !== 'trk') return
@@ -269,6 +279,7 @@ export function CaptureView(props: Props) {
     : busy ? 'Procesando…'
     : res?.k === 'gym' ? `Registrado: ${draftText(res.cmd.draft, exercises, unit)}${res.auto ? ' Sesión de Gym apuntada en HERO (hoy).' : ''}`
     : res?.k === 'trk' ? `Registrado: ${res.t.name} · +${res.ev.amount} ${unitFor(res.ev.amount, res.t.unit)} · +${res.ev.amount * res.t.xpPerUnit} ${LABEL[res.t.branch]} XP`
+    : res?.k === 'ask' ? `¿Apuntar en ${res.t.name}? +${res.cmd.amount} ${unitFor(res.cmd.amount!, res.t.unit)}. Aún no se ha apuntado nada.`
     : res?.k === 'food' ? foodStatus(res.done, props.foods)
     : res?.k === 'form' ? (res.problem === 'unit' ? `${res.t.name} se mide en ${res.t.unit}: no se ha apuntado nada.` : res.problem === 'range' ? `La cantidad debe estar entre 1 y ${MAX_CAPTURE} ${res.t.unit}: no se ha apuntado nada.` : '')
     : res?.k === 'new' ? (res.auto ? (stopped ? 'Cuenta atrás parada. Revisa la propuesta.' : `Se creará sola en ${AUTO_CREATE_S} segundos. Toca la tarjeta para revisarla.`) : '')
@@ -278,7 +289,7 @@ export function CaptureView(props: Props) {
     : res?.k === 'undone' ? res.text
     : mode === 'text' ? (message ?? '') : ''
   const visible = statusText !== '' && res?.k !== 'new' && (busy || res !== null || (mode === 'text' && message !== null))
-  const branch = res?.k === 'trk' || res?.k === 'form' || res?.k === 'created' ? CARD[res.t.branch] : res?.k === 'food' ? CARD.hero : null
+  const branch = res?.k === 'trk' || res?.k === 'form' || res?.k === 'ask' || res?.k === 'created' ? CARD[res.t.branch] : res?.k === 'food' ? CARD.hero : null
   const card = res?.k === 'gym' ? `flex flex-col gap-2 rounded-lg border p-3 ${t.border} ${t.surface} ${t.text}` : branch ? `flex flex-col gap-2 rounded-lg border p-3 ${branch.box}` : ''
 
   return (
@@ -306,6 +317,9 @@ export function CaptureView(props: Props) {
             <p role="status" className={visible ? `flex items-start gap-2 text-sm ${res?.k === 'gym' || res?.k === 'trk' || res?.k === 'created' || res?.k === 'food' ? 'font-semibold' : ''} ${branch ? '' : t.text}` : 'sr-only'}>
               {(res?.k === 'other-day' || res?.k === 'unknown' || (mode === 'text' && message !== null)) && <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />}{statusText}
             </p>
+            {res?.k === 'ask' && (
+              <ConfirmTracker tracker={res.t} heard={res.cmd.text} aiDown={res.cmd.aiError !== undefined} onConfirm={confirmAsk} onDiscard={close} />
+            )}
             {(res?.k === 'trk' || res?.k === 'form') && (
               <TrackerResult key={res.k} tracker={res.t} heard={res.text} note={res.k === 'trk' ? res.note : null} form={res.k === 'form'} amount={res.k === 'form' ? res.amount : null}
                 onUndo={undoTracker} onEdit={editTracker} onClose={close} onSubmit={applyAmount} onCancel={close} onFood={res.k === 'trk' && res.food && !res.fres ? attachFood : undefined} />

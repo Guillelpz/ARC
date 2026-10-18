@@ -1273,6 +1273,10 @@ test('U-C1 «+»: Reading con páginas, conversión y Deshacer deja el neto en 0
 test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto en 2', async () => {
   ackVoice(); setVoz('ate a burguer'); render(<App />)
   go('Nuevo')
+  expect(await screen.findByText('¿Apuntar en Burgers? +1 unidad. Aún no se ha apuntado nada.')).toBeTruthy()
+  expect(net('burgers')).toBe(0)
+  expect(document.activeElement).toBe(btn('Apuntar'))
+  fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad · \+20 VILLAIN XP$/)).toBeTruthy()
   await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   fireEvent.click(btn('Editar'))
@@ -1283,6 +1287,33 @@ test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto
   fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+2 unidades/)).toBeTruthy()
   await vi.waitFor(() => expect(net('burgers')).toBe(2))
+})
+
+test('U-C9 sin clave, «I ran out of milk» pide confirmar: Descartar no guarda y Escribir a mano abre el formulario', async () => {
+  ackVoice(); setVoz('I ran out of milk'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText(/^¿Apuntar en Running\?/)).toBeTruthy()
+  await vi.waitFor(() => expect(stored()).toHaveLength(0))
+  fireEvent.click(btn('Descartar'))
+  expect(screen.queryByText(/^¿Apuntar en Running\?/)).toBeNull()
+  expect(stored()).toHaveLength(0)
+  fireEvent.click(btn('Dictar'))
+  await screen.findByText(/^¿Apuntar en Running\?/)
+  fireEvent.click(btn('Escribir a mano'))
+  expect((screen.getByLabelText('¿Qué has hecho?') as HTMLInputElement).value).toBe('I ran out of milk')
+})
+
+test('U-C10 con clave y la IA caída (500), la tarjeta lo dice y no se guarda nada', async () => {
+  ackVoice(); setVoz('I ran out of milk'); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn().mockResolvedValue(new Response('{}', { status: 500 })); vi.stubGlobal('fetch', f)
+  try {
+    render(<App />)
+    fireEvent.click(btn('Dictar'))
+    expect(await screen.findByText(/^¿Apuntar en Running\?/)).toBeTruthy()
+    expect(screen.getByText('La IA no ha respondido: interpretado en el dispositivo.')).toBeTruthy()
+    expect(f).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(stored()).toHaveLength(0))
+  } finally { vi.unstubAllGlobals() }
 })
 
 test('U-C6 unidad que no encaja: no guarda y pide la cantidad en la unidad del hábito', async () => {

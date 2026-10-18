@@ -163,8 +163,16 @@ test('A-C2 propuesta de hábito nuevo en HERO y en VILLAIN', async () => {
 
 test('A-C3 resultado de un hábito existente', async () => {
   try {
-    await capture('ate a burguer')
+    await capture('comí una hamburguesa')
     expect(await screen.findByText(/^Registrado: Burgers/)).toBeTruthy()
+    expect(await serious()).toEqual([])
+  } finally { noSpeech() }
+})
+
+test('A-C4 tarjeta «¿Apuntar en Burgers?»', async () => {
+  try {
+    await capture('ate a burguer')
+    expect(await screen.findByText(/^¿Apuntar en Burgers\?/)).toBeTruthy()
     expect(await serious()).toEqual([])
   } finally { noSpeech() }
 })

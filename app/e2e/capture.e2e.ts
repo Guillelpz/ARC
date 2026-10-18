@@ -75,13 +75,15 @@ test('E10 captura a 320 px: «+», hábito nuevo propuesto, creado, recarga y ax
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
 })
 
-test('E11 pestaña «Nuevo» sin clave: Burgers +1 y ninguna llamada a la IA', async ({ page }) => {
+test('E11 pestaña «Nuevo» sin clave: «¿Apuntar en Burgers?» → Apuntar → Burgers +1 y ninguna llamada a la IA', async ({ page }) => {
   const calls = await anthropic(page)
   await fakeSpeech(page)
   await page.addInitScript(() => localStorage.setItem('life-rpg-voice-v1', JSON.stringify({ privacyAck: '2026-10-07T10:00:00.000Z' })))
   await page.goto('./')
   await say(page, 'eat a burguer')
   await nav(page, 'Nuevo')
+  await expect(page.getByText(/^¿Apuntar en Burgers\?/)).toBeVisible()
+  await page.getByRole('button', { name: 'Apuntar', exact: true }).click()
   await expect(page.getByText(/^Registrado: Burgers · \+1 unidad/)).toBeVisible()
   expect(await net(page, 'burgers')).toBe(1)
   expect(calls).toHaveLength(0)

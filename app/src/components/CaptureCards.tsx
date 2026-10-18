@@ -10,6 +10,29 @@ const validAmount = (v: string) => { const n = Number(v); return v.trim() !== ''
 
 // Hábito existente: acciones de lo guardado («Deshacer», «Editar», «Cerrar») o formulario de cantidad. Va dentro del panel
 // de la rama (el panel y el texto de estado los pone CaptureView). Paleta entera de la rama del hábito.
+// D1: «¿Apuntar en X?» (frase resuelta por el parser sin seguridad). Sin cuenta atrás; el foco va a «Apuntar».
+export function ConfirmTracker({ tracker, heard, aiDown, onConfirm, onDiscard }: {
+  tracker: Tracker
+  heard: string
+  aiDown: boolean // la IA falló: se dice que se interpretó en el dispositivo
+  onConfirm: () => void
+  onDiscard: () => void
+}) {
+  const c = CARD[tracker.branch]
+  const ok = useRef<HTMLButtonElement>(null)
+  useEffect(() => { ok.current?.focus() }, [])
+  return (
+    <>
+      <p className={`text-sm ${c.muted}`}>Oído: «{heard}»</p>
+      {aiDown && <p className={`text-sm ${c.muted}`}>La IA no ha respondido: interpretado en el dispositivo.</p>}
+      <div className="flex flex-wrap gap-2">
+        <button ref={ok} type="button" onClick={onConfirm} className={`${c.secondary} font-semibold`}>Apuntar</button>
+        <button type="button" onClick={onDiscard} className={c.link}>Descartar</button>
+      </div>
+    </>
+  )
+}
+
 export function TrackerResult({ tracker, heard, note, form, amount, onUndo, onEdit, onClose, onSubmit, onCancel, onFood }: {
   tracker: Tracker
   heard: string
