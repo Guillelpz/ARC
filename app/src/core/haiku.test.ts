@@ -148,13 +148,13 @@ describe('captura', () => {
     const f = mock(() => ok(reply(newAlta)))
     const a = await run('ate a burguer', f, null), b = await run('ate a burguer', f, KEY, false)
     expect(f).not.toHaveBeenCalled()
-    expect(a).toEqual(routeCapture('ate a burguer', ctx)); expect(b).toEqual(a)
+    expect(a).toEqual({ ...routeCapture('ate a burguer', ctx), confirm: true }); expect(b).toEqual(a)
     expect(a).toMatchObject({ kind: 'tracker', trackerId: 'burgers', amount: 1, source: 'parser' })
     expect(a).not.toHaveProperty('aiError')
   })
   test('un 401 deja el parser con aiError auth', async () => {
     const r = await run('ate a burguer', mock(() => ok({}, 401)))
-    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'auth' })
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'auth', confirm: true })
   })
   test('la IA new alta llega tal cual', async () => {
     const r = await run('grounding 30 min', mock(() => ok(reply(newAlta))))
@@ -162,7 +162,21 @@ describe('captura', () => {
   })
   test('la IA con trackerId inventado cae al parser', async () => {
     const r = await run('ate a burguer', mock(() => ok(reply({ ...cap, kind: 'tracker', trackerId: 'ghost' }))))
-    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'invalid' })
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'parser', aiError: 'invalid', confirm: true })
+  })
+  test('D1: «corrí 5 km» sin clave no lleva confirm', async () => {
+    const r = await run('corrí 5 km', mock(() => ok(reply(newAlta))), null)
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'running', source: 'parser' })
+    expect(r).not.toHaveProperty('confirm')
+  })
+  test('D1: «I ran out of milk» con un 500 pide confirmar', async () => {
+    const r = await run('I ran out of milk', mock(() => ok({}, 500)))
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'running', confirm: true, aiError: 'http' })
+  })
+  test('D1: Haiku OK decide y no lleva confirm', async () => {
+    const r = await run('ate a burguer', mock(() => ok(reply({ ...cap, kind: 'tracker', trackerId: 'burgers', amount: null }))))
+    expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'ai' })
+    expect(r).not.toHaveProperty('confirm')
   })
   test('O3: el dispositivo seguro no llama a fetch', async () => {
     for (const t of ['corrí 5 km', '80kg bench press 5 reps', 'corrí 30 minutos', 'ayer leí 20 páginas']) {
@@ -187,6 +201,7 @@ describe('captura', () => {
       const r = await interpretCapture('ate a burguer', mctx(burg), KEY, true, f)
       expect(f).not.toHaveBeenCalled()
       expect(r).toMatchObject({ kind: 'tracker', trackerId: 'burgers', source: 'memory' })
+      expect(r).not.toHaveProperty('confirm')
     })
     test('memoria incompleta con clave: 1 llamada; si falla (500), la memoria con aiError', async () => {
       const f = mock(() => ok({}, 500))

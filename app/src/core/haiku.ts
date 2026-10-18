@@ -1,7 +1,7 @@
 import type { Exercise, Food, WeightUnit } from './types'
 import { VOICE_MAX_CHARS, fromAI, parseGym, pickDraft, type GymDraft, type HaikuError, type VoiceCommand } from './voice'
 import { localCapture, recall, type Memo } from './memory'
-import { captureFromAI, deviceSure, isReady, localFood, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { captureFromAI, deviceSure, isReady, localFood, needsConfirm, pickCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { foodItemsFromAI } from './foodVoice'
 
 export type { HaikuError } from './voice'
@@ -198,7 +198,8 @@ export async function interpretCapture(text: string, ctx: CaptureCtx, key: strin
   if (done) return cmd
   const ai = key && online ? await askCapture(text, ctx, key, fetchImpl) : null
   const c = pickCapture(ai?.ok ? ai.cmd : null, cmd, ctx)
-  return ai && !ai.ok ? { ...c, aiError: ai.error } : c
+  const out = ai && !ai.ok ? { ...c, aiError: ai.error } : c
+  return !ai?.ok && needsConfirm(out, ctx) ? { ...out, confirm: true } : out
 }
 
 export type FoodCmd = Extract<CaptureCommand, { kind: 'food' | 'other-day' | 'unknown' }>

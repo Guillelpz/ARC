@@ -10,7 +10,7 @@ import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
 import { CAPTURE_SYSTEM, FOOD_SYSTEM, capturePrompt, captureSchema, foodItemSchema, foodPrompt, foodSchema, voicePrompt, voiceSchema } from './haiku'
-import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, needsConfirm, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
 import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, copyDay, hasCopy, makeEntry, mealNameTaken, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, undoEntries, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
@@ -688,6 +688,12 @@ export function runSelfCheck() {
         ['corrí 5 km', 'comí una hamburguesa', 'drank 3 beers', 'cómics 10 páginas', 'fui al gimnasio'].every(sure) &&
         ranOut.kind === 'tracker' && ranOut.trackerId === 'running' &&
         localCapture('ate a burguer', { ...ctx, memo: cvMemo }).done && localCapture('burguer', { ...ctx, memo: cvMemo }).done, 'CV14 deviceSure sin palabras ajenas')
+      // CV15 (ciclo 40) — needsConfirm («leí un libro» es deviceSure: alias exacto de Reading, así que se guarda sola)
+      const nc = (t: string) => needsConfirm(routeCapture(t, ctx), ctx)
+      const burgerAi = { ...routeCapture('ate a burguer', ctx) } as CaptureCommand
+      ok(['I ran out of milk', 'ate a burguer'].every(nc) &&
+        !['leí un libro', 'corrí 5 km', 'comí una hamburguesa', 'fui al gimnasio', 'Read 50 pages of the name of the wind', 'corrí 5', 'corrí 30 minutos', '80kg bench press 5 reps', 'grounding 30 min'].some(nc) &&
+        !needsConfirm({ ...burgerAi, source: 'ai' } as CaptureCommand, ctx) && !needsConfirm({ ...burgerAi, source: 'memory' } as CaptureCommand, ctx), 'CV15 needsConfirm')
     }
     // SU1 — storageUsage
     {

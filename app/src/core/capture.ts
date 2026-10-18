@@ -21,7 +21,7 @@ export type NewHabit = {
 export type Src = { text: string; source: 'ai' | 'parser' | 'memory'; aiError?: HaikuError }
 export type CaptureCommand =
   | VoiceCommand
-  | Src & { kind: 'tracker'; trackerId: string; amount: number | null; said: Measure | null; problem: Problem | null; food?: FoodItem[] } // food = comida adjunta (FV4)
+  | Src & { kind: 'tracker'; trackerId: string; amount: number | null; said: Measure | null; problem: Problem | null; food?: FoodItem[]; confirm?: true } // food = comida adjunta (FV4); confirm = D1: pedir «¿Apuntar en X?»
   | Src & { kind: 'food'; items: FoodItem[]; rest: string }
   | Src & { kind: 'new'; habit: NewHabit; said: Measure | null }
   | Src & { kind: 'other-day' }
@@ -181,8 +181,7 @@ export function routeCapture(text: string, ctx: CaptureCtx): CaptureCommand {
 
 // ¿Está el dispositivo seguro sin preguntar a Haiku? Gym completo, comida lista sin resto, o hábito con coincidencia exacta y única
 // y sin palabras ajenas: fuera del nombre/alias del hábito solo números, unidades (incl. la del tracker) y stopwords.
-// ponytail: sin clave el router sigue guardando estas frases (C3, «I ran out of milk» → Running +1); esto solo evita saltarse Haiku.
-// Palabras de < 3 letras se ignoran (como exactHits). Una frase mixta hábito + comida ya no es segura.
+// ponytail: sin clave o con Haiku caído, un hábito no seguro y sin cantidad dicha no se guarda solo: `needsConfirm` (D1). Palabras de < 3 letras se ignoran (como exactHits). Una frase mixta hábito + comida ya no es segura.
 export function deviceSure(c: CaptureCommand, ctx: CaptureCtx): boolean {
   if (c.kind === 'gym') return isComplete(c.draft, ctx.exercises)
   if (c.kind === 'tracker') {
@@ -194,6 +193,12 @@ export function deviceSure(c: CaptureCommand, ctx: CaptureCtx): boolean {
   }
   if (c.kind === 'food') return c.source === 'parser' && foodReady(c.items) && c.rest === ''
   return false
+}
+
+// D1 (ciclo 40): lo que resuelve el parser (sin clave, sin conexión o con Haiku caído) solo se guarda solo si el dispositivo está
+// seguro (deviceSure) o hay una cantidad dicha que resolveAmount acepta. Si no, la vista pregunta «¿Apuntar en X?».
+export function needsConfirm(c: CaptureCommand, ctx: CaptureCtx): c is Extract<CaptureCommand, { kind: 'tracker' }> {
+  return c.kind === 'tracker' && c.source === 'parser' && c.amount !== null && c.problem === null && c.said === null && !deviceSure(c, ctx)
 }
 
 export function isReady(c: CaptureCommand, ctx: CaptureCtx): boolean {
