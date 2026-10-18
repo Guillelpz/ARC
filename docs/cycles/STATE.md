@@ -1,6 +1,6 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en pausa, sin nada pendiente del usuario (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15, y los del ciclo 39 (proposals, evaluation, review y analysis) el 2026-10-18; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; ciclo 40 en curso (ver abajo) (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15, y los del ciclo 39 (proposals, evaluation, review y analysis) el 2026-10-18; todos están en el historial de git.
 
 ## En curso
 
@@ -8,6 +8,18 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en paus
 - Ciclo 26 (registro de series de Gym por voz) — **cerrado** (merge 163eb2c, push a origin; análisis en `cycle-26/analysis.md`, en el historial de git). T8 probado en iPhone por el usuario (2026-10-15, sin fallos reportados). El workflow vuelve a pausa.
 - Ciclo 27 (captura rápida por voz desde el «+») — **cerrado** (merge 1f1e706, push a origin; análisis en `cycle-27/analysis.md`, en el historial de git). Probado en iPhone por el usuario (2026-10-15, sin fallos reportados). El workflow vuelve a pausa. Spec aprobada el 2026-10-13; §3-A: sin clave, un hábito nuevo nunca se crea solo (siempre tarjeta).
 - Ciclo 28 (menos llamadas a Haiku en la captura) — **cerrado** (merge ea67c15, push a origin; análisis en `cycle-28/analysis.md`, en el historial de git). El workflow vuelve a pausa. Arrancado el 2026-10-14 con la decisión M-B.
+
+## Ciclo 40 — Almacenamiento y voz sin clave
+
+Aprobado por el usuario el 2026-10-18 (paso 3) a partir de `cycle-40/evaluation.md`: **P40.1** (medir almacenamiento y avisar) y **P40.2** (voz: no guardar hábitos por palabras sueltas, y menores de la captura), en ese orden, con los cambios del evaluador. Decisiones:
+
+- **D1 (P40.2):** cuando el parser resuelve la frase, un hábito sin coincidencia exacta y limpia (`deviceSure`) y sin cantidad dicha **pide confirmación** con la tarjeta «¿Apuntar en X?» (también con clave si Haiku falla). Acepta que «ate a burguer» sin clave pida confirmación (cambia el ejemplo del ciclo 27).
+- **D2 (P40.5):** **sí**, «Escribir a mano» usará Haiku con la clave del dispositivo y se quitará el proxy de dev (`claude-haiku-5-5`, aviso de privacidad propio). Va al **ciclo 41**, no al 40.
+- **D3 (P40.1):** **no** se purgan las copias selladas `.backup.<stamp>`; solo se mide y avisa.
+
+Fuera del ciclo 40: P40.4 (Gym: editar rutinas, partir `GymView`, aviso al reponer) → ciclo 41; P40.3 pospuesta.
+
+**Estado:** paso 5 (implementer, rama `cycle-40`). Spec `docs/TECH_SPEC-cycle40.md` (T1–T7), sin decisiones nuevas.
 
 ## Ciclo 39 — Preparar iPhone, copiar día y saneamiento
 
@@ -201,5 +213,8 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 | P24.6 | Nivel Gym propio (requiere peso corporal y cambia reglas de juego) | pospuesta |
 | P24.9 | G8 Sugerencia de sobrecarga progresiva | pospuesta |
 | P39.2 | Métricas de uso de Haiku (más «olvidar la frase al deshacer desde misiones») | pospuesta |
+| P40.3 | Open Food Facts: fichas solo por ración y saneamiento del código de barras | pospuesta |
+| P40.4 | Gym: editar rutinas, partir GymView, avisar al reponer la sesión | aprobada para el ciclo 41 |
+| P40.5 | «Escribir a mano» con Haiku y la clave del usuario (D2) | aprobada para el ciclo 41 |
 | P24.11 | G10 Temporizador de descanso (= P39.4) | rechazada (2026-10-15, decisión del usuario) |
 | P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |
