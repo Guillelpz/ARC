@@ -1,6 +1,6 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en pausa, sin nada pendiente del usuario (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en pausa, sin nada pendiente del usuario (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15, y los del ciclo 39 (proposals, evaluation, review y analysis) el 2026-10-18; todos están en el historial de git.
 
 ## En curso
 
@@ -11,7 +11,7 @@ Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; workflow en paus
 
 ## Ciclo 39 — Preparar iPhone, copiar día y saneamiento
 
-Aprobado por el usuario el 2026-10-15 (paso 3) a partir de `cycle-39/evaluation.md`, todo lo recomendado. Orden:
+Aprobado por el usuario el 2026-10-15 (paso 3) a partir de `cycle-39/evaluation.md` (eliminado, en el historial de git), todo lo recomendado. Orden:
 1. **P39.5, parte preparatoria:** checklist unificada en `DEPLOY.md` y botón «Copiar resumen» en `VoiceCheck.tsx`, sin la clave. El usuario probó en iPhone el 2026-10-15 sin fallos reportados: `KEYBOARD_ON_IOS` se queda en `'never'` y no hace falta mini-ciclo.
 2. **P39.1 Comida, «Copiar día anterior»:** el origen es siempre el día anterior al del selector. Helper puro `copyDay` con assert FD; copia también las entradas rápidas y las estimadas, con `via: 'copy'`.
 3. **P39.3 recortada:**
@@ -26,7 +26,7 @@ Pospuestas: P39.2 (métricas de Haiku) y olvidar la frase al deshacer desde misi
 
 **Spec:** `TECH_SPEC-cycle39.md` (eliminada al cerrar, en el historial de git; CV13 cambió por el endurecimiento aprobado de `deviceSure`).
 
-**Estado:** **cerrado** (merge 0f7f3a6; review APROBADO, 2 menores; análisis en `cycle-39/analysis.md`). Decisiones del usuario del 2026-10-15: P39.4 (temporizador de descanso) **rechazada**; checklist unificada probada en iPhone sin fallos reportados, así que `KEYBOARD_ON_IOS` sigue en `'never'` (sin fallos reportados en la prueba del usuario) y el mini-ciclo de iPhone queda cerrado sin cambios de código. **Workflow en pausa**, sin nada pendiente del usuario.
+**Estado:** **cerrado** (merge 0f7f3a6; review APROBADO, 2 menores; análisis eliminado, en el historial de git). Decisiones del usuario del 2026-10-15: P39.4 (temporizador de descanso) **rechazada**; checklist unificada probada en iPhone sin fallos reportados, así que `KEYBOARD_ON_IOS` sigue en `'never'` (sin fallos reportados en la prueba del usuario) y el mini-ciclo de iPhone queda cerrado sin cambios de código. **Workflow en pausa**, sin nada pendiente del usuario.
 
 ## Ciclos 36+ — Comida fase 3: voz
 
@@ -200,5 +200,6 @@ Decisiones vigentes del usuario (2026-10-12), no se reabren. Algunas frases del 
 | P3.5 | Cuentas + sincronización (partir en a/b) | pospuesta |
 | P24.6 | Nivel Gym propio (requiere peso corporal y cambia reglas de juego) | pospuesta |
 | P24.9 | G8 Sugerencia de sobrecarga progresiva | pospuesta |
+| P39.2 | Métricas de uso de Haiku (más «olvidar la frase al deshacer desde misiones») | pospuesta |
 | P24.11 | G10 Temporizador de descanso (= P39.4) | rechazada (2026-10-15, decisión del usuario) |
 | P13.4 | Endpoint de IA en servidor | no aprobada (2026-10-12: sin endpoint) |
