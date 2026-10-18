@@ -324,3 +324,10 @@ test('A11Y-2 Comida con Copiar día anterior activo y desactivado', async () => 
   expect(screen.getByRole('button', { name: 'Copiar día anterior' }).hasAttribute('disabled')).toBe(true)
   expect(await serious()).toEqual([])
 })
+
+test('A-S1 Inicio con el aviso de espacio casi lleno', async () => {
+  localStorage.setItem('life-rpg-food-v1.backup.20261008T123456', 'x'.repeat(3_600_000))
+  render(<App />)
+  expect(screen.getByText(/está casi lleno/)).toBeTruthy()
+  expect(await serious()).toEqual([])
+})

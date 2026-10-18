@@ -2142,3 +2142,19 @@ test('U-ML3 añadir un plato que ya no existe avisa', () => {
   fireEvent.click(btn('Añadir plato Cena'))
   expect(screen.getByText('Ese plato ya no existe.')).toBeTruthy()
 })
+
+// --- Espacio usado (ciclo 40) ---
+test('U-S1 «Tus datos» muestra el espacio usado y no avisa con el ejemplo', () => {
+  render(<App />)
+  fireEvent.click(btn('Cargar ejemplo'))
+  expect(screen.getByText(/^Espacio usado: aprox\. .+ de ~5 MB/)).toBeTruthy()
+  expect(screen.queryByText(/casi lleno/)).toBeNull()
+})
+
+test('U-S2 aviso del 70 % con una copia dañada de 3,6 M', () => {
+  localStorage.setItem('life-rpg-food-v1.backup.20261008T123456', 'x'.repeat(3_600_000))
+  render(<App />)
+  const w = screen.getByText(/está casi lleno \(aprox\. 72 %\)/)
+  expect(w.textContent).toContain('Incluye 1 copia de datos dañados')
+  expect(btn('Exportar copia')).toBeTruthy()
+})
