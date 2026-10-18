@@ -1,6 +1,6 @@
 # Estado del workflow
 
-Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; ciclo 40 en curso (ver abajo) (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15, y los del ciclo 39 (proposals, evaluation, review y analysis) el 2026-10-18; todos están en el historial de git.
+Ver `docs/WORKFLOW.md`. Ciclos 1–39 cerrados e implementados; ciclo 40 cerrado; ciclo 41 aprobado (P40.4 + P40.5), sin arrancar (prueba en iPhone hecha el 2026-10-15, sin fallos reportados). Las specs y documentos de los ciclos 1–22 se eliminaron el 2026-10-12, y los de los ciclos 23–28 la spec de Comida y los ciclos 29–31, la spec de integraciones y el ciclo 34 el 2026-10-15, y los del ciclo 39 (proposals, evaluation, review y analysis) el 2026-10-18; todos están en el historial de git.
 
 ## En curso
 
@@ -19,7 +19,7 @@ Aprobado por el usuario el 2026-10-18 (paso 3) a partir de `cycle-40/evaluation.
 
 Fuera del ciclo 40: P40.4 (Gym: editar rutinas, partir `GymView`, aviso al reponer) → ciclo 41; P40.3 pospuesta.
 
-**Estado:** paso 5 (implementer, rama `cycle-40`). Spec `docs/TECH_SPEC-cycle40.md` (T1–T7), sin decisiones nuevas.
+**Estado:** **cerrado** (merge 8f65200, push a origin; review APROBADO, 2 menores; análisis en `cycle-40/analysis.md`). Siguiente: ciclo 41 con P40.4 y P40.5 (ya aprobadas), pendiente de que el usuario lo arranque.
 
 ## Ciclo 39 — Preparar iPhone, copiar día y saneamiento
 
