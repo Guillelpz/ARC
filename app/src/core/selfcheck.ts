@@ -5,12 +5,12 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { FOOD_PRIVACY_KEY, exportBackup, isDataKey, loadFoodPrivacy, parseBackup, parseCustom, readFood, readGym, saveFoodPrivacy } from './storage'
+import { FOOD_PRIVACY_KEY, storageUsage, usageWarn, exportBackup, isDataKey, loadFoodPrivacy, parseBackup, parseCustom, readFood, readGym, saveFoodPrivacy } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
 import { CAPTURE_SYSTEM, FOOD_SYSTEM, capturePrompt, captureSchema, foodItemSchema, foodPrompt, foodSchema, voicePrompt, voiceSchema } from './haiku'
-import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
+import { ALL_UNITS, captureFromAI, captureNorm, convNote, deviceSure, isOtherDay, isReady, localFood, needsConfirm, pickCapture, routeCapture, type CaptureCommand, type CaptureCtx } from './capture'
 import { CATALOG } from './foodCatalog'
 import { allFoods, foodByRef, dayTotals, fmtKcal, fold, dietActive, dietDays, dietSync, frequentFoods, foodWeekly, goalOn, inRange, kcalRange, lastPortion, copyDay, hasCopy, makeEntry, mealNameTaken, mealEntries, mealFromEntries, nameTaken, parseKcal, parseMacro, parsePct, parseQty, parseServings, portion, quickEntry, recentFoods, searchFoods, setFoodGoal, undoEntries, withDiet } from './food'
 import { kcalCoherent, normEan, parseOff } from './off'
@@ -688,6 +688,24 @@ export function runSelfCheck() {
         ['corrí 5 km', 'comí una hamburguesa', 'drank 3 beers', 'cómics 10 páginas', 'fui al gimnasio'].every(sure) &&
         ranOut.kind === 'tracker' && ranOut.trackerId === 'running' &&
         localCapture('ate a burguer', { ...ctx, memo: cvMemo }).done && localCapture('burguer', { ...ctx, memo: cvMemo }).done, 'CV14 deviceSure sin palabras ajenas')
+      // CV15 (ciclo 40) — needsConfirm («leí un libro» es deviceSure: alias exacto de Reading, así que se guarda sola)
+      const nc = (t: string) => needsConfirm(routeCapture(t, ctx), ctx)
+      const burgerAi = { ...routeCapture('ate a burguer', ctx) } as CaptureCommand
+      ok(['I ran out of milk', 'ate a burguer'].every(nc) &&
+        !['leí un libro', 'corrí 5 km', 'comí una hamburguesa', 'fui al gimnasio', 'Read 50 pages of the name of the wind', 'corrí 5', 'corrí 30 minutos', '80kg bench press 5 reps', 'grounding 30 min'].some(nc) &&
+        !needsConfirm({ ...burgerAi, source: 'ai' } as CaptureCommand, ctx) && !needsConfirm({ ...burgerAi, source: 'memory' } as CaptureCommand, ctx), 'CV15 needsConfirm')
+    }
+    // SU1 — storageUsage
+    {
+      const init: Record<string, string> = { 'life-rpg-demo-v1': '[]', 'life-rpg-food-v1.backup.last': 'abc', 'life-rpg-food-v1.backup.20261008T123456': 'xyz', 'life-rpg-ai-key-v1': 'sk', 'otra-app': 'zzzz' }
+      const keys = Object.keys(init)
+      const fake = { length: keys.length, key: (i: number) => keys[i] ?? null, getItem: (k: string) => init[k] ?? null }
+      const L = (k: string) => k.length + init[k].length
+      const u = storageUsage(fake)
+      const boom = { length: 1, key: (): string | null => { throw new Error('x') }, getItem: () => null }
+      ok(u !== null && u.data === L('life-rpg-demo-v1') && u.backups === L('life-rpg-food-v1.backup.last') && u.sealed === L('life-rpg-food-v1.backup.20261008T123456') &&
+        u.device === L('life-rpg-ai-key-v1') && u.sealedCount === 1 && u.total === u.data + u.backups + u.sealed + u.device && storageUsage(boom) === null &&
+        usageWarn({ ...u, total: 3_500_000 }) && !usageWarn({ ...u, total: 3_499_999 }), 'SU1 storageUsage')
     }
     // MC1–MC5 — memoria de frases
     {
@@ -723,6 +741,8 @@ export function runSelfCheck() {
       ok(a.done && a.cmd.kind === 'other-day' && b.done && b.cmd.source === 'parser' && !c.done && c.cmd.source === 'parser' &&
         d.done && d.cmd.source === 'memory' && d.cmd.kind === 'tracker' && d.cmd.trackerId === 'burgers' && d.cmd.amount === 1 &&
         !e.done && e.cmd.source === 'memory' && !f2.done && f2.cmd.source === 'parser', 'MC5 localCapture')
+      // MC6 (ciclo 40) — número pegado a la unidad
+      ok(memoKey('máquina de piernas 100kg 10') === 'maquina piernas' && memoKey('press banca 80kg 5') === memoKey('press banca 80 kg 5') && memoKey('3x5 press banca') === 'press banca', 'MC6 memoKey con número pegado')
     }
     // CV6 (combinación) y CV8 — captureFromAI
     {

@@ -926,6 +926,7 @@ test('U-V1 Copiar resumen: copia el resumen sin la clave', async () => {
     expect(txt).toContain(navigator.userAgent)
     for (const k of ['Reconocimiento:', '80 kilos press banca 5 repeticiones', 'KEYBOARD_ON_IOS']) expect(txt).toContain(k)
     expect(txt).not.toContain('sk-ant-test-XYZ')
+    expect(txt).not.toMatch(/sk-ant-/)
   } finally { voiceCleanup() }
 })
 
@@ -1273,6 +1274,10 @@ test('U-C1 «+»: Reading con páginas, conversión y Deshacer deja el neto en 0
 test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto en 2', async () => {
   ackVoice(); setVoz('ate a burguer'); render(<App />)
   go('Nuevo')
+  expect(await screen.findByText('¿Apuntar en Burgers? +1 unidad. Aún no se ha apuntado nada.')).toBeTruthy()
+  expect(net('burgers')).toBe(0)
+  expect(document.activeElement).toBe(btn('Apuntar'))
+  fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+1 unidad · \+20 VILLAIN XP$/)).toBeTruthy()
   await vi.waitFor(() => expect(net('burgers')).toBe(1)) // el guardado en localStorage va en un efecto: puede llegar tras el texto
   fireEvent.click(btn('Editar'))
@@ -1283,6 +1288,33 @@ test('U-C2 pestaña «Nuevo»: Burgers +1; Editar → 2 → Apuntar deja el neto
   fireEvent.click(btn('Apuntar'))
   expect(await screen.findByText(/^Registrado: Burgers · \+2 unidades/)).toBeTruthy()
   await vi.waitFor(() => expect(net('burgers')).toBe(2))
+})
+
+test('U-C9 sin clave, «I ran out of milk» pide confirmar: Descartar no guarda y Escribir a mano abre el formulario', async () => {
+  ackVoice(); setVoz('I ran out of milk'); render(<App />)
+  fireEvent.click(btn('Dictar'))
+  expect(await screen.findByText(/^¿Apuntar en Running\?/)).toBeTruthy()
+  await vi.waitFor(() => expect(stored()).toHaveLength(0))
+  fireEvent.click(btn('Descartar'))
+  expect(screen.queryByText(/^¿Apuntar en Running\?/)).toBeNull()
+  expect(stored()).toHaveLength(0)
+  fireEvent.click(btn('Dictar'))
+  await screen.findByText(/^¿Apuntar en Running\?/)
+  fireEvent.click(btn('Escribir a mano'))
+  expect((screen.getByLabelText('¿Qué has hecho?') as HTMLInputElement).value).toBe('I ran out of milk')
+})
+
+test('U-C10 con clave y la IA caída (500), la tarjeta lo dice y no se guarda nada', async () => {
+  ackVoice(); setVoz('I ran out of milk'); localStorage.setItem('life-rpg-ai-key-v1', KEY2)
+  const f = vi.fn().mockResolvedValue(new Response('{}', { status: 500 })); vi.stubGlobal('fetch', f)
+  try {
+    render(<App />)
+    fireEvent.click(btn('Dictar'))
+    expect(await screen.findByText(/^¿Apuntar en Running\?/)).toBeTruthy()
+    expect(screen.getByText('La IA no ha respondido: interpretado en el dispositivo.')).toBeTruthy()
+    expect(f).toHaveBeenCalledTimes(1)
+    await vi.waitFor(() => expect(stored()).toHaveLength(0))
+  } finally { vi.unstubAllGlobals() }
 })
 
 test('U-C6 unidad que no encaja: no guarda y pide la cantidad en la unidad del hábito', async () => {
@@ -1361,6 +1393,16 @@ test('U-C4b tocar la tarjeta cancela la cuenta atrás', async () => {
   } finally { vi.unstubAllGlobals() }
 })
 
+test('U-C4c con la pestaña ya oculta al aparecer la propuesta, la cuenta atrás no arranca', async () => {
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden')
+  try {
+    await dictateNewWithKey()
+    for (let i = 0; i < 12; i++) await tick(1000)
+    expect(customTrackers()).toHaveLength(0)
+    expect(screen.getByText('Cuenta atrás parada. Revisa la propuesta.')).toBeTruthy()
+  } finally { vi.unstubAllGlobals() }
+})
+
 test('U-C7 Deshacer un hábito recién creado lo archiva y anula el registro', async () => {
   ackVoice(); setVoz('grounding 30 min'); render(<App />)
   fireEvent.click(btn('Dictar'))
@@ -1415,18 +1457,20 @@ test('U-M2 Deshacer olvida la frase y la siguiente vuelve a llamar a fetch', asy
   } finally { vi.unstubAllGlobals() }
 })
 
-test('U-M3 «Borrar todo» vacía la memoria y conserva la clave de IA; la copia no los lleva', () => {
+test('U-M3 «Borrar todo» vacía la memoria y conserva la clave de IA; la copia no los lleva', async () => {
   localStorage.setItem('life-rpg-ai-key-v1', KEY2)
   localStorage.setItem(MEMO, JSON.stringify({ v: 1, entries: [{ k: 'maquina piernas', kind: 'gym', id: 'leg-press' }] }))
   render(<App />)
   fireEvent.click(btn('Cargar ejemplo'))
-  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+  fireEvent.click(btn('Exportar copia'))
+  const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
+  const text = await blob.text()
+  expect(text).not.toContain(KEY2); expect(text).not.toContain('maquina'); expect(text).not.toContain('life-rpg-capture-memo-v1')
+  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(true) // tras exportar la copia ya no es antigua: solo queda la confirmación del borrado
   fireEvent.click(btn('Borrar todo'))
   expect(confirm).toHaveBeenCalled()
   expect(localStorage.getItem(MEMO)).toBeNull()
   expect(localStorage.getItem('life-rpg-ai-key-v1')).toBe(KEY2)
-  const text = exportBackup([], { trackers: [], proposals: [] } as never, 'x')
-  expect(text).not.toContain(KEY2); expect(text).not.toContain('maquina')
 })
 
 // --- Comida (ciclo 29) ---
@@ -2141,4 +2185,20 @@ test('U-ML3 añadir un plato que ya no existe avisa', () => {
   render(<FoodMeals food={food} day="2026-10-07" onSave={() => true} onDelete={() => {}} onAdd={() => ({ ids: [], missing: 0, diet: 0, gone: true })} onUndo={() => ({ undone: 0, diet: 0 })} />)
   fireEvent.click(btn('Añadir plato Cena'))
   expect(screen.getByText('Ese plato ya no existe.')).toBeTruthy()
+})
+
+// --- Espacio usado (ciclo 40) ---
+test('U-S1 «Tus datos» muestra el espacio usado y no avisa con el ejemplo', () => {
+  render(<App />)
+  fireEvent.click(btn('Cargar ejemplo'))
+  expect(screen.getByText(/^Espacio usado: aprox\. .+ de ~5 MB/)).toBeTruthy()
+  expect(screen.queryByText(/casi lleno/)).toBeNull()
+})
+
+test('U-S2 aviso del 70 % con una copia dañada de 3,6 M', () => {
+  localStorage.setItem('life-rpg-food-v1.backup.20261008T123456', 'x'.repeat(3_600_000))
+  render(<App />)
+  const w = screen.getByText(/está casi lleno \(aprox\. 72 %\)/)
+  expect(w.textContent).toContain('Incluye 1 copia de datos dañados')
+  expect(btn('Exportar copia')).toBeTruthy()
 })

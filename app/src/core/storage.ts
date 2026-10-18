@@ -278,6 +278,36 @@ export function loadAll(store: Store = localStorage, now = new Date()): Loaded {
   return { events, custom, gym, food, problems }
 }
 
+export const STORAGE_QUOTA = 5_000_000 // caracteres; ponytail: estimado, la cuota real de localStorage no se puede consultar y la comparten otras apps del mismo origen
+export const USAGE_WARN = 0.7
+export type Usage = {
+  total: number       // suma de todo lo de abajo (solo claves life-rpg-*)
+  data: number        // life-rpg-demo-v1, -custom-v1, -gym-v1, -food-v1
+  backups: number     // <clave>.backup.last y <clave>.backup.prev
+  sealed: number      // <clave>.backup.<AAAAMMDDTHHMMSS> (copias de datos dañados, no se purgan: D3)
+  sealedCount: number
+  device: number      // resto de life-rpg-*: meta, voz, clave de IA, memoria de frases, privacidad de Comida
+}
+const SEALED = /\.backup\.\d{8}T\d{6}$/ // mismo sello que loadAll
+const INTERNAL = /\.backup\.(?:last|prev)$/
+export function storageUsage(store: Pick<Storage, 'length' | 'key' | 'getItem'> = localStorage): Usage | null {
+  try {
+    const u: Usage = { total: 0, data: 0, backups: 0, sealed: 0, sealedCount: 0, device: 0 }
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i)
+      if (k === null || !k.startsWith('life-rpg-')) continue
+      const n = k.length + (store.getItem(k)?.length ?? 0)
+      if (SEALED.test(k)) { u.sealed += n; u.sealedCount++ }
+      else if (INTERNAL.test(k)) u.backups += n
+      else if (k === KEY || k === CUSTOM_KEY || k === GYM_KEY || k === FOOD_KEY) u.data += n
+      else u.device += n
+    }
+    u.total = u.data + u.backups + u.sealed + u.device
+    return u
+  } catch { return null }
+}
+export const usageWarn = (u: Usage): boolean => u.total >= USAGE_WARN * STORAGE_QUOTA
+
 // true = escrito; false = setItem lanzó (cuota, modo privado…); null = clave bloqueada, no se intenta (lo avisa noticeFor)
 export const saveEvents = (e: ActivityEvent[], store: Store = localStorage): boolean | null => {
   if (locked.has(KEY)) return null
@@ -293,7 +323,7 @@ export const saveGym = (g: GymData, store: Store = localStorage): boolean | null
   try { store.setItem(GYM_KEY, JSON.stringify(g)); return true } catch { return false }
 }
 
-// ponytail: ~200 B por entrada y ~10 al día → ~0,7 MB al año; con el resto de claves, el límite de localStorage (~5 MB) llega a los ~5 años. El fallo se avisa con SaveFailBanner.
+// ponytail: ~170 caracteres por entrada de comida y ~10 al día → ~0,6 M al año; `.backup.last/.prev` pueden triplicarlo tras importar o borrar: con uso intenso de Comida el límite (~5 M) llega en ~3 años. `storageUsage` lo mide y «Tus datos» avisa al 70 %; el fallo sigue avisándose con SaveFailBanner.
 export const saveFood = (d: FoodData, store: Store = localStorage): boolean | null => {
   if (locked.has(FOOD_KEY)) return null
   try { store.setItem(FOOD_KEY, JSON.stringify(d)); return true } catch { return false }

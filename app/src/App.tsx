@@ -6,7 +6,7 @@ import { mergeBackup } from './core/merge'
 import { branchWeekly, clampAmount, localDate, todaySummary, undoneIds } from './core/stats'
 import { EXERCISES, GYM_TRACKER, allExercises, autoSession, beaten, ensureAuto, exerciseName, recordText, retractAuto, liveSets, setDays, gymDay, undoMany } from './core/gym'
 import { DIET_TRACKER, dietActive, dietDays, dietSync, withDiet } from './core/food'
-import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadFoodPrivacy, saveFoodPrivacy, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, unlockStorage, type LoadProblem } from './core/storage'
+import { EMPTY_CUSTOM, EMPTY_FOOD, EMPTY_GYM, backupCurrent, backupDue, exportBackup, hasLastBackup, isDataKey, loadAll, loadLastExport, loadVoicePrefs, saveVoicePrefs, loadFoodPrivacy, saveFoodPrivacy, loadAiKey, hasAiKeyEntry, saveAiKey, clearAiKey, readAiKey, loadMemo, saveMemo, clearMemo, META_KEY, parseBackup, readLast, requestPersist, lockStorage, restoreLast, saveCustom, saveEvents, saveGym, saveLastExport, storageUsage, unlockStorage, type LoadProblem } from './core/storage'
 import { useFood, foodCount } from './useFood'
 import { forget, learn } from './core/memory'
 import { fetchOff } from './core/off'
@@ -125,6 +125,10 @@ export default function App() {
   useEffect(() => { const ok = saveCustom(custom); if (ok !== null) setUnsaved(u => (u.custom === !ok ? u : { ...u, custom: !ok })) }, [custom])
   // oxlint-disable-next-line react/set-state-in-effect -- ver ponytail
   useEffect(() => { const ok = saveGym(gym); if (ok !== null) setUnsaved(u => (u.gym === !ok ? u : { ...u, gym: !ok })) }, [gym])
+  const [usage, setUsage] = useState(() => storageUsage())
+  // ponytail: con >3 MB, medir solo al entrar en Inicio (getItem copia cadenas grandes); hoy se mide también tras cada guardado hecho en Inicio.
+  // oxlint-disable-next-line react/set-state-in-effect -- medir tras guardar (mismo patrón que los efectos de guardado)
+  useEffect(() => { if (screen === 'home') setUsage(storageUsage()) }, [screen, events, custom, gym, food])
   const saveFailed = unsaved.events || unsaved.custom || unsaved.gym || foodUnsaved
   // ponytail: si dos pestañas escriben en menos tiempo del que tarda en llegar el evento `storage`, la última escritura pisa a la otra.
   // Cerrarlo de verdad exige fusionar eventos o Web Locks.
@@ -466,7 +470,7 @@ export default function App() {
   return (
     <>
       {screen === 'home' && (
-        <HomeView game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} foodToday={foodToday} onOpenFood={() => openFood('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
+        <HomeView usage={usage} game={game} summary={summary} gymToday={gymToday} onOpenGym={() => openGym('home')} foodToday={foodToday} onOpenFood={() => openFood('home')} focusHoy={focusHoy} onCapture={openCapture} onWriteNew={() => openManual()} weeks={weeks} partyStates={partyStates} archived={archived} onUnarchive={unarchive} onNavigate={goTo} onAdd={t => add(t, t.increment)} onUndo={undo}
           onOpenParty={id => { setPartyId(id); go('party') }} onReset={reset} onLoadExample={events.length === 0 ? loadExample : undefined} onRestore={canRestore ? restore : undefined}
           onExport={exportData} onImport={importData} onMerge={mergeData} onImportError={() => setNotice('No se pudo leer el archivo.')} copy={copy}
           notice={notice} saveFailed={saveFailed} onDismissNotice={() => setNotice(null)} />

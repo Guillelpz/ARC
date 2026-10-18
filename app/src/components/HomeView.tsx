@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { ArchiveRestore, ChevronRight, CircleAlert, Download, Flame, Merge, Mic, Moon, Plus, RotateCcw, Shield, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import type { ActivityEvent, Branch, BranchWeek, GameState, GymDay, PartyState, TodaySummary, Tracker } from '../core/types'
-import type { CopyStatus } from '../core/storage'
+import { STORAGE_QUOTA, usageWarn, type CopyStatus, type Usage } from '../core/storage'
 import type { Screen } from './BottomNav'
 import { weeklyXp } from '../core/rpg'
 import { unitFor } from '../core/trackers'
@@ -38,6 +38,7 @@ type Props = {
   onMerge: (text: string) => void
   onImportError: () => void
   copy: CopyStatus
+  usage: Usage | null
   notice: string | null
   saveFailed: boolean
   onDismissNotice: () => void
@@ -76,7 +77,10 @@ function TodayList({ rows, onGo }: { rows: { t: Tracker; text: string; action?: 
 const BAR = { hero: 'bg-hero', villain: 'bg-villain-bg' }
 const BAR_CUR = { hero: 'min-h-1 border-2 border-dashed border-hero', villain: 'min-h-1 border-2 border-dashed border-villain-bg' }
 
-export function HomeView({ game, summary, gymToday, onOpenGym, foodToday, onOpenFood, focusHoy, onCapture, onWriteNew, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, notice, saveFailed, onDismissNotice }: Props) {
+const mb = (n: number) => n < 100_000 ? '< 0,1 MB' : (n / 1e6).toFixed(1).replace('.', ',') + ' MB'
+const usagePct = (u: Usage) => { const p = Math.round(u.total / STORAGE_QUOTA * 100); return u.total > 0 && p === 0 ? '< 1' : String(p) }
+
+export function HomeView({ game, summary, gymToday, onOpenGym, foodToday, onOpenFood, focusHoy, onCapture, onWriteNew, weeks, partyStates, archived, onUnarchive, onNavigate, onAdd, onUndo, onOpenParty, onReset, onLoadExample, onRestore, onExport, onImport, onMerge, onImportError, copy, usage, notice, saveFailed, onDismissNotice }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const mode = useRef<'replace' | 'merge'>('replace')
   const hoyRef = useRef<HTMLHeadingElement>(null)
@@ -285,6 +289,20 @@ export function HomeView({ game, summary, gymToday, onOpenGym, foodToday, onOpen
                 {copy.days === null ? 'Tus datos se guardan solo en este navegador.'
                   : copy.days === 0 ? 'Última copia: hoy.'
                   : `Última copia: hace ${copy.days} ${copy.days === 1 ? 'día' : 'días'}.`}
+              </p>
+            )}
+            {usage && (
+              <p className="text-xs leading-5 text-app-muted">
+                Espacio usado: aprox. {mb(usage.total)} de ~5 MB ({usagePct(usage)} %). Orientativo: el navegador no deja consultar su límite y lo comparten otras apps del mismo dominio.
+              </p>
+            )}
+            {usage && usageWarn(usage) && (
+              <p className="flex items-start gap-2 text-sm leading-6 text-app-text">
+                <CircleAlert className="mt-1 size-4 shrink-0" aria-hidden />
+                <span>
+                  El espacio de este navegador está casi lleno (aprox. {usagePct(usage)} %). Exporta una copia ahora: si se llena, lo que apuntes dejará de guardarse.
+                  {usage.sealedCount > 0 && ` Incluye ${usage.sealedCount} ${usage.sealedCount === 1 ? 'copia' : 'copias'} de datos dañados (aprox. ${mb(usage.sealed)}) que solo se borran desde las herramientas del navegador.`}
+                </span>
               </p>
             )}
             <p className="text-xs leading-5 text-app-muted">En iPhone y iPad, la app añadida a la pantalla de inicio guarda sus datos aparte de Safari: exporta una copia aquí e impórtala en la app.</p>
