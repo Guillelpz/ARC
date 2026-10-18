@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from 'vitest'
-import { FOOD_PRIVACY_KEY, loadFoodPrivacy, saveFoodPrivacy, MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, EMPTY_FOOD, FOOD_KEY, GYM_KEY, readFood, saveFood, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
+import { storageUsage, usageWarn, FOOD_PRIVACY_KEY, loadFoodPrivacy, saveFoodPrivacy, MEMO_KEY, loadMemo, saveMemo, clearMemo, AI_KEY, VOICE_KEY, loadAiKey, loadVoicePrefs, readAiKey, saveAiKey, clearAiKey, saveVoicePrefs, EMPTY_CUSTOM, EMPTY_GYM, EMPTY_FOOD, FOOD_KEY, GYM_KEY, readFood, saveFood, isDataKey, readGym, saveGym, backupCurrent, backupDue, exportAge, exportBackup, hasLastBackup, loadAll, loadLastExport, parseBackup, parseCustom, readCustom, readEvents, readLast, restoreLast, saveCustom, saveEvents, saveLastExport, unlockStorage } from './storage'
 import { SEED_EVENTS } from './seed'
 
 describe('readEvents', () => {
@@ -580,5 +580,29 @@ describe('avisos de privacidad de Comida (32.2)', () => {
     expect([...s.m.keys()].filter(k => k.includes('backup')).every(k => !k.includes('food-privacy'))).toBe(true)
     const text = exportBackup([good], EMPTY_CUSTOM, 'x', EMPTY_GYM)
     expect(text).not.toContain('food-privacy'); expect(text).not.toContain('"off"')
+  })
+})
+
+describe('storageUsage (ciclo 40)', () => {
+  const store = (init: Record<string, string>, getItem?: (k: string) => string | null) => {
+    const keys = Object.keys(init)
+    return { length: keys.length, key: (i: number) => keys[i] ?? null, getItem: getItem ?? ((k: string) => init[k] ?? null) }
+  }
+  const init = { 'life-rpg-demo-v1': '[]', 'life-rpg-food-v1.backup.last': 'abc', 'life-rpg-food-v1.backup.20261008T123456': 'xyz', 'life-rpg-ai-key-v1': 'sk', 'otra-app': 'zzzz' }
+  const len = (k: keyof typeof init) => k.length + init[k].length
+  test('ST-U1: clasifica', () => {
+    const data = len('life-rpg-demo-v1'), backups = len('life-rpg-food-v1.backup.last'), sealed = len('life-rpg-food-v1.backup.20261008T123456'), device = len('life-rpg-ai-key-v1')
+    expect(storageUsage(store(init))).toEqual({ data, backups, sealed, sealedCount: 1, device, total: data + backups + sealed + device })
+  })
+  test('ST-U2: ignora claves ajenas', () => {
+    expect(storageUsage(store({ 'otra-app': 'zzzz' }))?.total).toBe(0)
+  })
+  test('ST-U3: umbral de usageWarn', () => {
+    const u = storageUsage(store({}))!
+    expect(usageWarn({ ...u, total: 3_500_000 })).toBe(true)
+    expect(usageWarn({ ...u, total: 3_499_999 })).toBe(false)
+  })
+  test('ST-U4: getItem que lanza → null', () => {
+    expect(storageUsage(store(init, () => { throw new Error('x') }))).toBeNull()
   })
 })

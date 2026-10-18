@@ -5,7 +5,7 @@ import { addDays, byRecent, clampAmount, dayTotal, daysLeftInWeek, branchWeekly,
 import { deriveGame, diffLevelDowns, diffLevelUps, weeklyXp } from './rpg'
 import { buildRanking, countsIn, derivePartyState, overtakes, PARTIES, partyCriteria, proposeTo, rankScore, vote } from './party'
 import { buttonLabel, classify, createTracker, editTracker, exactTracker, findSimilar, isDuplicateName, isValidName, trackerName } from './classify'
-import { FOOD_PRIVACY_KEY, exportBackup, isDataKey, loadFoodPrivacy, parseBackup, parseCustom, readFood, readGym, saveFoodPrivacy } from './storage'
+import { FOOD_PRIVACY_KEY, storageUsage, usageWarn, exportBackup, isDataKey, loadFoodPrivacy, parseBackup, parseCustom, readFood, readGym, saveFoodPrivacy } from './storage'
 import { mergeBackup } from './merge'
 import { ALIASES, draftText, fromAI, isComplete, matchExercise, normalizeVoice, parseGym, pickDraft, type GymDraft } from './voice'
 import { MEMO_MAX, forget, learn, localCapture, memoKey, readMemo, recall, type Memo } from './memory'
@@ -688,6 +688,18 @@ export function runSelfCheck() {
         ['corrí 5 km', 'comí una hamburguesa', 'drank 3 beers', 'cómics 10 páginas', 'fui al gimnasio'].every(sure) &&
         ranOut.kind === 'tracker' && ranOut.trackerId === 'running' &&
         localCapture('ate a burguer', { ...ctx, memo: cvMemo }).done && localCapture('burguer', { ...ctx, memo: cvMemo }).done, 'CV14 deviceSure sin palabras ajenas')
+    }
+    // SU1 — storageUsage
+    {
+      const init: Record<string, string> = { 'life-rpg-demo-v1': '[]', 'life-rpg-food-v1.backup.last': 'abc', 'life-rpg-food-v1.backup.20261008T123456': 'xyz', 'life-rpg-ai-key-v1': 'sk', 'otra-app': 'zzzz' }
+      const keys = Object.keys(init)
+      const fake = { length: keys.length, key: (i: number) => keys[i] ?? null, getItem: (k: string) => init[k] ?? null }
+      const L = (k: string) => k.length + init[k].length
+      const u = storageUsage(fake)
+      const boom = { length: 1, key: (): string | null => { throw new Error('x') }, getItem: () => null }
+      ok(u !== null && u.data === L('life-rpg-demo-v1') && u.backups === L('life-rpg-food-v1.backup.last') && u.sealed === L('life-rpg-food-v1.backup.20261008T123456') &&
+        u.device === L('life-rpg-ai-key-v1') && u.sealedCount === 1 && u.total === u.data + u.backups + u.sealed + u.device && storageUsage(boom) === null &&
+        usageWarn({ ...u, total: 3_500_000 }) && !usageWarn({ ...u, total: 3_499_999 }), 'SU1 storageUsage')
     }
     // MC1–MC5 — memoria de frases
     {
