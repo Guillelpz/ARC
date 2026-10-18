@@ -95,7 +95,7 @@ Una sola pasada, ordenada por tiempo de prueba. El usuario la hizo en iPhone el 
 
 ### 3. Captura del «+» (ciclo 27)
 
-- [ ] «Read 50 pages…» → Reading +100 min; «ate a burguer» → Burgers +1; «grounding 30 min» → tarjeta de propuesta; «ayer…» → aviso.
+- [ ] «Read 50 pages…» → Reading +100 min; «ate a burguer» → Burgers +1 **con clave**; sin clave, «¿Apuntar en Burgers?» → «Apuntar» → Burgers +1; «I ran out of milk» sin clave → tarjeta «¿Apuntar en Running?», nada guardado hasta «Apuntar»; «grounding 30 min» → tarjeta de propuesta; «ayer…» → aviso.
 - [ ] Con clave, una propuesta de confianza «alta» con cuenta atrás de 10 s.
 
 ### 4. Comida por voz (ciclos 36-38)
