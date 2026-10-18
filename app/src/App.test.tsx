@@ -926,6 +926,7 @@ test('U-V1 Copiar resumen: copia el resumen sin la clave', async () => {
     expect(txt).toContain(navigator.userAgent)
     for (const k of ['Reconocimiento:', '80 kilos press banca 5 repeticiones', 'KEYBOARD_ON_IOS']) expect(txt).toContain(k)
     expect(txt).not.toContain('sk-ant-test-XYZ')
+    expect(txt).not.toMatch(/sk-ant-/)
   } finally { voiceCleanup() }
 })
 
@@ -1456,18 +1457,20 @@ test('U-M2 Deshacer olvida la frase y la siguiente vuelve a llamar a fetch', asy
   } finally { vi.unstubAllGlobals() }
 })
 
-test('U-M3 «Borrar todo» vacía la memoria y conserva la clave de IA; la copia no los lleva', () => {
+test('U-M3 «Borrar todo» vacía la memoria y conserva la clave de IA; la copia no los lleva', async () => {
   localStorage.setItem('life-rpg-ai-key-v1', KEY2)
   localStorage.setItem(MEMO, JSON.stringify({ v: 1, entries: [{ k: 'maquina piernas', kind: 'gym', id: 'leg-press' }] }))
   render(<App />)
   fireEvent.click(btn('Cargar ejemplo'))
-  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(false).mockReturnValueOnce(true)
+  fireEvent.click(btn('Exportar copia'))
+  const blob = vi.mocked(URL.createObjectURL).mock.calls[0][0] as Blob
+  const text = await blob.text()
+  expect(text).not.toContain(KEY2); expect(text).not.toContain('maquina'); expect(text).not.toContain('life-rpg-capture-memo-v1')
+  const confirm = vi.mocked(window.confirm).mockReturnValueOnce(true) // tras exportar la copia ya no es antigua: solo queda la confirmación del borrado
   fireEvent.click(btn('Borrar todo'))
   expect(confirm).toHaveBeenCalled()
   expect(localStorage.getItem(MEMO)).toBeNull()
   expect(localStorage.getItem('life-rpg-ai-key-v1')).toBe(KEY2)
-  const text = exportBackup([], { trackers: [], proposals: [] } as never, 'x')
-  expect(text).not.toContain(KEY2); expect(text).not.toContain('maquina')
 })
 
 // --- Comida (ciclo 29) ---

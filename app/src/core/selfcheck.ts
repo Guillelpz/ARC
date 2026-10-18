@@ -741,6 +741,8 @@ export function runSelfCheck() {
       ok(a.done && a.cmd.kind === 'other-day' && b.done && b.cmd.source === 'parser' && !c.done && c.cmd.source === 'parser' &&
         d.done && d.cmd.source === 'memory' && d.cmd.kind === 'tracker' && d.cmd.trackerId === 'burgers' && d.cmd.amount === 1 &&
         !e.done && e.cmd.source === 'memory' && !f2.done && f2.cmd.source === 'parser', 'MC5 localCapture')
+      // MC6 (ciclo 40) — número pegado a la unidad
+      ok(memoKey('máquina de piernas 100kg 10') === 'maquina piernas' && memoKey('press banca 80kg 5') === memoKey('press banca 80 kg 5') && memoKey('3x5 press banca') === 'press banca', 'MC6 memoKey con número pegado')
     }
     // CV6 (combinación) y CV8 — captureFromAI
     {
